@@ -1,3 +1,4 @@
 name: ericdahl.github.io
 markdown: redcarpet
 pygments: true
+safe: true
