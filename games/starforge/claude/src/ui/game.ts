@@ -355,6 +355,10 @@ export class Game {
       return;
     }
     this.box = null;
+    if (Math.hypot(x1 - x0, y1 - y0) < 12) {
+      this.tap(x1, y1, false, shift);
+      return;
+    }
     const a = this.worldAt(Math.min(x0, x1), Math.min(y0, y1));
     const b = this.worldAt(Math.max(x0, x1), Math.max(y0, y1));
     const inBox = this.world.list.filter(

@@ -30,6 +30,8 @@ export class Renderer {
   private fog: HTMLCanvasElement;
   private fogCtx: CanvasRenderingContext2D;
   private fogImg: ImageData;
+  /** Crystal sprites keyed by remaining-amount level; glow is expensive to draw live on mobile. */
+  private sprites = new Map<number, HTMLCanvasElement>();
   dpr = 1;
 
   constructor(
@@ -236,39 +238,13 @@ export class Renderer {
   private drawResource(e: Entity, t: number) {
     const ctx = this.ctx;
     if (e.kind === 'crystal') {
-      const frac = 0.55 + 0.45 * (e.amount / RESOURCES.crystal.amount);
-      const shards = [
-        [-0.55, 0.25, 0.35, 0.75, -0.2],
-        [-0.1, 0.3, 0.42, 1.0, 0.1],
-        [0.45, 0.25, 0.32, 0.7, 0.25],
-        [0.15, 0.35, 0.25, 0.5, -0.35],
-      ];
-      ctx.save();
-      ctx.translate(e.x, e.y);
-      ctx.shadowColor = CRYSTAL;
-      ctx.shadowBlur = 10;
-      for (let i = 0; i < shards.length; i++) {
-        const [sx, sy, sw, sh, rot] = shards[i];
-        ctx.save();
-        ctx.translate(sx, sy);
-        ctx.rotate(rot);
-        const hgt = sh * frac;
-        const g = ctx.createLinearGradient(0, -hgt, 0, 0);
-        g.addColorStop(0, '#e8fdff');
-        g.addColorStop(0.5, i % 2 ? '#56c9ff' : '#9b7cff');
-        g.addColorStop(1, '#1d3c8a');
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.moveTo(-sw / 2, 0);
-        ctx.lineTo(-sw / 3, -hgt * 0.7);
-        ctx.lineTo(0, -hgt);
-        ctx.lineTo(sw / 3, -hgt * 0.7);
-        ctx.lineTo(sw / 2, 0);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
+      const level = Math.max(1, Math.ceil((e.amount / RESOURCES.crystal.amount) * 4));
+      let sprite = this.sprites.get(level);
+      if (!sprite) {
+        sprite = crystalSprite(level / 4);
+        this.sprites.set(level, sprite);
       }
-      ctx.restore();
+      ctx.drawImage(sprite, e.x - CRYSTAL_BOX.x, e.y - CRYSTAL_BOX.y, CRYSTAL_BOX.w, CRYSTAL_BOX.h);
     } else {
       ctx.save();
       ctx.translate(e.x, e.y);
@@ -703,6 +679,48 @@ export class Renderer {
       ctx.stroke();
     }
   }
+}
+
+const CRYSTAL_BOX = { x: 1.2, y: 1.5, w: 2.4, h: 2.3 };
+const SPRITE_PX = 48;
+
+function crystalSprite(amountFrac: number): HTMLCanvasElement {
+  const cv = document.createElement('canvas');
+  cv.width = Math.ceil(CRYSTAL_BOX.w * SPRITE_PX);
+  cv.height = Math.ceil(CRYSTAL_BOX.h * SPRITE_PX);
+  const ctx = cv.getContext('2d')!;
+  ctx.setTransform(SPRITE_PX, 0, 0, SPRITE_PX, CRYSTAL_BOX.x * SPRITE_PX, CRYSTAL_BOX.y * SPRITE_PX);
+  const frac = 0.55 + 0.45 * amountFrac;
+  const shards = [
+    [-0.55, 0.25, 0.35, 0.75, -0.2],
+    [-0.1, 0.3, 0.42, 1.0, 0.1],
+    [0.45, 0.25, 0.32, 0.7, 0.25],
+    [0.15, 0.35, 0.25, 0.5, -0.35],
+  ];
+  ctx.shadowColor = CRYSTAL;
+  ctx.shadowBlur = 10;
+  for (let i = 0; i < shards.length; i++) {
+    const [sx, sy, sw, sh, rot] = shards[i];
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(rot);
+    const hgt = sh * frac;
+    const g = ctx.createLinearGradient(0, -hgt, 0, 0);
+    g.addColorStop(0, '#e8fdff');
+    g.addColorStop(0.5, i % 2 ? '#56c9ff' : '#9b7cff');
+    g.addColorStop(1, '#1d3c8a');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(-sw / 2, 0);
+    ctx.lineTo(-sw / 3, -hgt * 0.7);
+    ctx.lineTo(0, -hgt);
+    ctx.lineTo(sw / 3, -hgt * 0.7);
+    ctx.lineTo(sw / 2, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  return cv;
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {

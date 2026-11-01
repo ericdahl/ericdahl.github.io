@@ -297,11 +297,7 @@ export class Hud {
   }
 
   toast(msg: string, kind: 'info' | 'error' | 'alert', seconds = 2.5, onClick?: () => void) {
-    const last = this.toasts.lastElementChild as HTMLElement | null;
-    if (last && last.dataset.msg === msg) {
-      last.dataset.t = String(performance.now());
-      return;
-    }
+    for (const el of this.toasts.children) if ((el as HTMLElement).dataset.msg === msg && !el.classList.contains('out')) return;
     const t = document.createElement('div');
     t.className = `toast ${kind}`;
     t.textContent = msg;
@@ -311,7 +307,7 @@ export class Hud {
       t.addEventListener('click', onClick);
     }
     this.toasts.appendChild(t);
-    while (this.toasts.children.length > 3) this.toasts.firstElementChild!.remove();
+    while (this.toasts.children.length > 2) this.toasts.firstElementChild!.remove();
     setTimeout(() => {
       t.classList.add('out');
       setTimeout(() => t.remove(), 400);
