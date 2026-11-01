@@ -8,7 +8,9 @@ test('mid-game snapshot with AI on both sides', async ({ page }, info) => {
   await page.waitForFunction(() => !!(window as any).game);
   await page.evaluate(async () => {
     const g = (window as any).game;
-    const { AIController } = await import('/src/game/ai.ts');
+    // Loaded from the Vite dev server inside the page, not from Node.
+    const aiModule = '/src/game/ai.ts';
+    const { AIController } = await import(/* @vite-ignore */ aiModule);
     const me = new AIController(g.world, 1, 'normal');
     g.paused = true;
     for (let i = 0; i < 20 * 400; i++) {
