@@ -17,6 +17,7 @@ Open http://localhost:5173. No install step is required.
 - Use the command bar to train units, switch to attack-move, or select all combat units.
 - Drag the battlefield with two fingers to pan on touchscreens. Use the minimap to jump around the map.
 - Keyboard: `A` attack-move, `S` stop, `1` select army, `Esc` cancel command.
+- Tap **∞ CHEAT** in the top bar, or press `F`, to toggle infinite flux. Unit supply limits still apply.
 
 ## Tests
 

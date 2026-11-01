@@ -44,3 +44,16 @@ test('first hostile reinforcement allows time to establish an economy', () => {
   advance(game,1.1);
   assert.equal(game.units.filter(u=>u.side==='enemy').length,startingEnemies+1);
 });
+
+test('infinite flux permits training without spending flux and can be turned off', () => {
+  const game=createGame();game.flux=0;
+  game.infiniteFlux=true;
+  assert.equal(canTrain(game,'tank'),true);
+  assert.equal(train(game,'tank'),true);
+  assert.equal(game.flux,0);
+  game.infiniteFlux=false;
+  assert.equal(canTrain(game,'worker'),false);
+  game.infiniteFlux=true;
+  game.supplyCap=supplyUsed(game);
+  assert.equal(canTrain(game,'worker'),false);
+});

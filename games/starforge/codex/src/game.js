@@ -10,7 +10,7 @@ const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const clamp = (n, low, high) => Math.max(low, Math.min(high, n));
 export function createGame() {
   nextId = 1;
-  const game = { time: 0, flux: 240, supplyCap: 24, selected: [], units: [], bases: [], crystals: [], shots: [], sparks: [], queue: [], enemyClock: -6, status: 'playing', message: 'Secure the nearby flux field, then build your army.', messageUntil: 8 };
+  const game = { time: 0, flux: 240, infiniteFlux: false, supplyCap: 24, selected: [], units: [], bases: [], crystals: [], shots: [], sparks: [], queue: [], enemyClock: -6, status: 'playing', message: 'Secure the nearby flux field, then build your army.', messageUntil: 8 };
   game.bases.push({ id: nextId++, side: 'player', x: 285, y: 505, radius: 64, hp: 1100, maxHp: 1100, name: 'Frontier Forge' });
   game.bases.push({ id: nextId++, side: 'enemy', x: 1320, y: 490, radius: 64, hp: 1100, maxHp: 1100, name: 'Hostile Forge' });
   [[505,290],[560,340],[485,390],[558,640],[480,710],[780,190],[820,270],[810,735],[860,815],[1060,310],[1100,390],[1060,680],[1140,740]].forEach(([x,y], i) => game.crystals.push({ id: nextId++, x, y, amount: i < 5 ? 440 : 310, radius: 23 }));
@@ -27,10 +27,10 @@ export function spawn(game, type, side, x, y) {
   return unit;
 }
 export function supplyUsed(game) { return game.units.filter(u => u.side === 'player' && u.hp > 0).reduce((n,u) => n + UNIT[u.type].supply, 0) + game.queue.reduce((n,q) => n + UNIT[q.type].supply, 0); }
-export function canTrain(game, type) { return game.status === 'playing' && !!UNIT[type] && game.flux >= COST[type] && supplyUsed(game) + UNIT[type].supply <= game.supplyCap; }
+export function canTrain(game, type) { return game.status === 'playing' && !!UNIT[type] && (game.infiniteFlux || game.flux >= COST[type]) && supplyUsed(game) + UNIT[type].supply <= game.supplyCap; }
 export function train(game, type) {
   if (!canTrain(game, type)) return false;
-  game.flux -= COST[type];
+  if (!game.infiniteFlux) game.flux -= COST[type];
   game.queue.push({ type, remaining: UNIT[type].build, total: UNIT[type].build });
   return true;
 }
