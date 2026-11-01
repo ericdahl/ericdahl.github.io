@@ -133,7 +133,7 @@ function damageEnemy(game, enemy, amount, source = 'hit') {
   game.effects.push({ type: 'hit', x: enemy.x, y: enemy.y, age: 0, color: source === 'skill' ? '#ff9a42' : '#e6d1a2' });
   if (enemy.hp > 0) return;
   game.kills++; const p = game.player; p.xp += enemy.xp;
-  if (enemy.kind === 'boss') { game.won = true; game.pendingFloor = true; event(game, 'AZRATH HAS FALLEN. The forge is yours.', 'victory'); game.drops.push({ x: enemy.x, y: enemy.y, type: 'item', item: makeItem(game, 'weapon'), age: 0 }); game.drops.push({ x: enemy.x + .5, y: enemy.y, type: 'potion', age: 0 }); }
+  if (enemy.kind === 'boss') { game.won = true; game.pendingFloor = true; const trophy = makeItem(game, 'weapon'); trophy.rarity = 'rare'; if (p.inventory.length < 18) { p.inventory.push(trophy); event(game, `Victory reward: ${trophy.name}`, 'loot'); } else game.drops.push({ x: enemy.x, y: enemy.y, type: 'item', item: trophy, age: 0 }); p.potions = Math.min(9, p.potions + 1); event(game, 'AZRATH HAS FALLEN. The forge is yours.', 'victory'); }
   else if (game.rng() < (enemy.elite ? .86 : .22)) game.drops.push({ x: enemy.x, y: enemy.y, type: 'item', item: makeItem(game), age: 0 });
   else if (game.rng() < .22) game.drops.push({ x: enemy.x, y: enemy.y, type: 'potion', age: 0 });
   const gold = 3 + Math.floor(game.rng() * 8) + game.floor * 2; game.gold += gold;

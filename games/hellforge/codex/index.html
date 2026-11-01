@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#090b0e">
+  <meta name="description" content="Hellforge: a dark fantasy action RPG of steel, sorcery, and cursed loot.">
+  <title>Hellforge</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main id="game-shell">
+    <canvas id="world" aria-label="Hellforge game world"></canvas>
+    <div id="vignette" aria-hidden="true"></div>
+    <div id="hud" class="hidden">
+      <div class="hud-top">
+        <div class="vitals panel">
+          <div class="portrait" id="portrait"><span>⚔</span></div>
+          <div class="vital-lines">
+            <div class="character-line"><span id="hero-name">IRON WARDEN</span><span id="hero-level">LVL 1</span></div>
+            <div class="meter hp"><div id="hp-fill"></div><span id="hp-label">128 / 128</span></div>
+            <div class="meter mana"><div id="mana-fill"></div><span id="mana-label">48 / 48</span></div>
+            <div class="xp-track"><div id="xp-fill"></div></div>
+          </div>
+        </div>
+        <div class="quest panel"><span class="eyebrow">ACT I · ASHEN RUINS</span><strong id="quest-title">The Tyrant's Forge</strong><span id="quest-detail">Find and slay Azrath</span></div>
+        <div class="map-wrap panel"><canvas id="minimap" width="152" height="152" aria-label="Dungeon minimap"></canvas><span id="floor-label">DEPTH I</span></div>
+      </div>
+      <div id="message-log" aria-live="polite"></div>
+      <div class="hud-bottom">
+        <div class="stat-chip"><span class="gold-icon">◆</span><span id="gold-label">0</span><span class="divider">/</span><span id="kills-label">0 slain</span></div>
+        <div class="hotbar panel">
+          <button class="action-slot" id="potion-button" aria-label="Drink potion"><span class="slot-key">SPACE</span><span class="slot-icon potion-icon">✚</span><span class="slot-label">Potion <b id="potion-count">5</b></span></button>
+          <button class="action-slot" id="skill-button" aria-label="Use class skill"><span class="slot-key">1</span><span class="slot-icon skill-icon" id="skill-icon">✦</span><span class="slot-label" id="skill-name">Cleave</span><span class="cooldown" id="skill-cooldown"></span></button>
+          <button class="action-slot" id="inventory-button" aria-label="Open inventory"><span class="slot-key">I</span><span class="slot-icon">▣</span><span class="slot-label">Inventory</span></button>
+        </div>
+        <div class="control-hint">WASD / MOVE · CLICK / ATTACK · 1 / SKILL</div>
+      </div>
+      <div class="mobile-controls" id="mobile-controls">
+        <div id="joystick" aria-label="Movement joystick"><div id="joystick-knob"></div></div>
+        <div class="mobile-actions"><button id="mobile-potion" aria-label="Drink potion"><span>✚</span><small>POTION</small></button><button id="mobile-skill" aria-label="Use skill"><span>✦</span><small>SKILL</small></button><button id="mobile-attack" aria-label="Attack"><span>⚔</span><small>ATTACK</small></button></div>
+      </div>
+    </div>
+    <section id="start-screen" class="screen">
+      <div class="start-backdrop" aria-hidden="true"><div class="sigil"><div class="sigil-inner">✦</div></div></div>
+      <div class="start-content">
+        <div class="overline">A DARK FANTASY ACTION RPG</div>
+        <h1>HELL<span>FORGE</span></h1>
+        <p class="tagline">Steel your heart. Descend into the fire.</p>
+        <div class="title-rule"><span>✦</span></div>
+        <div class="class-prompt">CHOOSE YOUR PATH</div>
+        <div class="class-list" id="class-list">
+          <button class="class-card selected" data-class="knight"><span class="class-glyph">⚔</span><span><strong>IRON WARDEN</strong><small>Blade & bulwark</small></span><span class="class-arrow">›</span></button>
+          <button class="class-card" data-class="ranger"><span class="class-glyph">➶</span><span><strong>DUSK HUNTER</strong><small>Bow & shadow</small></span><span class="class-arrow">›</span></button>
+          <button class="class-card" data-class="mage"><span class="class-glyph">✦</span><span><strong>EMBER SEER</strong><small>Fire & storm</small></span><span class="class-arrow">›</span></button>
+        </div>
+        <button id="start-button" class="primary-button">ENTER THE RUINS <span>→</span></button>
+        <button id="continue-button" class="text-button hidden">CONTINUE YOUR JOURNEY</button>
+        <p class="start-note">Desktop: WASD to move, hold click to attack · Mobile: drag to move, tap to strike</p>
+      </div>
+    </section>
+    <section id="inventory-panel" class="modal hidden" aria-label="Inventory">
+      <div class="modal-card inventory-card">
+        <div class="modal-head"><div><span class="eyebrow">YOUR LEGACY</span><h2>Inventory</h2></div><button class="close-button" id="close-inventory" aria-label="Close inventory">×</button></div>
+        <div class="character-summary" id="character-summary"></div>
+        <h3>EQUIPPED</h3><div class="equipment-grid" id="equipment-grid"></div>
+        <h3>SATCHEL <span id="bag-count"></span></h3><div class="bag-grid" id="bag-grid"></div>
+        <p class="inventory-tip">Tap an item to equip it. Walk over loot to collect it.</p>
+      </div>
+    </section>
+    <section id="end-screen" class="modal hidden" aria-label="Game result"><div class="modal-card end-card"><span class="eyebrow" id="end-eyebrow">THE FORGE AWAITS</span><h2 id="end-title">You have fallen</h2><p id="end-description"></p><div id="end-stats"></div><button class="primary-button" id="end-primary">TRY AGAIN <span>→</span></button><button class="text-button" id="end-secondary">NEW HERO</button></div></section>
+  </main>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
