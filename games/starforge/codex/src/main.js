@@ -3,7 +3,7 @@ import { WORLD, UNIT, COST, createGame, tick, train, canTrain, supplyUsed, entit
 const $ = id => document.getElementById(id);
 const canvas = $('gameCanvas'), ctx = canvas.getContext('2d');
 const minimap = $('minimap'), mini = minimap.getContext('2d');
-let game = createGame(), camera = {x: 560, y: 500, zoom: 1}, attackMode = false, paused = false;
+let game = createGame(), camera = {x: 425, y: 500, zoom: 1}, attackMode = false, paused = false;
 let width = 0, height = 0, scale = 1, drag = null, pointers = new Map(), lastFrame = performance.now();
 const stars = Array.from({length: 180}, (_,i) => ({x:(i*9973%1597), y:(i*7433%997), r:i%7===0?1.5:.7, a:.17+(i%5)*.07}));
 const debris = Array.from({length: 38}, (_,i) => ({x:(i*731%1550)+25,y:(i*431%950)+25,r:4+i%9,rot:i*.74}));
@@ -105,7 +105,7 @@ function updateUI(){
   if(game.status!=='playing'&&!$('overlay').dataset.finished){$('overlay').dataset.finished='1';showDialog(game.status==='victory'?'SECTOR SECURED':'FORGE LOST',game.status==='victory'?'The Ashen Reach is yours.':'Your frontier forge has fallen.',game.status==='victory'?'Your fleet destroyed the hostile forge. Ready for another command?':'Regroup, gather flux early, and defend your forge.', 'PLAY AGAIN', true);}
 }
 function showDialog(kicker,title,body,button,finished=false){$('dialogKicker').textContent=kicker;$('dialogTitle').textContent=title;$('dialogText').textContent=body;$('dialogButton').textContent=button;$('dialogTips').innerHTML=finished?'':'<ul><li>Tap a unit, then tap terrain to move it.</li><li>Send drones to glowing crystals to gather flux.</li><li>Train combat units and destroy the hostile forge.</li><li>Drag to select several units. Two-finger drag pans the field.</li></ul>';$('overlay').hidden=false;paused=true;}
-function closeDialog(){if($('overlay').dataset.finished){game=createGame();camera={x:560,y:500,zoom:1};delete $('overlay').dataset.finished;resize();} $('overlay').hidden=true;paused=false;lastFrame=performance.now();}
+function closeDialog(){if($('overlay').dataset.finished){game=createGame();camera={x:425,y:500,zoom:1};delete $('overlay').dataset.finished;resize();} $('overlay').hidden=true;paused=false;lastFrame=performance.now();}
 function showHint(text){game.message=text;game.messageUntil=game.time+4;$('hint').textContent=text;clearTimeout(showHint.timer);showHint.timer=setTimeout(()=>$('hint').textContent='Tap a unit to select · drag to select several',4500);}
 function issueAt(world){const target=entityAt(game,world.x,world.y);if(target?.side==='player'){select(game,[target.id]);return;}if(game.selected.length){if(command(game,world.x,world.y,target,attackMode)){attackMode=false;showHint(target?.amount!==undefined?'Drones gathering flux':target?.side==='enemy'?'Focus fire ordered':'Order confirmed');}}else if(target?.side==='enemy')showHint('Select your units first');}
 function pointerPosition(e){const r=canvas.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
