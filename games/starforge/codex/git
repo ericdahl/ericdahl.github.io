@@ -1,4 +1,0 @@
-#!/bin/sh
-# Git metadata lives in .repo because this workspace reserves the .git path.
-root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-exec git --git-dir="$root/.repo" --work-tree="$root" "$@"
