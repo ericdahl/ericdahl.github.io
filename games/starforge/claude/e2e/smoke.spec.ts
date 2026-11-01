@@ -42,6 +42,7 @@ test('menu starts a game and the HUD works', async ({ page, isMobile }, info) =>
   // Open the build menu and place a habitat.
   await page.evaluate(() => ((window as any).game.world.players[1].crystal = 500));
   await page.locator('.cmd[aria-label="Build"]').click();
+  await page.locator('.card').screenshot({ path: `test-results/${info.project.name}-buildmenu.png` });
   await page.locator('.cmd[aria-label="Habitat"]').click();
   const core = await page.evaluate(() => {
     const g = (window as any).game;

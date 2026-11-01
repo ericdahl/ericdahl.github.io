@@ -625,6 +625,37 @@ canvas.view {
   color: var(--text);
 }
 
+.cmd .nm.top {
+  top: 2px;
+  bottom: auto;
+  padding: 0 2px;
+  font-size: 9px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cmd.priced img {
+  width: 34px;
+  height: 34px;
+  margin: 2px 0 0;
+}
+
+.lockbadge {
+  position: absolute;
+  top: 12px;
+  right: 3px;
+  width: 16px;
+  height: 16px;
+  color: #ffb02e;
+}
+
+.lockbadge svg {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
 .cmd .cost em {
   font-style: normal;
   color: var(--flux);
@@ -639,7 +670,8 @@ canvas.view {
   color: #ff8f80;
 }
 
-.cmd.locked {
+.cmd.locked img,
+.cmd.locked .cost {
   opacity: 0.35;
 }
 
@@ -779,6 +811,14 @@ canvas.view {
   .cmd img {
     width: 32px;
     height: 32px;
+  }
+  .cmd.priced img {
+    width: 24px;
+    height: 24px;
+  }
+  .cmd .nm.top {
+    font-size: 8.5px;
+    letter-spacing: -0.2px;
   }
 }
 

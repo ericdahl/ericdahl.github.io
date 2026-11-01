@@ -57,7 +57,8 @@ export class Renderer {
       const d = UNITS[kind];
       const e = new Entity(0, kind, 'unit', owner, 0, 0, 1, d.radius);
       e.angle = -Math.PI / 4;
-      const sc = size / 1.9;
+      // Small units would be specks at true scale, so portraits are normalised by radius.
+      const sc = size / Math.max(1.0, d.radius * 3.2);
       this.ctx.setTransform(sc, 0, 0, sc, size / 2, size / 2 + (d.air ? sc * 0.4 : 0));
       this.drawUnit(e, { x: 0, y: 0 }, 0);
     } else {

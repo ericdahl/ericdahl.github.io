@@ -8,6 +8,8 @@ interface Btn {
   id: string;
   icon: string;
   label: string;
+  /** Hover tooltip (desktop); touch users get the label on the button itself. */
+  tip?: string;
   hotkey?: string;
   cost?: Cost;
   state?: 'ok' | 'dim' | 'locked' | 'active';
@@ -16,6 +18,14 @@ interface Btn {
 
 const UNIT_HOTKEYS: Record<UnitKind, string> = { harvester: 'H', trooper: 'T', ranger: 'R', raider: 'R', crawler: 'C', wasp: 'W' };
 const BUILD_HOTKEYS: Record<BuildingKind, string> = { core: 'C', habitat: 'H', extractor: 'E', garrison: 'G', turret: 'T', works: 'W', skyport: 'K' };
+
+/** Button captions must fit a ~46px-wide phone button. */
+const SHORT_NAMES: Record<string, string> = { 'Command Core': 'Core', 'War Works': 'Works' };
+
+function tooltip(name: string, hotkey: string, desc: string, cost: Cost, requires: string | null) {
+  const price = `${cost.crystal} crystal${cost.flux ? `, ${cost.flux} flux` : ''}`;
+  return `${name} (${hotkey})\n${desc}\nCost: ${price}${requires ? `\nRequires ${requires}` : ''}`;
+}
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -171,9 +181,10 @@ export class Hud {
       this.cardSig = sig;
       this.card.innerHTML = btns
         .map(
-          (b, i) => `<button class="cmd ${b.state ?? 'ok'}" data-i="${i}" aria-label="${esc(b.label)}">
+          (b, i) => `<button class="cmd ${b.state ?? 'ok'}${b.cost ? ' priced' : ''}" data-i="${i}" aria-label="${esc(b.label)}" title="${esc(b.tip ?? (b.hotkey ? `${b.label} (${b.hotkey})` : b.label))}">
             ${b.icon}
-            ${b.hotkey ? `<span class="hk">${b.hotkey}</span>` : ''}
+            ${b.state === 'locked' ? `<span class="lockbadge">${ICONS.lock}</span>` : ''}
+            ${b.cost ? `<span class="nm top">${esc(SHORT_NAMES[b.label] ?? b.label)}</span>` : b.hotkey ? `<span class="hk">${b.hotkey}</span>` : ''}
             ${b.cost ? `<span class="cost">${b.cost.crystal}${b.cost.flux ? `<em>${b.cost.flux}</em>` : ''}</span>` : `<span class="nm">${esc(b.label)}</span>`}
           </button>`,
         )
@@ -202,8 +213,9 @@ export class Hud {
         return [
           ...BUILD_MENU.map((k): Btn => {
             const d = BUILDINGS[k];
-            const locked = !!w.missingRequirement(HUMAN, k);
-            return { id: k, icon: locked ? ICONS.lock : this.icon(k), label: d.name, hotkey: BUILD_HOTKEYS[k], cost: d.cost, state: affordState(d.cost, locked), action: () => g.chooseBuild(k) };
+            const req = w.missingRequirement(HUMAN, k);
+            const tip = tooltip(d.name, BUILD_HOTKEYS[k], d.desc, d.cost, req ? BUILDINGS[req].name : null);
+            return { id: k, icon: this.icon(k), label: d.name, tip, hotkey: BUILD_HOTKEYS[k], cost: d.cost, state: affordState(d.cost, !!req), action: () => g.chooseBuild(k) };
           }),
           { id: 'back', icon: ICONS.back, label: 'Back', hotkey: 'X', action: () => g.closeBuildMenu() },
         ];
@@ -225,8 +237,9 @@ export class Hud {
       if (!b.built) return [{ id: 'cxl', icon: ICONS.cancel, label: 'Cancel', hotkey: 'X', action: () => g.cancelBuilding() }];
       const out: Btn[] = (d.trains ?? []).map((k): Btn => {
         const u = UNITS[k];
-        const locked = !!w.missingRequirement(HUMAN, k);
-        return { id: k, icon: this.icon(k), label: u.name, hotkey: UNIT_HOTKEYS[k], cost: u.cost, state: affordState(u.cost, locked), action: () => g.train(k) };
+        const req = w.missingRequirement(HUMAN, k);
+        const tip = tooltip(u.name, UNIT_HOTKEYS[k], u.desc, u.cost, req ? BUILDINGS[req].name : null);
+        return { id: k, icon: this.icon(k), label: u.name, tip, hotkey: UNIT_HOTKEYS[k], cost: u.cost, state: affordState(u.cost, !!req), action: () => g.train(k) };
       });
       if (d.trains) out.push({ id: 'rally', icon: ICONS.rally, label: 'Rally', hotkey: 'Y', action: () => g.rallyMode() });
       if (buildings.some((x) => x.queue.length)) out.push({ id: 'cq', icon: ICONS.cancel, label: 'Cancel', hotkey: 'X', action: () => g.cancelTrain() });
