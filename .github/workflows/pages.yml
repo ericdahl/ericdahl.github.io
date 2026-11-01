@@ -46,12 +46,12 @@ jobs:
             echo "::endgroup::"
           done
 
-          # Plain static games (an index.html with no package.json above it) are copied as-is.
+          # Plain static games (an index.html not inside a built npm project) are copied as-is.
           for html in $(find games -name index.html -not -path '*/node_modules/*' -not -path '*/dist/*' | sort); do
             dir=$(dirname "$html")
             d="$dir"; skip=0
             while [ "$d" != "." ]; do
-              if [ -f "$d/package.json" ]; then skip=1; break; fi
+              if [ -f "$d/package.json" ] && jq -e '.scripts.build' "$d/package.json" >/dev/null; then skip=1; break; fi
               d=$(dirname "$d")
             done
             [ "$skip" = 1 ] && continue
