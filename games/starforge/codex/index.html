@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#08111c" />
+  <title>Starforge — Command the frontier</title>
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">✦</span><span>STAR<span class="brand-accent">FORGE</span></span><small>FRONTIER COMMAND</small></div>
+      <div class="resources"><div class="resource"><span class="crystal-icon">◆</span><strong id="flux">0</strong><small>FLUX</small></div><div class="resource"><span class="supply-icon">◈</span><strong id="supply">0/0</strong><small>SUPPLY</small></div></div>
+      <button class="icon-btn cheat-btn" id="cheatBtn" type="button" aria-label="Toggle infinite flux" aria-pressed="false" title="Infinite flux (F)">∞<span> CHEAT</span></button>
+      <button class="icon-btn" id="pauseBtn" aria-label="Pause game" title="Pause game">Ⅱ</button>
+    </header>
+    <main class="game-layout">
+      <section class="battlefield" aria-label="Starforge battlefield">
+        <canvas id="gameCanvas"></canvas>
+        <div class="mission"><span class="mission-dot"></span><span id="objective">DESTROY THE ENEMY FORGE</span></div>
+        <div class="mode-pill" id="modePill" hidden>ATTACK MOVE · CHOOSE TARGET</div>
+        <div class="hint" id="hint">Tap a unit to select · drag to select several</div>
+        <div class="zoom-controls"><button id="zoomIn" aria-label="Zoom in">+</button><button id="zoomOut" aria-label="Zoom out">−</button></div>
+        <canvas id="minimap" aria-label="Minimap"></canvas>
+      </section>
+      <aside class="command-panel">
+        <div class="panel-heading"><span>COMMAND DECK</span><span class="status-light">● LIVE</span></div>
+        <div class="selection-card"><div class="selection-icon" id="selectionIcon">✦</div><div><div class="selection-name" id="selectionName">Frontier Outpost</div><div class="selection-meta" id="selectionMeta">Select your units to issue orders</div><div class="health-track"><div id="healthFill"></div></div></div></div>
+        <div class="section-label">PRODUCTION <span id="queueLabel"></span></div>
+        <div class="action-grid">
+          <button class="action train" id="trainWorker"><span class="action-glyph">◇</span><span><strong>Forge Drone</strong><small>Gather flux · 50 ◆</small></span><kbd>W</kbd></button>
+          <button class="action train" id="trainSoldier"><span class="action-glyph">✣</span><span><strong>Vanguard</strong><small>Ranged unit · 75 ◆</small></span><kbd>V</kbd></button>
+          <button class="action train" id="trainTank"><span class="action-glyph">⬡</span><span><strong>Bulwark</strong><small>Heavy unit · 140 ◆</small></span><kbd>B</kbd></button>
+          <button class="action supply-action" id="buildSupply"><span class="action-glyph">◈</span><span><strong>Supply +8</strong><small>Raise capacity · 100 ◆</small></span><kbd>R</kbd></button>
+        </div>
+        <div class="section-label">FIELD ORDERS</div>
+        <div class="order-grid"><button class="order" id="attackMove"><span>⌖</span> Attack move</button><button class="order" id="stop"><span>◼</span> Stop</button><button class="order" id="selectArmy"><span>◎</span> Select army</button></div>
+        <div class="intel"><span>TACTICAL INTEL</span><p id="intelText">Train units and secure flux fields. Your drones harvest automatically when sent to a crystal.</p></div>
+        <button class="help-btn" id="helpBtn">HOW TO PLAY <span>↗</span></button>
+      </aside>
+    </main>
+    <footer><span>SECTOR 07 // THE ASHEN REACH</span><span id="gameTime">00:00</span></footer>
+  </div>
+  <div class="overlay" id="overlay" hidden><div class="dialog"><div class="dialog-kicker" id="dialogKicker">FIELD MANUAL</div><h1 id="dialogTitle">Command the frontier</h1><p id="dialogText"></p><div id="dialogTips"></div><button id="dialogButton">BACK TO BATTLE</button></div></div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
