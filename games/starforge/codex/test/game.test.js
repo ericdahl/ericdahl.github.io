@@ -35,3 +35,12 @@ test('training respects flux and supply limits', () => {
   const game=createGame();game.flux=0;assert.equal(canTrain(game,'worker'),false);
   game.flux=500;game.supplyCap=supplyUsed(game);assert.equal(canTrain(game,'soldier'),false);
 });
+
+test('first hostile reinforcement allows time to establish an economy', () => {
+  const game=createGame();
+  const startingEnemies=game.units.filter(u=>u.side==='enemy').length;
+  advance(game,23);
+  assert.equal(game.units.filter(u=>u.side==='enemy').length,startingEnemies);
+  advance(game,1.1);
+  assert.equal(game.units.filter(u=>u.side==='enemy').length,startingEnemies+1);
+});

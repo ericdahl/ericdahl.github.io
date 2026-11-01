@@ -10,7 +10,7 @@ const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const clamp = (n, low, high) => Math.max(low, Math.min(high, n));
 export function createGame() {
   nextId = 1;
-  const game = { time: 0, flux: 240, supplyCap: 24, selected: [], units: [], bases: [], crystals: [], shots: [], sparks: [], queue: [], enemyClock: 0, status: 'playing', message: 'Secure the nearby flux field, then build your army.', messageUntil: 8 };
+  const game = { time: 0, flux: 240, supplyCap: 24, selected: [], units: [], bases: [], crystals: [], shots: [], sparks: [], queue: [], enemyClock: -6, status: 'playing', message: 'Secure the nearby flux field, then build your army.', messageUntil: 8 };
   game.bases.push({ id: nextId++, side: 'player', x: 285, y: 505, radius: 64, hp: 1100, maxHp: 1100, name: 'Frontier Forge' });
   game.bases.push({ id: nextId++, side: 'enemy', x: 1320, y: 490, radius: 64, hp: 1100, maxHp: 1100, name: 'Hostile Forge' });
   [[505,290],[560,340],[485,390],[558,640],[480,710],[780,190],[820,270],[810,735],[860,815],[1060,310],[1100,390],[1060,680],[1140,740]].forEach(([x,y], i) => game.crystals.push({ id: nextId++, x, y, amount: i < 5 ? 440 : 310, radius: 23 }));
@@ -92,7 +92,7 @@ function updateWorker(game, u, dt) {
 }
 function enemyAI(game, dt) {
   game.enemyClock += dt;
-  if (game.enemyClock < 10) return;
+  if (game.enemyClock < 18) return;
   game.enemyClock = 0;
   const base = game.bases.find(b => b.side === 'enemy');
   if (!base || base.hp <= 0) return;
