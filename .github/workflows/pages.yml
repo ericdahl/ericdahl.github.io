@@ -1,0 +1,91 @@
+name: Deploy games to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "games/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Deploys run one at a time and a running deploy is never cancelled midway.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build games
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          : > _site/.games
+
+          # npm projects with a build script are built and their dist/ published.
+          for pkg in $(find games -name package.json -not -path '*/node_modules/*' | sort); do
+            dir=$(dirname "$pkg")
+            if ! jq -e '.scripts.build' "$pkg" >/dev/null; then continue; fi
+            echo "::group::Building $dir"
+            (cd "$dir" && npm ci && npm run build)
+            mkdir -p "_site/$dir"
+            cp -R "$dir/dist/." "_site/$dir/"
+            echo "$dir" >> _site/.games
+            echo "::endgroup::"
+          done
+
+          # Plain static games (an index.html with no package.json above it) are copied as-is.
+          for html in $(find games -name index.html -not -path '*/node_modules/*' -not -path '*/dist/*' | sort); do
+            dir=$(dirname "$html")
+            d="$dir"; skip=0
+            while [ "$d" != "." ]; do
+              if [ -f "$d/package.json" ]; then skip=1; break; fi
+              d=$(dirname "$d")
+            done
+            [ "$skip" = 1 ] && continue
+            mkdir -p "_site/$dir"
+            cp -R "$dir/." "_site/$dir/"
+            echo "$dir" >> _site/.games
+          done
+
+      - name: Generate index
+        run: |
+          set -euo pipefail
+          {
+            echo '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            echo '<meta name="viewport" content="width=device-width, initial-scale=1">'
+            echo '<title>Games</title>'
+            echo '<style>body{font-family:system-ui,sans-serif;background:#0b0f17;color:#e6edf3;max-width:640px;margin:0 auto;padding:32px 16px}a{color:#5cc8ff;text-decoration:none}a:hover{text-decoration:underline}li{margin:10px 0}small{color:#8b949e;margin-left:8px}</style>'
+            echo '</head><body><h1>Games</h1><ul>'
+            sort -u _site/.games | while read -r dir; do
+              title=$(sed -n 's:.*<title>\(.*\)</title>.*:\1:p' "_site/$dir/index.html" | head -1)
+              echo "<li><a href=\"$dir/\">${title:-$dir}</a><small>$dir</small></li>"
+            done
+            echo '</ul></body></html>'
+          } > _site/index.html
+          rm _site/.games
+          cat _site/index.html
+
+      - uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
