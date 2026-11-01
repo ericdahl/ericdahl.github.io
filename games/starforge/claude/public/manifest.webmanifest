@@ -1,0 +1,11 @@
+{
+  "name": "Starforge",
+  "short_name": "Starforge",
+  "description": "Real-time strategy on the frontier.",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#02030a",
+  "theme_color": "#05070d",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
