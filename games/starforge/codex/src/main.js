@@ -30,7 +30,6 @@ function circle(x,y,r,fill,stroke=null,sw=1){ctx.beginPath();ctx.arc(x,y,r,0,Mat
 function polygon(points,fill,stroke=null,sw=1){ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=sw;ctx.stroke();}}
 function renderTerrain() {
   ctx.fillStyle='#0b1b2b';ctx.fillRect(0,0,width,height);
-  const left=camera.x-width/2/scale, top=camera.y-height/2/scale;
   ctx.save();ctx.translate(width/2-camera.x*scale,height/2-camera.y*scale);ctx.scale(scale,scale);
   const bg=ctx.createRadialGradient(770,500,80,770,500,900);bg.addColorStop(0,'#173247');bg.addColorStop(.55,'#0d2232');bg.addColorStop(1,'#091723');ctx.fillStyle=bg;ctx.fillRect(0,0,WORLD.width,WORLD.height);
   ctx.strokeStyle='#36506437';ctx.lineWidth=1;

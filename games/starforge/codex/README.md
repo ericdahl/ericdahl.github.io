@@ -24,3 +24,7 @@ Open http://localhost:5173. No install step is required.
 npm test
 npm run check
 ```
+
+## Repository note
+
+This workspace reserves the `.git` path, so Git metadata is stored in `.repo` instead. Use `./git status`, `./git log`, and other `./git` commands from this directory. The working tree and commits are otherwise ordinary Git.
