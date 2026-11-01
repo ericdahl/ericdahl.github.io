@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame, tick, train, canTrain, supplyUsed, select, selectedUnits, command, spawn } from '../src/game.js';
+import { createGame, tick, train, canTrain, buildSupply, canBuildSupply, supplyUsed, select, selectedUnits, command, spawn } from '../src/game.js';
 
 const advance = (game, seconds) => { for (let i=0; i<seconds*20; i++) tick(game,.05); };
 
@@ -56,4 +56,28 @@ test('infinite flux permits training without spending flux and can be turned off
   game.infiniteFlux=true;
   game.supplyCap=supplyUsed(game);
   assert.equal(canTrain(game,'worker'),false);
+});
+
+test('supply expansion costs flux and raises capacity after production', () => {
+  const game=createGame();
+  const used=supplyUsed(game);
+  assert.equal(buildSupply(game),true);
+  assert.equal(game.flux,140);
+  assert.equal(game.supplyCap,24);
+  assert.equal(supplyUsed(game),used);
+  advance(game,8.1);
+  assert.equal(game.supplyCap,32);
+  assert.equal(game.queue.length,0);
+});
+
+test('supply expansion works with infinite flux and respects the maximum', () => {
+  const game=createGame();game.flux=0;game.infiniteFlux=true;
+  game.supplyCap=72;
+  assert.equal(canBuildSupply(game),true);
+  assert.equal(buildSupply(game),true);
+  assert.equal(game.flux,0);
+  assert.equal(canBuildSupply(game),false);
+  advance(game,8.1);
+  assert.equal(game.supplyCap,80);
+  assert.equal(canBuildSupply(game),false);
 });

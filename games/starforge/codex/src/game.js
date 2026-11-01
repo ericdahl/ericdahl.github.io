@@ -1,5 +1,6 @@
 export const WORLD = { width: 1600, height: 1000 };
-export const COST = { worker: 50, soldier: 75, tank: 140 };
+export const COST = { worker: 50, soldier: 75, tank: 140, supply: 100 };
+export const SUPPLY = { increase: 8, max: 80, build: 8 };
 export const UNIT = {
   worker: { name: 'Forge Drone', hp: 55, speed: 92, radius: 13, range: 70, damage: 5, cooldown: 1.1, supply: 1, build: 5.5 },
   soldier: { name: 'Vanguard', hp: 90, speed: 78, radius: 15, range: 155, damage: 13, cooldown: .82, supply: 2, build: 7 },
@@ -26,8 +27,15 @@ export function spawn(game, type, side, x, y) {
   game.units.push(unit);
   return unit;
 }
-export function supplyUsed(game) { return game.units.filter(u => u.side === 'player' && u.hp > 0).reduce((n,u) => n + UNIT[u.type].supply, 0) + game.queue.reduce((n,q) => n + UNIT[q.type].supply, 0); }
+export function supplyUsed(game) { return game.units.filter(u => u.side === 'player' && u.hp > 0).reduce((n,u) => n + UNIT[u.type].supply, 0) + game.queue.reduce((n,q) => n + (UNIT[q.type]?.supply || 0), 0); }
 export function canTrain(game, type) { return game.status === 'playing' && !!UNIT[type] && (game.infiniteFlux || game.flux >= COST[type]) && supplyUsed(game) + UNIT[type].supply <= game.supplyCap; }
+export function canBuildSupply(game) { return game.status === 'playing' && (game.infiniteFlux || game.flux >= COST.supply) && game.supplyCap + game.queue.filter(q => q.type === 'supply').length * SUPPLY.increase < SUPPLY.max; }
+export function buildSupply(game) {
+  if (!canBuildSupply(game)) return false;
+  if (!game.infiniteFlux) game.flux -= COST.supply;
+  game.queue.push({ type: 'supply', remaining: SUPPLY.build, total: SUPPLY.build });
+  return true;
+}
 export function train(game, type) {
   if (!canTrain(game, type)) return false;
   if (!game.infiniteFlux) game.flux -= COST[type];
@@ -108,9 +116,12 @@ export function tick(game, dt) {
   if (game.queue.length) {
     game.queue[0].remaining -= dt;
     if (game.queue[0].remaining <= 0) {
-      const {type} = game.queue.shift(); const base = game.bases[0];
-      const angle = Math.random() * Math.PI * 2;
-      spawn(game, type, 'player', base.x + Math.cos(angle)*100, base.y + Math.sin(angle)*100);
+      const {type} = game.queue.shift();
+      if (type === 'supply') game.supplyCap = Math.min(SUPPLY.max, game.supplyCap + SUPPLY.increase);
+      else {
+        const base = game.bases[0]; const angle = Math.random() * Math.PI * 2;
+        spawn(game, type, 'player', base.x + Math.cos(angle)*100, base.y + Math.sin(angle)*100);
+      }
     }
   }
   enemyAI(game, dt);

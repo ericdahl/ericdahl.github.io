@@ -5,3 +5,5 @@
 .cheat-btn{width:auto;min-width:36px;padding:0 9px;white-space:nowrap}.cheat-btn span{font-size:10px;letter-spacing:.1em}.cheat-btn.active{color:#071b25;background:#79e9df;border-color:#b4fff3;box-shadow:0 0 15px #69e5e855}
 @media(max-width:680px){.cheat-btn{width:29px;min-width:29px;padding:0}.cheat-btn span{display:none}}
 @media(max-width:380px){.topbar{gap:4px;padding:0 5px}.brand{font-size:18px}.brand-mark{font-size:20px}.resource{min-width:55px;padding:4px 3px}.icon-btn,.cheat-btn{width:25px;min-width:25px;height:27px}}
+.supply-action .action-glyph{color:#ffe0a2;border-color:#9b7f58;background:#493e31}
+@media(max-width:680px){.action-grid{grid-template-columns:repeat(2,1fr)}}
