@@ -156,7 +156,7 @@ export const NPC_INFO: Record<NpcKind, { name: string; title: string }> = {
   fence: { name: 'Mirela', title: 'Gambler' },
 };
 
-interface Hazard {
+export interface Hazard {
   x: number;
   y: number;
   t: number;
@@ -513,7 +513,6 @@ export class World {
     if (id === 'town') this.restockVendors();
     if (a.def.quest && this.questState(a.def.quest) === 'none') this.setQuest(a.def.quest, 'active');
     this.emit({ type: 'area', id });
-    this.msg(a.def.name, '#e8d9a8');
   }
 
   private arrivalNear(l: Level, p: Point): Point {

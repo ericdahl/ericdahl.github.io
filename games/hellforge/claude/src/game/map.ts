@@ -400,7 +400,7 @@ function genTown(spec: LevelSpec): Level {
     stash: { x: cx + 2, y: cy - 2 },
   };
   l.waypoint = { x: cx - 2, y: cy - 2 };
-  l.start = { x: cx + 1, y: cy + 1 };
+  l.start = { x: cx + 2, y: cy + 3 };
   const gate = { x: l.w - 2, y: cy };
   spec.links.forEach((link) => l.exits.push({ ...gate, ...link }));
   return l;

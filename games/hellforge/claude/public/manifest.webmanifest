@@ -1,0 +1,11 @@
+{
+  "name": "Hellforge",
+  "short_name": "Hellforge",
+  "description": "A dark fantasy action RPG of loot, demons and fire.",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0a0604",
+  "theme_color": "#0a0604",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
