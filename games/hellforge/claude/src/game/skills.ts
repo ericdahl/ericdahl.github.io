@@ -1,0 +1,218 @@
+import type { ClassId } from './items';
+
+export type Element = 'phys' | 'fire' | 'cold' | 'light' | 'poison';
+export type SkillKind =
+  | 'attack' | 'passive' | 'buff' | 'projectile' | 'nova' | 'teleport' | 'leap' | 'whirlwind'
+  | 'meteor' | 'multishot' | 'strafe' | 'bolts';
+
+export interface SkillParams {
+  /** Bonus % weapon damage for attack skills. */
+  dmgPct?: number;
+  arPct?: number;
+  min?: number;
+  max?: number;
+  radius?: number;
+  count?: number;
+  duration?: number;
+  chill?: number;
+  range?: number;
+  pct?: number;
+  pct2?: number;
+  stun?: number;
+  chains?: number;
+}
+
+export interface SkillDef {
+  id: string;
+  name: string;
+  classId: ClassId | 'all';
+  reqLevel: number;
+  prereq?: string[];
+  kind: SkillKind;
+  /** Attack skills scale off the weapon; 'bow' requires one. */
+  weapon?: 'melee' | 'bow' | 'any';
+  element?: Element;
+  mana: (l: number) => number;
+  params: (l: number) => SkillParams;
+  desc: string;
+  lines: (p: SkillParams) => string[];
+  synergies?: { skill: string; pct: number }[];
+  color: string;
+  glyph: string;
+  /** Spell cast time multiplier (cast rate). */
+  castTime?: number;
+}
+
+const dim = (base: number, per: number, l: number, cap: number) => Math.round(cap * (1 - Math.exp(-(base + per * (l - 1)) / cap)));
+
+export const SKILLS: SkillDef[] = [
+  {
+    id: 'attack', name: 'Attack', classId: 'all', reqLevel: 1, kind: 'attack', weapon: 'any', mana: () => 0,
+    params: () => ({}), desc: 'Strike with your weapon.', lines: () => [], color: '#c8b9a0', glyph: '⚔',
+  },
+  // ------------------------------------------------------------ Reaver
+  {
+    id: 'bash', name: 'Bash', classId: 'reaver', reqLevel: 1, kind: 'attack', weapon: 'melee',
+    mana: () => 2, params: (l) => ({ dmgPct: 45 + 15 * l, arPct: 20 + 8 * l }),
+    desc: 'A crushing blow that knocks enemies back.',
+    lines: (p) => [`+${p.dmgPct}% Damage`, `+${p.arPct}% Attack Rating`, 'Knocks back'], color: '#d9883a', glyph: '✊',
+  },
+  {
+    id: 'iron_skin', name: 'Iron Skin', classId: 'reaver', reqLevel: 1, kind: 'passive',
+    mana: () => 0, params: (l) => ({ pct: 25 + 12 * l, pct2: Math.min(40, 4 + 2 * l) }),
+    desc: 'Passive: hardened hide and thick blood.',
+    lines: (p) => [`+${p.pct}% Defense`, `+${p.pct2}% Max Life`], color: '#8a8f99', glyph: '⛨',
+  },
+  {
+    id: 'weapon_mastery', name: 'Weapon Mastery', classId: 'reaver', reqLevel: 6, kind: 'passive',
+    mana: () => 0, params: (l) => ({ pct: 25 + 10 * l, pct2: 20 + 12 * l, chill: dim(3, 1.5, l, 40) }),
+    desc: 'Passive: deadly skill with blades, axes and maces.',
+    lines: (p) => [`+${p.pct}% Damage`, `+${p.pct2}% Attack Rating`, `${p.chill}% Critical Strike`], color: '#b7b2a6', glyph: '🗡',
+  },
+  {
+    id: 'war_cry', name: 'War Cry', classId: 'reaver', reqLevel: 6, prereq: ['bash'], kind: 'nova', element: 'phys',
+    mana: (l) => 6 + l * 0.5, params: (l) => ({ min: 4 + 4 * l, max: 8 + 6 * l, radius: 4.2, stun: 1 + 0.15 * l }),
+    desc: 'A deafening howl that damages and stuns nearby foes.',
+    lines: (p) => [`Damage: ${p.min}-${p.max}`, `Stun: ${p.stun!.toFixed(1)}s`, `Radius: ${p.radius} yards`], color: '#e0b347', glyph: '📣',
+    synergies: [{ skill: 'battle_shout', pct: 12 }],
+  },
+  {
+    id: 'leap', name: 'Leap Attack', classId: 'reaver', reqLevel: 12, prereq: ['war_cry'], kind: 'leap', weapon: 'melee',
+    mana: () => 7, params: (l) => ({ dmgPct: 60 + 20 * l, range: Math.min(10, 5 + 0.4 * l), radius: 2 }),
+    desc: 'Leap into the fray, crashing down on everything nearby.',
+    lines: (p) => [`+${p.dmgPct}% Damage on landing`, `Range: ${p.range!.toFixed(1)} yards`], color: '#c96f2b', glyph: '⤴',
+  },
+  {
+    id: 'frenzy', name: 'Frenzy', classId: 'reaver', reqLevel: 12, prereq: ['bash'], kind: 'attack', weapon: 'melee',
+    mana: () => 3, params: (l) => ({ dmgPct: 40 + 12 * l, pct: 10 + 2 * l, duration: 4 }),
+    desc: 'Each hit grows your fury, increasing attack and run speed (stacks 4x).',
+    lines: (p) => [`+${p.dmgPct}% Damage`, `+${p.pct}% attack speed per stack`, `+${Math.round(p.pct! / 2)}% run speed per stack`], color: '#d23a2a', glyph: '♨',
+  },
+  {
+    id: 'battle_shout', name: 'Battle Shout', classId: 'reaver', reqLevel: 18, prereq: ['war_cry'], kind: 'buff',
+    mana: () => 12, params: (l) => ({ pct: 30 + 6 * l, pct2: 40 + 10 * l, duration: 40 + 5 * l }),
+    desc: 'Rally yourself: more life, mana and defense.',
+    lines: (p) => [`+${p.pct}% Max Life and Mana`, `+${p.pct2}% Defense`, `Duration: ${p.duration}s`], color: '#e8d27a', glyph: '♛',
+  },
+  {
+    id: 'whirlwind', name: 'Whirlwind', classId: 'reaver', reqLevel: 24, prereq: ['leap', 'frenzy'], kind: 'whirlwind', weapon: 'melee',
+    mana: () => 14, params: (l) => ({ dmgPct: 20 + 12 * l, range: 7, radius: 1.8 }),
+    desc: 'Spin through enemies, striking everything in your path.',
+    lines: (p) => [`+${p.dmgPct}% Damage`, `Distance: ${p.range} yards`], color: '#9fd2e6', glyph: '🌀',
+  },
+  // ------------------------------------------------------------ Arcanist
+  {
+    id: 'fire_bolt', name: 'Fire Bolt', classId: 'arcanist', reqLevel: 1, kind: 'projectile', element: 'fire',
+    mana: () => 2.5, params: (l) => ({ min: 3 + 4 * (l - 1), max: 6 + 5 * (l - 1) }),
+    desc: 'Hurl a bolt of flame.', lines: (p) => [`Fire Damage: ${p.min}-${p.max}`],
+    synergies: [{ skill: 'fireball', pct: 14 }, { skill: 'meteor', pct: 14 }], color: '#ff7a2a', glyph: '🔥',
+  },
+  {
+    id: 'ice_bolt', name: 'Ice Bolt', classId: 'arcanist', reqLevel: 1, kind: 'projectile', element: 'cold',
+    mana: () => 3, params: (l) => ({ min: 3 + 3 * (l - 1), max: 5 + 4 * (l - 1), chill: 2 + 0.4 * l }),
+    desc: 'A shard of ice that chills its target.',
+    lines: (p) => [`Cold Damage: ${p.min}-${p.max}`, `Chill: ${p.chill!.toFixed(1)}s`],
+    synergies: [{ skill: 'frost_nova', pct: 15 }], color: '#7fd0ff', glyph: '❄',
+  },
+  {
+    id: 'charged_bolt', name: 'Charged Bolt', classId: 'arcanist', reqLevel: 6, kind: 'bolts', element: 'light',
+    mana: (l) => 3 + 0.4 * l, params: (l) => ({ min: 1 + l, max: 4 + 2 * l, count: Math.min(12, 3 + Math.floor(l / 2)) }),
+    desc: 'Release a spray of crackling, wandering bolts.',
+    lines: (p) => [`Lightning Damage: ${p.min}-${p.max} each`, `Bolts: ${p.count}`], color: '#cfe3ff', glyph: '⚡',
+  },
+  {
+    id: 'frost_shell', name: 'Frost Shell', classId: 'arcanist', reqLevel: 6, prereq: ['ice_bolt'], kind: 'buff', element: 'cold',
+    mana: () => 9, params: (l) => ({ pct: 40 + 12 * l, duration: 120 + 12 * l }),
+    desc: 'A shell of ice raises defense and chills melee attackers.',
+    lines: (p) => [`+${p.pct}% Defense`, `Duration: ${p.duration}s`], color: '#a9e4ff', glyph: '🛡',
+  },
+  {
+    id: 'frost_nova', name: 'Frost Nova', classId: 'arcanist', reqLevel: 12, prereq: ['frost_shell'], kind: 'nova', element: 'cold',
+    mana: (l) => 9 + l, params: (l) => ({ min: 4 + 4 * l, max: 8 + 5 * l, radius: 4.5, chill: 3 + 0.3 * l }),
+    desc: 'A ring of frost blasts outward from you.',
+    lines: (p) => [`Cold Damage: ${p.min}-${p.max}`, `Chill: ${p.chill!.toFixed(1)}s`],
+    synergies: [{ skill: 'ice_bolt', pct: 10 }], color: '#bff0ff', glyph: '✳',
+  },
+  {
+    id: 'teleport', name: 'Teleport', classId: 'arcanist', reqLevel: 12, prereq: ['charged_bolt'], kind: 'teleport',
+    mana: (l) => Math.max(8, 22 - l), params: (l) => ({ range: Math.min(14, 8 + 0.5 * l) }),
+    desc: 'Instantly blink to a visible location.',
+    lines: (p) => [`Range: ${p.range!.toFixed(1)} yards`], color: '#c38cff', glyph: '✧', castTime: 0.7,
+  },
+  {
+    id: 'fireball', name: 'Fireball', classId: 'arcanist', reqLevel: 18, prereq: ['fire_bolt'], kind: 'projectile', element: 'fire',
+    mana: (l) => 5 + 0.6 * l, params: (l) => ({ min: 8 + 7 * (l - 1), max: 16 + 9 * (l - 1), radius: 2.2 }),
+    desc: 'An exploding sphere of flame.',
+    lines: (p) => [`Fire Damage: ${p.min}-${p.max}`, `Radius: ${p.radius} yards`],
+    synergies: [{ skill: 'fire_bolt', pct: 14 }, { skill: 'meteor', pct: 14 }], color: '#ffae3a', glyph: '☄',
+  },
+  {
+    id: 'meteor', name: 'Meteor', classId: 'arcanist', reqLevel: 24, prereq: ['fireball'], kind: 'meteor', element: 'fire',
+    mana: (l) => 17 + l, params: (l) => ({ min: 35 + 14 * (l - 1), max: 55 + 18 * (l - 1), radius: 3, duration: 3 }),
+    desc: 'Call down a burning star from the heavens.',
+    lines: (p) => [`Fire Damage: ${p.min}-${p.max}`, `Radius: ${p.radius} yards`, 'Leaves burning ground'],
+    synergies: [{ skill: 'fire_bolt', pct: 10 }, { skill: 'fireball', pct: 10 }], color: '#ff5522', glyph: '☀',
+  },
+  // ------------------------------------------------------------ Huntress
+  {
+    id: 'power_shot', name: 'Power Shot', classId: 'huntress', reqLevel: 1, kind: 'attack', weapon: 'bow',
+    mana: () => 1.5, params: (l) => ({ dmgPct: 50 + 15 * l, arPct: 25 + 10 * l }),
+    desc: 'A carefully aimed arrow that pierces.', lines: (p) => [`+${p.dmgPct}% Damage`, `+${p.arPct}% Attack Rating`, 'Pierces'],
+    color: '#d6c06a', glyph: '➶',
+  },
+  {
+    id: 'critical_eye', name: 'Critical Eye', classId: 'huntress', reqLevel: 1, kind: 'passive',
+    mana: () => 0, params: (l) => ({ pct: dim(12, 5, l, 70) }),
+    desc: 'Passive: chance to deal double physical damage.', lines: (p) => [`${p.pct}% chance of double damage`],
+    color: '#e6e6e6', glyph: '◎',
+  },
+  {
+    id: 'multishot', name: 'Multishot', classId: 'huntress', reqLevel: 6, prereq: ['power_shot'], kind: 'multishot', weapon: 'bow',
+    mana: (l) => 4 + 0.5 * l, params: (l) => ({ count: Math.min(15, 2 + l), dmgPct: -25 + 4 * l }),
+    desc: 'Loose a fan of arrows.', lines: (p) => [`Arrows: ${p.count}`, `${p.dmgPct! >= 0 ? '+' : ''}${p.dmgPct}% Damage`],
+    color: '#b9d06a', glyph: '⋔',
+  },
+  {
+    id: 'frost_arrow', name: 'Frost Arrow', classId: 'huntress', reqLevel: 6, kind: 'attack', weapon: 'bow', element: 'cold',
+    mana: () => 3, params: (l) => ({ min: 3 + 3 * l, max: 6 + 4 * l, chill: 2 + 0.3 * l }),
+    desc: 'An arrow wrapped in frost that chills.', lines: (p) => [`Adds ${p.min}-${p.max} Cold Damage`, `Chill: ${p.chill!.toFixed(1)}s`],
+    color: '#8fdcff', glyph: '❆',
+  },
+  {
+    id: 'evade', name: 'Evade', classId: 'huntress', reqLevel: 12, prereq: ['critical_eye'], kind: 'passive',
+    mana: () => 0, params: (l) => ({ pct: dim(8, 3, l, 55) }),
+    desc: 'Passive: chance to dodge attacks and missiles.', lines: (p) => [`${p.pct}% chance to evade`],
+    color: '#9bd39b', glyph: '↯',
+  },
+  {
+    id: 'exploding_arrow', name: 'Exploding Arrow', classId: 'huntress', reqLevel: 12, prereq: ['multishot'], kind: 'attack', weapon: 'bow', element: 'fire',
+    mana: (l) => 5 + 0.3 * l, params: (l) => ({ min: 4 + 5 * l, max: 8 + 7 * l, radius: 2 }),
+    desc: 'An arrow that bursts into flame on impact.', lines: (p) => [`Adds ${p.min}-${p.max} Fire Damage`, `Radius: ${p.radius} yards`],
+    color: '#ff8c3a', glyph: '✹',
+  },
+  {
+    id: 'strafe', name: 'Strafe', classId: 'huntress', reqLevel: 18, prereq: ['multishot'], kind: 'strafe', weapon: 'bow',
+    mana: () => 9, params: (l) => ({ count: Math.min(10, 3 + Math.floor(l / 2)), dmgPct: 20 + 10 * l }),
+    desc: 'Rapidly fire at several nearby enemies.', lines: (p) => [`Targets: ${p.count}`, `+${p.dmgPct}% Damage`],
+    color: '#e3d38c', glyph: '⇶',
+  },
+  {
+    id: 'storm_arrow', name: 'Storm Arrow', classId: 'huntress', reqLevel: 24, prereq: ['exploding_arrow', 'strafe'], kind: 'attack', weapon: 'bow', element: 'light',
+    mana: (l) => 10 + l * 0.5, params: (l) => ({ min: 10 + 8 * l, max: 30 + 12 * l, chains: 2 + Math.floor(l / 3) }),
+    desc: 'An arrow that unleashes chain lightning on impact.',
+    lines: (p) => [`Lightning Damage: ${p.min}-${p.max}`, `Chains: ${p.chains}`], color: '#d6e6ff', glyph: 'ϟ',
+  },
+];
+
+export const SKILL_BY_ID: Record<string, SkillDef> = Object.fromEntries(SKILLS.map((s) => [s.id, s]));
+
+export function classSkills(classId: ClassId): SkillDef[] {
+  return SKILLS.filter((s) => s.classId === classId);
+}
+
+/** Damage multiplier from synergies: +pct% per hard point in each synergy skill. */
+export function synergyBonus(def: SkillDef, hardPoints: Record<string, number>): number {
+  let pct = 0;
+  for (const s of def.synergies ?? []) pct += (hardPoints[s.skill] ?? 0) * s.pct;
+  return 1 + pct / 100;
+}
