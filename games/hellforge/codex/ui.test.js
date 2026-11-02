@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { runInThisContext } from 'node:vm';
+import { makeBundle } from './bundle.mjs';
 
 test('the static UI starts a game, renders a frame, and opens inventory', async () => {
   const elements = new Map(), frames = [];
@@ -32,7 +35,11 @@ test('the static UI starts a game, renders a frame, and opens inventory', async 
   globalThis.window = { innerWidth: 1024, innerHeight: 768, devicePixelRatio: 1, addEventListener() {} };
   globalThis.localStorage = { getItem() { return null; }, setItem() {}, removeItem() {} };
   globalThis.requestAnimationFrame = fn => frames.push(fn);
-  await import('./main.js');
+  const bundled = await readFile(new URL('./hellforge.js', import.meta.url), 'utf8');
+  assert.equal(bundled, await makeBundle(), 'the checked-in classic script must match its sources');
+  const html = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  assert.match(html, /<script src="\.\/hellforge\.js" defer><\/script>/);
+  runInThisContext(bundled);
   assert.equal(frames.length, 1);
   get('start-button').dispatch('click');
   assert.equal(get('hud').classList.contains('hidden'), false);

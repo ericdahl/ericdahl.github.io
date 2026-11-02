@@ -4,7 +4,7 @@ A mobile friendly dark fantasy action RPG for GitHub Pages. Choose one of three 
 
 ## Play
 
-Open `index.html` through a local web server, or visit the Pages deployment at `games/hellforge/codex/`.
+Open `index.html` directly in a browser, serve it locally, or visit the Pages deployment at `games/hellforge/codex/`.
 
 | Action | Desktop | Mobile |
 | --- | --- | --- |
@@ -18,11 +18,11 @@ Equipment is collected by walking over drops. Open Inventory and select an item 
 
 ## Develop
 
-No build step or runtime dependencies are needed. From this directory:
+No runtime dependencies are needed. From this directory:
 
 ```sh
 python3 -m http.server 8000
 npm test
 ```
 
-The repository's Pages workflow copies static games directly, so `index.html`, `style.css`, `main.js`, and `game.js` are ready to publish.
+After changing `game.js` or `main.js`, run `npm run bundle` to regenerate the classic script used by `index.html`. The repository's Pages workflow copies this static game directly.

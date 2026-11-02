@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "bundle": "node bundle.mjs",
     "test": "node --test"
   }
 }
