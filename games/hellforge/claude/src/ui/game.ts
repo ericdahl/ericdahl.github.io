@@ -355,6 +355,7 @@ export class Game implements PanelHost {
   }
 
   private banner(text: string) {
+    this.root.querySelectorAll('.banner').forEach((b) => b.remove());
     const el = h('div', { class: 'banner' }, text);
     this.root.append(el);
     setTimeout(() => el.classList.add('fade'), 1800);

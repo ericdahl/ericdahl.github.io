@@ -132,7 +132,7 @@ export class Renderer {
           continue;
         }
         // Fade walls standing between the camera and the player.
-        const occl = depth > p.x + p.y && Math.abs(s.x - pScreen.x) < 70 * z && s.y - WALL_H * z < pScreen.y && s.y + TILE_H * z > pScreen.y - 40 * z;
+        const occl = depth > p.x + p.y + 0.5 && Math.hypot(s.x - pScreen.x, (s.y - pScreen.y) * 1.6) < 150 * z;
         if (outdoor || theme === 'cave') {
           add(depth, () => {
             const v = Math.floor(tileHash(x, y, 7) * 6);

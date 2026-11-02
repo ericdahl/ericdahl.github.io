@@ -385,7 +385,7 @@ button {
 }
 .p-body { overflow: auto; padding: 10px; flex: 1; min-height: 0; -webkit-overflow-scrolling: touch; }
 .p-body.two { display: grid; grid-template-columns: auto minmax(220px, 1fr); gap: 12px; align-items: start; }
-.p-body.three { display: grid; grid-template-columns: minmax(190px, 1fr) auto minmax(200px, 1fr); gap: 12px; align-items: start; }
+.p-body.three { display: grid; grid-template-columns: minmax(170px, 1fr) auto minmax(190px, 1fr); gap: 10px; align-items: start; }
 .col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .sub { color: var(--gold); font-size: 13px; border-bottom: 1px solid #3a2e1e; padding-bottom: 2px; margin-top: 2px; }
 .npc-say { padding: 8px 14px 0; font-style: italic; color: #c8b890; font-size: 14px; }
@@ -530,7 +530,7 @@ button {
 .help-t th, .help-t td { text-align: left; padding: 4px; border-bottom: 1px solid #3a2e1e; vertical-align: top; }
 .help-t th { color: var(--gold); }
 
-@media (max-width: 760px), (max-height: 460px) {
+@media (max-width: 760px) {
   .p-body.three { grid-template-columns: 1fr auto; }
   .p-body.three > .detail { grid-column: 1 / -1; }
 }
