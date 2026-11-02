@@ -131,7 +131,7 @@ export function createCharacter(name: string, classId: ClassId, hardcore = false
 // ---------------------------------------------------------------- experience
 
 export const XP_TABLE: number[] = [0, 0];
-for (let n = 2; n <= MAX_LEVEL + 1; n++) XP_TABLE[n] = Math.round(110 * Math.pow(n - 1, 2.35));
+for (let n = 2; n <= MAX_LEVEL + 1; n++) XP_TABLE[n] = Math.round(80 * Math.pow(n - 1, 2.2));
 
 export function xpForLevel(level: number): number {
   return XP_TABLE[Math.min(level, MAX_LEVEL + 1)];

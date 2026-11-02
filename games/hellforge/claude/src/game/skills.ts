@@ -53,7 +53,7 @@ export const SKILLS: SkillDef[] = [
   // ------------------------------------------------------------ Reaver
   {
     id: 'bash', name: 'Bash', classId: 'reaver', reqLevel: 1, kind: 'attack', weapon: 'melee',
-    mana: () => 2, params: (l) => ({ dmgPct: 45 + 15 * l, arPct: 20 + 8 * l }),
+    mana: () => 2, params: (l) => ({ dmgPct: 45 + 20 * l, arPct: 20 + 8 * l }),
     desc: 'A crushing blow that knocks enemies back.',
     lines: (p) => [`+${p.dmgPct}% Damage`, `+${p.arPct}% Attack Rating`, 'Knocks back'], color: '#d9883a', glyph: '✊',
   },
@@ -156,7 +156,7 @@ export const SKILLS: SkillDef[] = [
   // ------------------------------------------------------------ Huntress
   {
     id: 'power_shot', name: 'Power Shot', classId: 'huntress', reqLevel: 1, kind: 'attack', weapon: 'bow',
-    mana: () => 1.5, params: (l) => ({ dmgPct: 50 + 15 * l, arPct: 25 + 10 * l }),
+    mana: () => 1.5, params: (l) => ({ dmgPct: 50 + 20 * l, arPct: 25 + 10 * l }),
     desc: 'A carefully aimed arrow that pierces.', lines: (p) => [`+${p.dmgPct}% Damage`, `+${p.arPct}% Attack Rating`, 'Pierces'],
     color: '#d6c06a', glyph: '➶',
   },
@@ -168,7 +168,7 @@ export const SKILLS: SkillDef[] = [
   },
   {
     id: 'multishot', name: 'Multishot', classId: 'huntress', reqLevel: 6, prereq: ['power_shot'], kind: 'multishot', weapon: 'bow',
-    mana: (l) => 4 + 0.5 * l, params: (l) => ({ count: Math.min(15, 2 + l), dmgPct: -25 + 4 * l }),
+    mana: (l) => 4 + 0.5 * l, params: (l) => ({ count: Math.min(15, 2 + l), dmgPct: -25 + 8 * l }),
     desc: 'Loose a fan of arrows.', lines: (p) => [`Arrows: ${p.count}`, `${p.dmgPct! >= 0 ? '+' : ''}${p.dmgPct}% Damage`],
     color: '#b9d06a', glyph: '⋔',
   },

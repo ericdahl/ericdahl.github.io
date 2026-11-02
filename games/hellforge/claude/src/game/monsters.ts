@@ -53,7 +53,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
   wraith: D({ id: 'wraith', name: 'Hollow Wraith', shape: 'wraith', ai: 'melee', lifeMul: 0.9, dmgMul: 0.9, speed: 2.6, radius: 0.34, range: 0.55, attackRate: 1.0, xpMul: 1.4, element: 'cold', undead: true, res: { phys: 40, cold: 50, poison: 100 }, color: '#9fb7d9' }),
   cultist: D({ id: 'cultist', name: 'Ash Cultist', shape: 'cultist', ai: 'caster', lifeMul: 0.8, dmgMul: 1.0, speed: 2.3, radius: 0.33, range: 7, attackRate: 0.45, xpMul: 1.5, missile: { element: 'light', speed: 9, kind: 'm_light' }, res: { light: 40, fire: 20 }, color: '#5c3b6b' }),
 
-  glutton: D({ id: 'glutton', name: 'Gorvath the Glutton', shape: 'glutton', ai: 'boss', lifeMul: 9, dmgMul: 2.2, speed: 1.9, radius: 0.7, range: 0.8, attackRate: 0.8, xpMul: 8, res: { phys: 20, poison: 60 }, scale: 1.6, color: '#7c6a3e', abilities: ['charge'] }),
+  glutton: D({ id: 'glutton', name: 'Gorvath the Glutton', shape: 'glutton', ai: 'boss', lifeMul: 8, dmgMul: 1.5, speed: 1.9, radius: 0.7, range: 0.8, attackRate: 0.8, xpMul: 8, res: { phys: 20, poison: 60 }, scale: 1.6, color: '#7c6a3e', abilities: ['charge'] }),
   bishop: D({ id: 'bishop', name: 'The Drowned Bishop', shape: 'bishop', ai: 'boss', lifeMul: 11, dmgMul: 1.6, speed: 2.2, radius: 0.5, range: 6, attackRate: 0.7, xpMul: 12, undead: true, element: 'cold', missile: { element: 'cold', speed: 8, kind: 'm_cold' }, res: { cold: 75, poison: 100, fire: -20 }, scale: 1.35, color: '#4c7a8a', abilities: ['nova_cold', 'summon_skeletons'] }),
   warden: D({ id: 'warden', name: 'Ossuary Warden Krell', shape: 'warden', ai: 'boss', lifeMul: 13, dmgMul: 2.4, speed: 2.4, radius: 0.6, range: 0.8, attackRate: 0.9, xpMul: 14, undead: true, element: 'cold', res: { phys: 30, cold: 60, poison: 100 }, scale: 1.55, color: '#d8d3c2', abilities: ['charge', 'summon_skeletons'] }),
   mother: D({ id: 'mother', name: 'Vhorza, Mother of Cinders', shape: 'mother', ai: 'boss', lifeMul: 30, dmgMul: 2.6, speed: 2.3, radius: 0.9, range: 1.0, attackRate: 0.8, xpMul: 40, element: 'fire', missile: { element: 'fire', speed: 8, kind: 'm_fire' }, res: { fire: 75, poison: 30, light: 20, cold: 10 }, scale: 2.1, color: '#c23b1f', abilities: ['fire_spread', 'nova_fire', 'summon_imps', 'meteor_rain'] }),
@@ -79,7 +79,7 @@ export interface MonsterStats {
 }
 
 export function baseLife(mlvl: number): number {
-  return 9 + mlvl * 6 + mlvl * mlvl * 0.35;
+  return 7 + mlvl * 4 + mlvl * mlvl * 0.25;
 }
 
 export function baseDamage(mlvl: number): number {

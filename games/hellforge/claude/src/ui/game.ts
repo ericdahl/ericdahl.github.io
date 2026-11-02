@@ -332,7 +332,7 @@ export class Game implements PanelHost {
     } else H.target.classList.add('hidden');
     this.setText('area', H.area, `${AREA_BY_ID[w.area.def.id].name}`);
     // Context button: nearest interactable.
-    const near = w.interactablesNear(p.x, p.y, 2.6).filter((n) => n.target.kind !== 'exit')[0];
+    const near = w.interactablesNear(p.x, p.y, 2.6)[0];
     if (near && !p.dead) {
       const label = w.interactLabel(near.target);
       this.setText('ctx', H.ctx, label);

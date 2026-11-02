@@ -430,7 +430,7 @@ export class World {
       const spot = l.spots.boss ?? spots.pop() ?? l.start;
       const isBoss = def.superUnique === 'mother';
       const boss = this.spawnMonster(a, sd.id, spot.x + 0.5, spot.y + 0.5, 'boss', {
-        packId, superId: sd.id, level: this.mlvl(def) + (isBoss ? 1 : 2), mods: isBoss ? [] : def.superUnique === 'glutton' ? ['strong'] : ['extraLife'],
+        packId, superId: sd.id, level: this.mlvl(def) + (isBoss ? 1 : 2), mods: isBoss || def.superUnique === 'glutton' ? [] : ['extraLife'],
       });
       boss.name = sd.name;
       const escort = { glutton: 'ghoul', bishop: 'skeleton', warden: 'skeleton', mother: 'imp' }[sd.id] ?? 'imp';
@@ -1234,14 +1234,18 @@ export class World {
     const p = this.player;
     if (p.invuln > 0.6) return;
     const a = this.area;
+    if (!p.moving) return;
     for (const e of a.level.exits) {
-      if (Math.hypot(e.x + 0.5 - p.x, e.y + 0.5 - p.y) < 0.75) {
+      // Stairs need a deliberate click/tap; edge paths trigger when walking into them.
+      if (e.kind !== 'path') continue;
+      const dx = e.x + 0.5 - p.x;
+      const dy = e.y + 0.5 - p.y;
+      if (Math.hypot(dx, dy) < 0.75 && Math.cos(Math.atan2(dy, dx) - p.facing) > 0) {
         this.enterArea(e.to, 'exit', a.def.id);
         return;
       }
     }
-    const pp = this.portalPos();
-    if (pp && p.intent?.kind !== 'interact' && Math.hypot(pp.x - p.x, pp.y - p.y) < 0.5) this.takePortal();
+
   }
 
   private followPath(dt: number, speed: number, goal: Point): boolean {
