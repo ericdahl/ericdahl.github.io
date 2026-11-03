@@ -1,0 +1,42 @@
+title: 守株待兔
+en: Waiting by the Tree Stump
+level: 2
+voice: zh-CN-YunxiNeural
+rate: -10%
+note: A fable from the Han Feizi, about 2,300 years old.
+fix: 越长越高=yuè zhǎng yuè gāo
+---
+很久很久以前，有一个农夫。
+A long, long time ago, there was a farmer.
+他每天都在田里干活，从早忙到晚。
+He worked in his field every day, busy from morning to night.
+
+有一天，农夫正在田里干活。
+One day, the farmer was working in his field.
+忽然，一只兔子从草里跑出来。
+Suddenly, a rabbit ran out of the grass.
+它跑得太快了，一下子撞在了一个树桩上。
+It was running so fast that it crashed right into a tree stump.
+兔子倒在地上，再也不动了。
+The rabbit fell to the ground and didn't move again.
+
+农夫高兴极了。
+The farmer was overjoyed.
+他想：“不用干活就能得到兔子，太好了！”
+He thought, "A rabbit without doing any work — wonderful!"
+从那天起，他不再种地了。
+From that day on, he stopped working his field.
+他每天坐在树桩旁边，等着兔子再来撞树桩。
+Every day he sat beside the stump, waiting for another rabbit to run into it.
+
+一天过去了，没有兔子。
+A day went by. No rabbit.
+十天过去了，还是没有兔子。
+Ten days went by. Still no rabbit.
+田里的草越长越高，庄稼都死了。
+The weeds in his field grew taller and taller, and all his crops died.
+
+农夫什么也没有等到。
+The farmer waited, and got nothing at all.
+这个故事告诉我们：好东西不会自己从天上掉下来，要靠自己努力。
+This story teaches us: good things don't just fall from the sky — we have to work for them.

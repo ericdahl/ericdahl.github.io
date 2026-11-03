@@ -1,0 +1,30 @@
+title: 我的一家
+en: My Family
+level: 1
+voice: zh-CN-XiaoxiaoNeural
+rate: -10%
+---
+我叫乐乐。
+My name is Lele.
+我今年六岁。
+I am six years old.
+我家有五口人：爸爸、妈妈、奶奶、妹妹和我。
+There are five people in my family: Dad, Mom, Grandma, my little sister, and me.
+我们家还有一只小白狗，它叫豆豆。
+We also have a little white dog. His name is Doudou.
+
+爸爸很高，他每天开车去上班。
+Dad is very tall. He drives to work every day.
+妈妈是老师，她喜欢唱歌。
+Mom is a teacher. She likes to sing.
+奶奶会做好吃的饺子。
+Grandma knows how to make delicious dumplings.
+妹妹两岁了，她最喜欢和豆豆一起玩。
+My little sister is two. What she likes best is playing with Doudou.
+
+晚上，我们一起吃饭。
+In the evening, we eat dinner together.
+吃完饭，爸爸给我们讲故事。
+After dinner, Dad tells us stories.
+我爱我的家！
+I love my family!

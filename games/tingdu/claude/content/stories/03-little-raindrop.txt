@@ -1,0 +1,37 @@
+title: 小雨点去旅行
+en: Little Raindrop Goes on a Trip
+level: 1
+voice: zh-CN-XiaoxiaoNeural
+rate: -10%
+---
+天上有一朵白白的云。
+There is a fluffy white cloud in the sky.
+云里住着很多小雨点。
+Lots of little raindrops live inside the cloud.
+有一天，一个小雨点说：“我想去下面看看！”
+One day, a little raindrop said, "I want to go down and take a look!"
+
+风来了，云变黑了。
+The wind came, and the cloud turned dark.
+小雨点跳了下去，“哗啦啦，哗啦啦！”
+The little raindrop jumped down. "Pitter-patter, pitter-patter!"
+它落在一朵红色的花上。
+It landed on a red flower.
+花儿说：“谢谢你，我正渴呢！”
+The flower said, "Thank you, I was so thirsty!"
+
+小雨点从花上滑下来，流进了小河。
+The little raindrop slid off the flower and flowed into a little river.
+它和小鱼一起游，和小鸭子一起玩。
+It swam with the little fish and played with the ducklings.
+小河流啊流，流进了大海。
+The river flowed and flowed, all the way to the sea.
+
+太阳出来了，天气很热。
+The sun came out, and it got very hot.
+小雨点觉得自己变轻了，慢慢地飞上了天。
+The little raindrop felt itself getting lighter, and slowly it floated up into the sky.
+它又回到了白云妈妈的家。
+It went back home to Mother Cloud.
+小雨点笑着说：“这次旅行真好玩！”
+The little raindrop smiled and said, "That was such a fun trip!"

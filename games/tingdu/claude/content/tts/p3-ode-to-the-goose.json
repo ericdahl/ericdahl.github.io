@@ -1,0 +1,47 @@
+{
+"key": "ff881f4825eca07b",
+"voice": "zh-CN-XiaoxiaoNeural",
+"rate": "-25%",
+"words": [
+{
+"text": "咏鹅",
+"start": 117,
+"end": 850
+},
+{
+"text": "骆宾王",
+"start": 1617,
+"end": 2617
+},
+{
+"text": "鹅",
+"start": 3367,
+"end": 3850
+},
+{
+"text": "鹅",
+"start": 4233,
+"end": 4683
+},
+{
+"text": "鹅",
+"start": 5033,
+"end": 5383
+},
+{
+"text": "曲项向天歌",
+"start": 6133,
+"end": 7800
+},
+{
+"text": "白毛浮绿水",
+"start": 8567,
+"end": 10133
+},
+{
+"text": "红掌拨清波",
+"start": 10900,
+"end": 12450
+}
+]
+}

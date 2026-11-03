@@ -1,0 +1,41 @@
+title: 和奶奶去买菜
+en: Shopping with Grandma
+level: 2
+voice: zh-CN-XiaoxiaoNeural
+rate: -10%
+fix: 长大=zhǎng dà
+---
+星期六早上，奶奶说：“乐乐，跟我去买菜吧！”
+On Saturday morning, Grandma said, "Lele, come with me to buy groceries!"
+我拿上小篮子，跟着奶奶出门了。
+I took my little basket and went out with Grandma.
+
+菜市场里人很多，非常热闹。
+The market was full of people and very lively.
+有卖菜的，有卖水果的，还有卖鱼的。
+There were people selling vegetables, people selling fruit, and people selling fish.
+
+我们先来到卖菜的地方。
+First we went to the vegetable stall.
+奶奶问：“西红柿多少钱一斤？”
+Grandma asked, "How much for a jin of tomatoes?"
+阿姨说：“五块钱一斤。”
+The lady said, "Five yuan a jin."
+奶奶买了两斤西红柿，还买了一把青菜。
+Grandma bought two jin of tomatoes, and a bunch of greens too.
+
+然后，我们去买水果。
+Then we went to buy fruit.
+红红的苹果，黄黄的香蕉，紫紫的葡萄，我都想吃。
+Red apples, yellow bananas, purple grapes — I wanted to eat them all.
+奶奶笑着说：“只能选一样哦。”
+Grandma laughed and said, "You can only pick one."
+我想了想，选了葡萄。
+I thought about it and picked the grapes.
+
+回家的路上，篮子变得很重。
+On the way home, the basket got very heavy.
+我说：“奶奶，我来帮你拿！”
+I said, "Grandma, let me carry it for you!"
+奶奶说：“乐乐长大了，真是个好孩子。”
+Grandma said, "Lele is all grown up. What a good child."

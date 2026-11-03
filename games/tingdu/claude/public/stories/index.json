@@ -1,0 +1,172 @@
+{
+ "stories": [
+  {
+   "id": "01-my-family",
+   "title": "我的一家",
+   "titleTrad": "我的一家",
+   "titlePy": "wǒ de yì jiā",
+   "en": "My Family",
+   "level": 1,
+   "kind": "story",
+   "duration": 34752,
+   "chars": 109,
+   "unique": 64
+  },
+  {
+   "id": "02-little-bear-birthday",
+   "title": "小熊的生日",
+   "titleTrad": "小熊的生日",
+   "titlePy": "xiǎo xióng de shēng rì",
+   "en": "Little Bear's Birthday",
+   "level": 1,
+   "kind": "story",
+   "duration": 47520,
+   "chars": 159,
+   "unique": 85
+  },
+  {
+   "id": "03-little-raindrop",
+   "title": "小雨点去旅行",
+   "titleTrad": "小雨點去旅行",
+   "titlePy": "xiǎo yǔ diǎn qù lǚ xíng",
+   "en": "Little Raindrop Goes on a Trip",
+   "level": 1,
+   "kind": "story",
+   "duration": 49824,
+   "chars": 162,
+   "unique": 84
+  },
+  {
+   "id": "04-waiting-by-the-stump",
+   "title": "守株待兔",
+   "titleTrad": "守株待兔",
+   "titlePy": "shǒu zhū dài tù",
+   "en": "Waiting by the Tree Stump",
+   "level": 2,
+   "kind": "story",
+   "duration": 57216,
+   "chars": 194,
+   "unique": 96
+  },
+  {
+   "id": "05-going-to-the-market",
+   "title": "和奶奶去买菜",
+   "titleTrad": "和奶奶去買菜",
+   "titlePy": "hé nǎi nai qù mǎi cài",
+   "en": "Shopping with Grandma",
+   "level": 2,
+   "kind": "story",
+   "duration": 56424,
+   "chars": 179,
+   "unique": 93
+  },
+  {
+   "id": "06-the-story-of-nian",
+   "title": "年的故事",
+   "titleTrad": "年的故事",
+   "titlePy": "nián de gù shi",
+   "en": "The Story of Nian",
+   "level": 2,
+   "kind": "story",
+   "duration": 65496,
+   "chars": 221,
+   "unique": 125
+  },
+  {
+   "id": "07-the-zodiac-race",
+   "title": "十二生肖",
+   "titleTrad": "十二生肖",
+   "titlePy": "shí èr shēng xiào",
+   "en": "The Great Zodiac Race",
+   "level": 2,
+   "kind": "story",
+   "duration": 66456,
+   "chars": 219,
+   "unique": 124
+  },
+  {
+   "id": "08-the-fox-and-the-tiger",
+   "title": "狐假虎威",
+   "titleTrad": "狐假虎威",
+   "titlePy": "hú jiǎ hǔ wēi",
+   "en": "The Fox Borrows the Tiger's Might",
+   "level": 3,
+   "kind": "story",
+   "duration": 59376,
+   "chars": 207,
+   "unique": 97
+  },
+  {
+   "id": "09-tuantuan-new-friend",
+   "title": "团团的新朋友",
+   "titleTrad": "團團的新朋友",
+   "titlePy": "tuán tuán de xīn péng you",
+   "en": "Tuantuan's New Friend",
+   "level": 3,
+   "kind": "story",
+   "duration": 81480,
+   "chars": 280,
+   "unique": 114
+  },
+  {
+   "id": "10-change-flies-to-the-moon",
+   "title": "嫦娥奔月",
+   "titleTrad": "嫦娥奔月",
+   "titlePy": "cháng é bēn yuè",
+   "en": "Chang'e Flies to the Moon",
+   "level": 3,
+   "kind": "story",
+   "duration": 91176,
+   "chars": 324,
+   "unique": 162
+  },
+  {
+   "id": "p1-quiet-night-thoughts",
+   "title": "静夜思",
+   "titleTrad": "靜夜思",
+   "titlePy": "jìng yè sī",
+   "en": "Quiet Night Thoughts",
+   "level": 1,
+   "kind": "poem",
+   "duration": 12504,
+   "chars": 20,
+   "unique": 17
+  },
+  {
+   "id": "p2-spring-dawn",
+   "title": "春晓",
+   "titleTrad": "春曉",
+   "titlePy": "chūn xiǎo",
+   "en": "Spring Dawn",
+   "level": 1,
+   "kind": "poem",
+   "duration": 12696,
+   "chars": 20,
+   "unique": 19
+  },
+  {
+   "id": "p3-ode-to-the-goose",
+   "title": "咏鹅",
+   "titleTrad": "詠鵝",
+   "titlePy": "yǒng é",
+   "en": "Ode to the Goose",
+   "level": 1,
+   "kind": "poem",
+   "duration": 13224,
+   "chars": 18,
+   "unique": 16
+  },
+  {
+   "id": "p4-pity-the-farmers",
+   "title": "悯农",
+   "titleTrad": "憫農",
+   "titlePy": "mǐn nóng",
+   "en": "Pity the Farmers",
+   "level": 1,
+   "kind": "poem",
+   "duration": 12576,
+   "chars": 20,
+   "unique": 18
+  }
+ ]
+}

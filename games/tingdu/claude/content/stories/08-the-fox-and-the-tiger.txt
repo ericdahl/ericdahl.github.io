@@ -1,0 +1,44 @@
+title: 狐假虎威
+en: The Fox Borrows the Tiger's Might
+level: 3
+voice: zh-CN-YunxiNeural
+rate: -10%
+note: A fable from the Warring States period, over 2,000 years old.
+---
+森林里住着一只老虎。
+A tiger lived in the forest.
+有一天，老虎饿了，出去找吃的。
+One day the tiger was hungry and went out to look for food.
+它抓住了一只狐狸。
+It caught a fox.
+
+狐狸心里很害怕，但是它眼珠一转，大声说：
+The fox was terrified, but its eyes darted about, and it said loudly:
+“你敢吃我？我是天帝派来管理百兽的！”
+"You dare to eat me? The Lord of Heaven sent me to rule over all the animals!"
+“你要是吃了我，就是不听天帝的话。”
+"If you eat me, you'll be disobeying the Lord of Heaven."
+
+老虎有点儿不相信。
+The tiger didn't quite believe it.
+狐狸说：“不信？你跟在我后面走一走，看看大家怕不怕我。”
+The fox said, "You don't believe me? Walk behind me and see whether everyone is afraid of me."
+
+于是，狐狸在前面走，老虎在后面跟着。
+So the fox walked in front, and the tiger followed behind.
+小鹿看见了，转身就跑。
+A little deer saw them, turned, and ran.
+兔子看见了，赶快躲进洞里。
+A rabbit saw them and hurried into its hole.
+猴子看见了，一下子爬到了树上。
+A monkey saw them and scrambled up a tree in a flash.
+
+老虎吃惊地说：“原来大家真的都怕你！”
+The tiger said in amazement, "So everyone really is afraid of you!"
+它放了狐狸，自己也走了。
+It let the fox go and went on its way.
+
+可是，动物们怕的到底是谁呢？
+But who were the animals really afraid of?
+它们怕的不是狐狸，而是狐狸身后的老虎。
+Not the fox — but the tiger walking behind it.

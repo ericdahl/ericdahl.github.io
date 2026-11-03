@@ -1,0 +1,35 @@
+title: 小熊的生日
+en: Little Bear's Birthday
+level: 1
+voice: zh-CN-XiaoxiaoNeural
+rate: -10%
+---
+今天是小熊的生日。
+Today is Little Bear's birthday.
+小熊很早就起床了。
+Little Bear got up very early.
+他想：今天会有朋友来吗？
+He wondered: will any friends come today?
+
+“咚咚咚！”有人敲门。
+"Knock, knock, knock!" Someone was at the door.
+小兔子来了，她送给小熊一个大萝卜。
+Little Rabbit came. She gave Little Bear a big radish.
+小猴子来了，他送给小熊三个香蕉。
+Little Monkey came. He gave Little Bear three bananas.
+小鸟也来了，她给小熊唱了一首歌。
+Little Bird came too. She sang Little Bear a song.
+
+小熊说：“谢谢你们！可是我没有准备蛋糕。”
+Little Bear said, "Thank you! But I didn't make a cake."
+大家笑了：“没关系，我们一起做吧！”
+Everyone laughed. "That's okay, let's make one together!"
+他们用萝卜、香蕉和蜂蜜，做了一个特别的蛋糕。
+With the radish, the bananas and some honey, they made a very special cake.
+
+小熊吹灭了蜡烛，许了一个愿望。
+Little Bear blew out the candles and made a wish.
+他的愿望是什么呢？
+What was his wish?
+他希望每年都能和好朋友在一起。
+He wished he could be with his good friends every year.

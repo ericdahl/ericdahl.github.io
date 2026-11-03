@@ -1,0 +1,40 @@
+title: 年的故事
+en: The Story of Nian
+level: 2
+voice: zh-CN-XiaoxiaoNeural
+rate: -10%
+note: A folk legend about why Chinese New Year is celebrated with red, lights and firecrackers.
+---
+很久以前，有一个怪兽，名字叫“年”。
+Long ago, there was a monster called "Nian".
+年的头上有角，样子非常可怕。
+Nian had horns on its head and looked terrifying.
+每年冬天的最后一天，它就跑到村子里吃东西，还会伤害人。
+On the last day of every winter, it came to the village to eat, and it hurt people too.
+大家都很害怕，一到那天就躲进山里。
+Everyone was very afraid, and when that day came they hid in the mountains.
+
+有一年，村子里来了一位白头发的老爷爷。
+One year, an old man with white hair came to the village.
+他说：“别怕，我有办法赶走年。”
+He said, "Don't be afraid. I know how to drive Nian away."
+
+那天晚上，年又来了。
+That night, Nian came again.
+它看见一家门上贴着红纸，吓了一跳。
+It saw red paper pasted on a family's door and got a fright.
+这时候，院子里突然“噼里啪啦”地响了起来。
+Just then, there was a sudden "crackle-pop!" in the courtyard.
+原来是老爷爷在烧竹子！
+It was the old man, burning bamboo!
+屋子里灯火通明，老爷爷穿着红衣服，哈哈大笑。
+The house was brightly lit, and the old man, dressed in red, laughed out loud.
+年吓得转身就跑，再也不敢回来了。
+Nian was so scared it turned and ran, and never dared to come back.
+
+原来，年最怕红色、火光和响声。
+It turned out that what Nian feared most was the color red, firelight, and loud noises.
+从那以后，每年的这一天，家家户户都贴红纸、放鞭炮、点灯笼。
+Ever since, on this day every year, every family puts up red paper, sets off firecrackers and lights lanterns.
+大家还会互相说：“过年好！”
+And everyone says to each other, "Happy New Year!"

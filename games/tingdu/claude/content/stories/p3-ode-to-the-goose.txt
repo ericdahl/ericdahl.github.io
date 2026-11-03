@@ -1,0 +1,18 @@
+title: 咏鹅
+en: Ode to the Goose
+author: 骆宾王
+author_en: Luo Binwang (c. 640–684), written when he was seven
+dynasty: 唐
+level: 1
+kind: poem
+voice: zh-CN-XiaoxiaoNeural
+rate: -25%
+---
+鹅，鹅，鹅，
+Goose, goose, goose,
+曲项向天歌。
+curving its neck, it sings to the sky.
+白毛浮绿水，
+White feathers float on green water,
+红掌拨清波。
+red feet paddle the clear ripples.

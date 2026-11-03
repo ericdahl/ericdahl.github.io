@@ -1,0 +1,18 @@
+title: 静夜思
+en: Quiet Night Thoughts
+author: 李白
+author_en: Li Bai (701–762)
+dynasty: 唐
+level: 1
+kind: poem
+voice: zh-CN-XiaoxiaoNeural
+rate: -25%
+---
+床前明月光，
+Before my bed, the bright moonlight —
+疑是地上霜。
+I take it for frost upon the ground.
+举头望明月，
+I raise my head and gaze at the bright moon,
+低头思故乡。
+I lower my head and think of home.

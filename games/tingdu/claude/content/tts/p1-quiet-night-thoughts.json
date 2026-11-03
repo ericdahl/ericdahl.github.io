@@ -1,0 +1,37 @@
+{
+"key": "e4b2e0218f62aef1",
+"voice": "zh-CN-XiaoxiaoNeural",
+"rate": "-25%",
+"words": [
+{
+"text": "静夜思",
+"start": 117,
+"end": 1150
+},
+{
+"text": "李白",
+"start": 1917,
+"end": 2650
+},
+{
+"text": "床前明月光",
+"start": 3383,
+"end": 4917
+},
+{
+"text": "疑是地上霜",
+"start": 5683,
+"end": 7233
+},
+{
+"text": "举头望明月",
+"start": 8000,
+"end": 9450
+},
+{
+"text": "低头思故乡",
+"start": 10200,
+"end": 11750
+}
+]
+}

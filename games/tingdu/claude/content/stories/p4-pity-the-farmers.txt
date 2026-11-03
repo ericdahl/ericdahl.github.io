@@ -1,0 +1,18 @@
+title: 悯农
+en: Pity the Farmers
+author: 李绅
+author_en: Li Shen (772–846)
+dynasty: 唐
+level: 1
+kind: poem
+voice: zh-CN-XiaoxiaoNeural
+rate: -25%
+---
+锄禾日当午，
+Hoeing the grain under the noonday sun,
+汗滴禾下土。
+sweat drips onto the soil below.
+谁知盘中餐，
+Who knows that of the food on our plates,
+粒粒皆辛苦。
+every single grain came from hard work?

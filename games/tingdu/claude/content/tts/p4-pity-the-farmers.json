@@ -1,0 +1,37 @@
+{
+"key": "93c38e2806f5dc46",
+"voice": "zh-CN-XiaoxiaoNeural",
+"rate": "-25%",
+"words": [
+{
+"text": "悯农",
+"start": 117,
+"end": 867
+},
+{
+"text": "李绅",
+"start": 1617,
+"end": 2417
+},
+{
+"text": "锄禾日当午",
+"start": 3150,
+"end": 4667
+},
+{
+"text": "汗滴禾下土",
+"start": 5417,
+"end": 7100
+},
+{
+"text": "谁知盘中餐",
+"start": 7850,
+"end": 9483
+},
+{
+"text": "粒粒皆辛苦",
+"start": 10233,
+"end": 11833
+}
+]
+}

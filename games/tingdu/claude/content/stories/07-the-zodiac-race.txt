@@ -1,0 +1,43 @@
+title: 十二生肖
+en: The Great Zodiac Race
+level: 2
+voice: zh-CN-XiaoxiaoNeural
+rate: -10%
+note: A folk tale explaining the order of the twelve animals of the Chinese zodiac.
+---
+很久很久以前，人们不知道怎么记年份。
+A long, long time ago, people didn't know how to keep track of the years.
+玉皇大帝想了一个办法：让动物们来比赛。
+The Jade Emperor came up with an idea: the animals would have a race.
+他说：“最先过河的十二个动物，每个可以代表一年。”
+He said, "The first twelve animals to cross the river will each have a year named after them."
+
+猫和老鼠是好朋友。
+The cat and the rat were good friends.
+猫说：“比赛那天早上，你叫我起床吧。”
+The cat said, "On the morning of the race, please wake me up."
+老鼠说：“好的。”
+The rat said, "Okay."
+可是到了那天，老鼠自己悄悄地走了。
+But when the day came, the rat quietly left on its own.
+
+河水又宽又急，老鼠不会游泳。
+The river was wide and fast, and the rat couldn't swim.
+它看见老牛，就跳到了牛的背上。
+It saw the ox and jumped onto the ox's back.
+老牛游得又稳又快，第一个快要到岸了。
+The ox swam steadily and quickly, and was the first to reach the far bank.
+就在这时，老鼠从牛背上跳下去，抢了第一名。
+Just then, the rat leapt off the ox's back and grabbed first place.
+
+老牛是第二名。
+The ox came second.
+接着，老虎、兔子、龙、蛇、马、羊、猴子、鸡、狗和猪也都到了。
+After that, the tiger, rabbit, dragon, snake, horse, goat, monkey, rooster, dog and pig all arrived too.
+
+猫醒来的时候，比赛已经结束了。
+When the cat woke up, the race was already over.
+它非常生气，从那天起，猫一看见老鼠就要抓它。
+It was furious, and from that day on, whenever a cat sees a rat, it chases it.
+你是属什么的呢？
+And which animal year were you born in?

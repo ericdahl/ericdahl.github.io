@@ -1,0 +1,51 @@
+title: 嫦娥奔月
+en: Chang'e Flies to the Moon
+level: 3
+voice: zh-CN-XiaoxiaoNeural
+rate: -10%
+note: The legend behind the Mid-Autumn Festival.
+---
+很久很久以前，天上有十个太阳。
+Long, long ago, there were ten suns in the sky.
+大地被晒得又干又热，庄稼都枯死了，人们生活得非常辛苦。
+The land was baked dry and hot, the crops all withered, and life was very hard for people.
+
+有一个叫后羿的英雄，力气特别大。
+There was a hero named Hou Yi, who was incredibly strong.
+他拉开神弓，一口气射下了九个太阳。
+He drew his magic bow and shot down nine of the suns, one after another.
+从此，天气变得凉快了，大家都很感谢他。
+After that the weather became cool, and everyone was very grateful to him.
+
+后羿有一个美丽善良的妻子，名叫嫦娥。
+Hou Yi had a beautiful, kind-hearted wife named Chang'e.
+有一天，王母娘娘送给后羿一包仙药。
+One day, the Queen Mother of the West gave Hou Yi a packet of magic elixir.
+吃了这种药，就可以飞到天上，成为神仙。
+Whoever took this elixir could fly up to the heavens and become immortal.
+后羿舍不得离开嫦娥，就把药交给她保管。
+Hou Yi couldn't bear to leave Chang'e, so he gave her the elixir to keep safe.
+
+有一个坏人知道了这件事。
+A wicked man found out about it.
+一天，后羿出门打猎，坏人闯进家里，要嫦娥交出仙药。
+One day, while Hou Yi was out hunting, the wicked man burst into the house and demanded that Chang'e hand over the elixir.
+嫦娥不愿意把药给坏人，就一口把药吞了下去。
+Chang'e would not give it to him, so she swallowed the elixir in one gulp.
+
+嫦娥的身体越来越轻，慢慢地飘出窗外，向天上飞去。
+Chang'e grew lighter and lighter, slowly drifted out of the window, and flew up toward the sky.
+她舍不得后羿，就停在了离人间最近的月亮上。
+She couldn't bear to be far from Hou Yi, so she stopped on the moon, the place closest to the world of people.
+
+后羿回到家，看不见嫦娥，心里非常难过。
+When Hou Yi came home and couldn't find Chang'e, he was heartbroken.
+他抬头一看，月亮又圆又亮，好像嫦娥在看着他。
+He looked up, and the moon was round and bright, as if Chang'e were watching him.
+他在院子里摆上嫦娥最爱吃的水果和点心，思念着她。
+He laid out Chang'e's favorite fruit and treats in the courtyard, and thought of her.
+
+后来，每年的八月十五，人们都会一边赏月，一边吃月饼。
+Ever since, on the fifteenth day of the eighth month, people admire the moon while eating mooncakes.
+这一天就是中秋节。
+That day is the Mid-Autumn Festival.
