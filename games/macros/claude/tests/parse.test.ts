@@ -48,6 +48,11 @@ describe('quick-add parser', () => {
     expect(q.macros).toMatchObject({ kcal: 900, protein: 45, fat: 35, carbs: 100 });
   });
 
+  it('knows mini (street taco) tortillas', () => {
+    const [t] = p('4 mini corn tortillas');
+    expect([t.food?.id, t.qty, t.unit, t.grams]).toEqual(['b:tortilla-corn', 4, 'mini tortilla', 52]);
+  });
+
   it('bare numbers ≥ 20 are grams', () => {
     expect(p('150 chicken breast')[0].grams).toBe(150);
   });

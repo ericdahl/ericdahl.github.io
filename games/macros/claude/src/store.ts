@@ -38,6 +38,10 @@ interface State {
   targets: Targets;
 }
 
+/**
+ * Built-in saved meals. Each is added once per device (tracked in "seeded"), so one added in a
+ * later version still appears for existing users, and one the user deleted stays deleted.
+ */
 const SEED_ROUTINES: Routine[] = [
   {
     id: 'r:morning',
@@ -50,12 +54,39 @@ const SEED_ROUTINES: Routine[] = [
       { foodId: 'b:fish-oil', qty: 3, unit: 'softgel' },
     ],
   },
+  {
+    id: 'r:protein-shake',
+    name: 'Protein shake',
+    items: [{ foodId: 'b:on-whey', qty: 2, unit: 'scoop' }],
+  },
+  {
+    id: 'r:egg-tacos',
+    name: 'Egg tacos',
+    items: [
+      { foodId: 'b:egg', qty: 4, unit: 'egg' },
+      { foodId: 'b:tortilla-corn', qty: 4, unit: 'mini tortilla' },
+      { foodId: 'b:salsa', qty: 2, unit: 'tbsp' },
+    ],
+  },
 ];
+
+function seedRoutines(): Routine[] {
+  const stored = load<Routine[] | null>('routines', null);
+  // Before seeds were tracked, only the breakfast existed; count it as offered if routines were saved.
+  const seeded = new Set(load<string[] | null>('seeded', null) ?? (stored ? ['r:morning'] : []));
+  const list = stored ?? [];
+  const fresh = SEED_ROUTINES.filter((r) => !seeded.has(r.id) && !list.some((x) => x.id === r.id));
+  if (!fresh.length && stored) return stored;
+  const out = [...list, ...fresh];
+  save('routines', out);
+  save('seeded', SEED_ROUTINES.map((r) => r.id));
+  return out;
+}
 
 const state: State = {
   entries: load<Entry[]>('entries', []),
   foods: load<Food[]>('foods', []),
-  routines: load<Routine[] | null>('routines', null) ?? SEED_ROUTINES,
+  routines: seedRoutines(),
   targets: { ...DEFAULT_TARGETS, ...load<Partial<Targets>>('targets', {}) },
 };
 

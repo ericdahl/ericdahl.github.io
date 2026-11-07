@@ -24,7 +24,7 @@ const ROWS: Row[] = [
   ['bagel', 'Bagel, plain', 'bagel', 257, 10, 1.6, 50.5, 2.2, 'bagel=105', 'bagel'],
   ['english-muffin', 'English muffin', 'english muffin,muffin', 227, 8.9, 1.7, 44.2, 3.5, 'muffin=57', 'muffin'],
   ['tortilla-flour', 'Flour tortilla', 'tortilla,wrap', 306, 8.2, 8, 50, 3.5, 'tortilla=49', 'tortilla'],
-  ['tortilla-corn', 'Corn tortilla', 'corn tortilla,taco shell', 218, 5.7, 2.9, 44.6, 6.3, 'tortilla=26', 'tortilla'],
+  ['tortilla-corn', 'Corn tortilla', 'corn tortilla,taco shell,street taco tortilla,mini tortilla', 218, 5.7, 2.9, 44.6, 6.3, 'tortilla=26|mini tortilla=13', 'tortilla'],
   ['bun', 'Hamburger bun', 'bun,burger bun,hot dog bun', 279, 9.7, 4.1, 49.7, 2.4, 'bun=52', 'bun'],
   ['granola', 'Granola', 'granola,muesli', 471, 10, 20, 64, 7, 'cup=122|half cup=61'],
   ['cheerios', 'Cheerios', 'cereal,cheerios,breakfast cereal', 376, 12, 6.7, 73, 10, 'cup=28'],

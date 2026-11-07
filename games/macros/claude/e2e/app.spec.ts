@@ -171,3 +171,37 @@ test('history charts render', async ({ page }) => {
   await expect(page.locator('.tile').first()).toContainText('653');
   await expect(page.locator('table.days tbody tr')).toHaveCount(1);
 });
+
+test('protein shake and egg tacos are one tap too', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /Egg tacos/ }).click();
+  await expect(page.locator('.meal .entry')).toHaveCount(3);
+  await expect(page.locator('.meal .entry').nth(1)).toContainText('4 mini tortillas');
+  await expect(page.locator('.meal-head')).toContainText('411 kcal · P 29');
+  await page.getByRole('button', { name: /Protein shake/ }).click();
+  await expect(page.locator('.meal .entry')).toHaveCount(4);
+  await expect(page.locator('.meal-head')).toContainText('651 kcal · P 77');
+});
+
+test('new built-in meals reach existing users once, and deleted ones stay deleted', async ({ page }) => {
+  // someone from before this version: breakfast renamed, no seed tracking yet
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('init')) return;
+    sessionStorage.setItem('init', '1');
+    localStorage.setItem(
+      'macros.v1.routines',
+      JSON.stringify([{ id: 'r:morning', name: 'My oats', meal: 'breakfast', items: [{ foodId: 'b:oats-dry', qty: 86, unit: 'g' }] }]),
+    );
+  });
+  await page.goto('/');
+  const chips = page.locator('.chip.routine');
+  await expect(chips).toHaveText([/My oats/, /Protein shake/, /Egg tacos/]);
+
+  await page.goto('/#/foods');
+  await page.getByRole('button', { name: /Egg tacos/ }).click();
+  page.on('dialog', (d) => d.accept());
+  await page.locator('dialog.sheet').getByRole('button', { name: 'Delete' }).click();
+  await page.goto('/');
+  await page.reload();
+  await expect(chips).toHaveText([/My oats/, /Protein shake/]);
+});

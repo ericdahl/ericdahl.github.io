@@ -32,7 +32,12 @@ Items with no match stay in the box after the rest are added, with a link to sea
 
 **One-tap buttons** sit under the box:
 
-- **Saved meals.** A "Usual breakfast" with the four items above is already set up. Any logged meal can be saved as a new one with "Save as a meal…" below it.
+- **Saved meals.** Three come set up:
+  - "Usual breakfast": the four items above.
+  - "Protein shake": 2 scoops of whey.
+  - "Egg tacos": 4 eggs, 4 mini corn tortillas and 2 tbsp salsa.
+
+  Any logged meal can be saved as a new one with "Save as a meal…" below it. Saved meals can be edited or deleted on the Foods page. A deleted built-in meal doesn't come back.
 - **Portions you log often.** Anything logged at least twice in 60 days, with the same amount, gets a button.
 
 Every add has an **Undo**. Tap a logged item to change its amount, meal or date, or to delete it. ‹ › and the date move between days.
