@@ -670,3 +670,24 @@ button {
 }
 .hc-toggle { font-size: 14px; color: #c8b890; }
 .credits { font-size: 11px; margin-top: auto; }
+
+/* ------------------------------------------------------------------ save transfer */
+
+.xfer-box { width: min(480px, 100%); background: rgba(20, 12, 8, 0.95); border: 1px solid #4a3a26; border-radius: 6px; padding: 18px 16px; }
+.xfer-title { font-size: 22px; color: var(--gold-hi); letter-spacing: 0.06em; }
+.xfer-sec { display: flex; flex-direction: column; gap: 8px; align-items: center; width: 100%; }
+.xfer-h { color: #c8b890; font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; }
+.xfer-code {
+  width: 100%;
+  font: 11px/1.3 ui-monospace, monospace;
+  background: #0e0a06;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 6px 8px;
+  resize: vertical;
+  word-break: break-all;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.xfer-status { min-height: 18px; font-size: 13px; color: #9ad08a; }
+.xfer-status.bad { color: #ff7a6a; }

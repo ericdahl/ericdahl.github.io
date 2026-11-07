@@ -36,7 +36,16 @@ Panels pause the game.
 - **Quests.** Cleanse the Hollow Cave (+1 skill point), slay the Drowned Bishop (+5 stat points), and destroy the Mother of Cinders to unlock **Nightmare**, then **Hell**: tougher monsters, immunities and resistance penalties.
 - **Hardcore** heroes die permanently. Softcore heroes respawn in town and lose some gold.
 
-Progress saves automatically to the browser's local storage.
+Progress saves automatically to the browser's local storage. To move heroes to another device, use **Export / Import** on the title screen: download a save file or copy a short save code, then load the file or paste the code on the other device. Importing replaces a hero with the same identity and keeps the rest.
+
+## Versions
+
+The version is shown at the bottom of the title screen.
+
+| Version | Commit | Notes |
+|---|---|---|
+| 0.2.0 | | Save export/import (file or copy/paste code) |
+| 0.1.0 | `0fffeff` | Initial release. Roll back with `git checkout 0fffeff -- games/hellforge/claude` |
 
 ## Development
 

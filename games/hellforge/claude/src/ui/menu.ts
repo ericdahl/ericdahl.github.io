@@ -1,7 +1,8 @@
 import { CLASSES, createCharacter, DIFFICULTIES, type Character } from '../game/character';
 import type { ClassId } from '../game/items';
 import { h } from './dom';
-import { deleteCharacter, loadCharacters, saveCharacter } from './save';
+import { deleteCharacter, importCharacters, loadCharacters, saveCharacter } from './save';
+import { bundleJson, decodeSave, downloadFile, encodeCode } from './transfer';
 
 /** Title screen: pick, create or delete a hero. Calls `play` with the chosen character. */
 export function showMenu(root: HTMLElement, play: (c: Character) => void) {
@@ -54,7 +55,8 @@ export function showMenu(root: HTMLElement, play: (c: Character) => void) {
             }, 'Delete')
           : null,
       ),
-      h('div', { class: 'credits dim' }, 'All art and sound generated in code.'),
+      h('div', { class: 'menu-actions' }, h('button', { class: 'btn', onclick: () => showTransfer(root, play) }, 'Export / Import')),
+      h('div', { class: 'credits dim' }, `All art and sound generated in code. v${__APP_VERSION__}`),
     );
   };
 
@@ -95,10 +97,85 @@ export function showMenu(root: HTMLElement, play: (c: Character) => void) {
         }, 'Create'),
         h('button', { class: 'btn big', onclick: () => (chars.length ? renderList() : showMenu(root, play)) }, 'Back'),
       ),
+      chars.length ? '' : h('button', { class: 'btn', onclick: () => showTransfer(root, play) }, 'Import a save'),
     );
     name.focus();
   };
 
   if (chars.length) renderList();
   else renderCreate();
+}
+
+/** Overlay for moving heroes between devices: download/copy all heroes, or load a file/code. */
+function showTransfer(root: HTMLElement, play: (c: Character) => void) {
+  const chars = loadCharacters();
+  const status = h('div', { class: 'xfer-status' });
+  const say = (msg: string, bad = false) => {
+    status.textContent = msg;
+    status.classList.toggle('bad', bad);
+  };
+  const close = () => {
+    ov.remove();
+    showMenu(root, play);
+  };
+  const code = h('textarea', { class: 'xfer-code', rows: 4, spellcheck: 'false', placeholder: 'Paste a save code here', 'aria-label': 'Save code' }) as HTMLTextAreaElement;
+
+  const doImport = async (text: string) => {
+    try {
+      const incoming = await decodeSave(text);
+      const have = new Set(chars.map((c) => c.id));
+      const clash = incoming.filter((c) => have.has(c.id));
+      if (clash.length && !confirm(`Replace the existing ${clash.map((c) => c.name).join(', ')} with the imported version?`)) return;
+      importCharacters(incoming);
+      say(`Imported ${incoming.map((c) => c.name).join(', ')}.`);
+      setTimeout(close, 700);
+    } catch (e) {
+      say(e instanceof Error ? e.message : String(e), true);
+    }
+  };
+  const file = h('input', {
+    type: 'file', accept: '.json,application/json,text/plain', style: { display: 'none' },
+    onchange: async () => {
+      const f = file.files?.[0];
+      if (f) await doImport(await f.text());
+      file.value = '';
+    },
+  }) as HTMLInputElement;
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  const exportBox = chars.length
+    ? h('div', { class: 'xfer-sec' },
+        h('div', { class: 'xfer-h' }, `Export (${chars.length} hero${chars.length === 1 ? '' : 'es'})`),
+        h('div', { class: 'menu-actions' },
+          h('button', { class: 'btn', onclick: () => { downloadFile(`hellforge-save-${stamp}.json`, bundleJson(chars)); say('Save file downloaded.'); } }, 'Download file'),
+          h('button', {
+            class: 'btn', onclick: async () => {
+              const c = await encodeCode(chars);
+              code.value = c;
+              code.select();
+              try {
+                await navigator.clipboard.writeText(c);
+                say(`Save code copied (${c.length.toLocaleString()} characters).`);
+              } catch {
+                say('Copy the code from the box below.');
+              }
+            },
+          }, 'Copy save code')))
+    : null;
+
+  const ov = h('div', { class: 'overlay xfer', onclick: (e: Event) => e.target === ov && close() },
+    h('div', { class: 'ov-box xfer-box' },
+      h('div', { class: 'xfer-title' }, 'Export / Import'),
+      exportBox,
+      h('div', { class: 'xfer-sec' },
+        h('div', { class: 'xfer-h' }, 'Import'),
+        h('div', { class: 'menu-actions' },
+          h('button', { class: 'btn', onclick: () => file.click() }, 'Load file'),
+          h('button', { class: 'btn', onclick: () => doImport(code.value) }, 'Import code')),
+        h('div', { class: 'small dim' }, 'Heroes with the same identity are replaced; others are kept.')),
+      code,
+      status,
+      file,
+      h('button', { class: 'btn big', onclick: close }, 'Close')));
+  document.body.append(ov);
 }
