@@ -46,8 +46,10 @@ export class Game implements PanelHost {
     root.append(this.canvas);
     this.renderer = new Renderer(this.canvas);
     this.renderer.showLabels = this.settings.labels;
+    this.renderer.showWeather = this.settings.weather;
     this.renderer.automap = this.settings.automap === 'full' ? 'mini' : this.settings.automap;
     this.audio.setEnabled(this.settings.sound);
+    this.audio.setMusic(this.settings.music);
     this.buildHud();
     this.bindInput();
     this.resize();
@@ -68,6 +70,7 @@ export class Game implements PanelHost {
     window.removeEventListener('pagehide', this.onHide);
     window.removeEventListener('keydown', this.onKey);
     window.removeEventListener('keyup', this.onKeyUp);
+    this.audio.close();
   }
 
   private onHide = () => {
@@ -101,6 +104,7 @@ export class Game implements PanelHost {
       }
     } else this.acc = 0;
     this.drainEvents();
+    this.updateMusic();
     this.renderer.render(w, this.paused ? 0 : dt);
     this.updateHud();
     this.saveT += dt;
@@ -110,6 +114,21 @@ export class Game implements PanelHost {
     }
     this.raf = requestAnimationFrame(this.frame);
   };
+
+  /** Feed the score how hard the fight is and how close to death the player is. */
+  private updateMusic() {
+    const m = this.audio.music;
+    if (!m) return;
+    const w = this.world;
+    const p = w.player;
+    let threat = 0;
+    for (const mo of w.area.monsters) {
+      if (mo.dead || !mo.alert || Math.abs(mo.x - p.x) > 12 || Math.abs(mo.y - p.y) > 12) continue;
+      threat += mo.rarity === 'boss' ? 6 : mo.rarity === 'unique' || mo.rarity === 'champion' ? 2 : 1;
+    }
+    m.setIntensity(w.inTown ? 0 : threat / 8);
+    m.life = p.dead ? 1 : p.life / Math.max(1, w.stats.maxLife);
+  }
 
   private updateHeld() {
     const w = this.world;
@@ -423,9 +442,11 @@ export class Game implements PanelHost {
     if (s) this.panelEl.querySelector('.detail .acts')?.scrollIntoView({ block: 'nearest' });
   }
 
-  toggleSetting(k: 'sound' | 'labels' | 'numbers') {
+  toggleSetting(k: 'sound' | 'music' | 'weather' | 'labels' | 'numbers') {
     this.settings[k] = !this.settings[k];
     if (k === 'sound') this.audio.setEnabled(this.settings.sound);
+    if (k === 'music') this.audio.setMusic(this.settings.music);
+    if (k === 'weather') this.renderer.showWeather = this.settings.weather;
     if (k === 'labels') this.renderer.showLabels = this.settings.labels;
     saveSettings(this.settings);
   }

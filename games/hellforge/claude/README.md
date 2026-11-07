@@ -37,6 +37,8 @@ Panels pause the game.
 - **Quests.** Cleanse the Hollow Cave (+1 skill point), slay the Drowned Bishop (+5 stat points), and destroy the Mother of Cinders to unlock **Nightmare**, then **Hell**: tougher monsters, immunities and resistance penalties.
 - **Hardcore** heroes die permanently. Softcore heroes respawn in town and lose some gold.
 
+Music, ambient sound and weather are all generated in code too; the menu has switches for each.
+
 Progress saves automatically to the browser's local storage. To move heroes to another device, use **Export / Import** on the title screen: download a save file or copy a short save code, then load the file or paste the code on the other device. Importing replaces a hero with the same identity and keeps the rest.
 
 ## Versions
@@ -45,7 +47,8 @@ The version is shown at the bottom of the title screen; tap it for the player-fa
 
 | Version | Commit | Notes |
 |---|---|---|
-| 0.4.2 | | Equipped/Backpack separation and side-by-side gear comparison |
+| 0.5.0 | | Generated music, ambient sound, weather and status vignettes |
+| 0.4.2 | `81bbadc` | Equipped/Backpack separation and side-by-side gear comparison |
 | 0.4.1 | `d77a7a5` | Item keyboard shortcuts and right-click |
 | 0.4.0 | `12380da` | Necromancer class |
 | 0.3.0 | `45bb4fd` | Changelog viewer on the title screen |

@@ -1,6 +1,17 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.5.0',
+    date: '2026-11-07',
+    notes: [
+      'Music: a generated score for every area, from a lute by the camp fire to war drums in the Hellforge. Drums build as fights get heavier, and a heartbeat sets in when your life runs low.',
+      'Ambient sound: crackling fires, wind, owls, cave drips, distant bells, rattling chains and whispers, and rumbles from deep below.',
+      'Weather: falling ash and drifting embers in the Cinder Fields, leaves and fog in Gloomwood, drips and dust underground, a storm of embers in the Hellforge.',
+      'The screen edges frost over when you are chilled, turn green when poisoned and pulse red near death.',
+      'New Music and Weather effects switches in the menu.',
+    ],
+  },
+  {
     version: '0.4.2',
     date: '2026-11-07',
     notes: [

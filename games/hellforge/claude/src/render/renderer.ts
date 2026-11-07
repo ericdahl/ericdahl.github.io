@@ -4,6 +4,7 @@ import { tileHash } from '../game/rng';
 import type { AreaState, Fx, Monster, Npc, Projectile, World } from '../game/world';
 import { Camera, TILE_H, TILE_W } from './camera';
 import { baseIconCanvas } from './icons';
+import { Weather } from './weather';
 import { drawHumanoid, drawMonsterShape, floorTile, shade, treeSprite, wallBlock, WALL_H, TREE_W, TREE_H, type HumanoidLook, type Pose } from './sprites';
 
 interface Drawable {
@@ -42,6 +43,9 @@ export class Renderer {
   private propIndex = new WeakMap<Level, Map<number, Prop>>();
   private mapCache = new WeakMap<AreaState, { canvas: HTMLCanvasElement; t: number; ox: number; oy: number }>();
   private time = 0;
+  private weather = new Weather();
+  /** Particle atmosphere (ash, fog, embers...). */
+  showWeather = true;
 
   constructor(readonly canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d')!;
@@ -247,6 +251,10 @@ export class Renderer {
     for (const f of a.fx) this.drawFx(f, lights);
 
     this.drawLighting(lights, a.def.dark);
+    if (this.showWeather) {
+      this.weather.update(w, dt);
+      this.weather.draw(ctx, cam, w);
+    }
 
     // Screen-space overlays.
     this.drawLabels(w);
@@ -259,6 +267,7 @@ export class Renderer {
       ctx.fillStyle = `rgba(160,0,0,${p.hurt * 0.6})`;
       ctx.fillRect(0, 0, cam.w, cam.h);
     }
+    this.weather.drawVignettes(ctx, cam, w);
     if (this.automap !== 'off') this.drawAutomap(w);
   }
 

@@ -1,4 +1,6 @@
+import { AREA_BY_ID } from '../game/areas';
 import type { SoundId } from '../game/world';
+import { Music } from './music';
 
 /** Tiny procedural sound bank on WebAudio; no audio files needed. */
 export class Audio {
@@ -8,6 +10,9 @@ export class Audio {
   private last: Partial<Record<SoundId, number>> = {};
   private ambient: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
   enabled = true;
+  musicOn = true;
+  music: Music | null = null;
+  private area = 'town';
 
   /** Must be called from a user gesture on iOS. */
   unlock() {
@@ -25,11 +30,28 @@ export class Audio {
     this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    this.music = new Music(this.ctx, this.noise, this.master);
+    this.music.setEnabled(this.musicOn && this.enabled);
+    this.ambience(this.area);
+  }
+
+  /** Stop everything and release the audio device (leaving the game). */
+  close() {
+    this.music?.dispose();
+    this.music = null;
+    void this.ctx?.close();
+    this.ctx = null;
+  }
+
+  setMusic(on: boolean) {
+    this.musicOn = on;
+    this.music?.setEnabled(on && this.enabled);
   }
 
   setEnabled(on: boolean) {
     this.enabled = on;
     if (this.master) this.master.gain.value = on ? 0.5 : 0;
+    this.music?.setEnabled(this.musicOn && on);
   }
 
   private tone(type: OscillatorType, f0: number, f1: number, dur: number, vol: number, delay = 0) {
@@ -99,7 +121,9 @@ export class Audio {
 
   /** Low filtered rumble that changes per area for atmosphere. */
   ambience(areaId: string) {
+    this.area = areaId;
     if (!this.ctx) return;
+    this.music?.setTheme(AREA_BY_ID[areaId]?.spec.theme ?? 'fields');
     if (this.ambient) {
       const old = this.ambient;
       old.gain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.4);
@@ -115,7 +139,7 @@ export class Audio {
     f.frequency.value = areaId === 'town' ? 500 : areaId === 'hellforge' ? 160 : 260;
     const g = c.createGain();
     g.gain.value = 0;
-    g.gain.setTargetAtTime(areaId === 'town' ? 0.05 : 0.09, c.currentTime, 1);
+    g.gain.setTargetAtTime(areaId === 'town' ? 0.03 : 0.06, c.currentTime, 1);
     s.connect(f).connect(g).connect(this.master!);
     s.start();
     this.ambient = { src: s, gain: g };

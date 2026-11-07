@@ -28,8 +28,8 @@ export interface PanelHost {
   open(p: PanelKind): void;
   toast(text: string, color?: string): void;
   quitToMenu(): void;
-  settings: { sound: boolean; labels: boolean; numbers: boolean };
-  toggleSetting(k: 'sound' | 'labels' | 'numbers'): void;
+  settings: { sound: boolean; music: boolean; weather: boolean; labels: boolean; numbers: boolean };
+  toggleSetting(k: 'sound' | 'music' | 'weather' | 'labels' | 'numbers'): void;
 }
 
 const SLOT_LAYOUT: { slot: Slot; label: string; area: string }[] = [
@@ -495,7 +495,7 @@ function fencePanel(host: PanelHost) {
 
 function menuPanel(host: PanelHost) {
   const s = host.settings;
-  const tog = (k: 'sound' | 'labels' | 'numbers', label: string) => h('button', { class: `btn ${s[k] ? 'on' : ''}`, onclick: () => { host.toggleSetting(k); host.refresh(); } }, `${label}: ${s[k] ? 'On' : 'Off'}`);
+  const tog = (k: 'sound' | 'music' | 'weather' | 'labels' | 'numbers', label: string) => h('button', { class: `btn ${s[k] ? 'on' : ''}`, onclick: () => { host.toggleSetting(k); host.refresh(); } }, `${label}: ${s[k] ? 'On' : 'Off'}`);
   return h(
     'div',
     { class: 'panel menu' },
@@ -503,6 +503,8 @@ function menuPanel(host: PanelHost) {
     h('div', { class: 'p-body menu-list' },
       h('button', { class: 'btn primary', onclick: () => host.close() }, 'Return to Game'),
       tog('sound', 'Sound'),
+      tog('music', 'Music'),
+      tog('weather', 'Weather effects'),
       tog('labels', 'Item labels'),
       tog('numbers', 'Damage numbers'),
       h('button', { class: 'btn', onclick: () => host.open('help') }, 'How to Play'),
