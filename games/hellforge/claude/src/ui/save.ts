@@ -8,6 +8,7 @@ export interface Settings {
   sound: boolean;
   music: boolean;
   weather: boolean;
+  screenFx: boolean;
   labels: boolean;
   numbers: boolean;
   automap: 'off' | 'mini' | 'full';
@@ -57,7 +58,7 @@ export function deleteCharacter(id: string) {
 }
 
 export function loadSettings(): Settings {
-  return { sound: true, music: true, weather: true, labels: true, numbers: true, automap: 'mini', ...read<Partial<Settings>>(SETTINGS, {}) };
+  return { sound: true, music: true, weather: true, screenFx: true, labels: true, numbers: true, automap: 'mini', ...read<Partial<Settings>>(SETTINGS, {}) };
 }
 
 export function saveSettings(s: Settings) {

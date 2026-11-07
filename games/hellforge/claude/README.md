@@ -47,7 +47,8 @@ The version is shown at the bottom of the title screen; tap it for the player-fa
 
 | Version | Commit | Notes |
 |---|---|---|
-| 0.5.0 | | Generated music, ambient sound, weather and status vignettes |
+| 0.6.0 | | Hit feedback: freeze frames, crit pops, death effects by damage type, boss flashes |
+| 0.5.0 | `41e78b6` | Generated music, ambient sound, weather and status vignettes |
 | 0.4.2 | `81bbadc` | Equipped/Backpack separation and side-by-side gear comparison |
 | 0.4.1 | `d77a7a5` | Item keyboard shortcuts and right-click |
 | 0.4.0 | `12380da` | Necromancer class |

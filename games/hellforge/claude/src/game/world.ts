@@ -32,11 +32,16 @@ export type GameEvent =
   | { type: 'area'; id: string }
   | { type: 'quest'; id: string }
   | { type: 'victory' }
-  | { type: 'shake'; amount: number };
+  | { type: 'shake'; amount: number }
+  /** Freeze the action for a moment to sell a heavy hit. */
+  | { type: 'hitstop'; t: number }
+  /** A full-screen colour flash (boss abilities, boss deaths). */
+  | { type: 'flash'; color: string; a: number };
 
 export type FxKind =
   | 'blood' | 'spark' | 'nova' | 'explosion' | 'chain' | 'meteor_mark' | 'burn' | 'teleport' | 'levelup' | 'heal'
-  | 'shrine' | 'text' | 'shout' | 'revive' | 'whirl' | 'slam' | 'portal_open' | 'raise' | 'curse';
+  | 'shrine' | 'text' | 'shout' | 'revive' | 'whirl' | 'slam' | 'portal_open' | 'raise' | 'curse'
+  | 'shatter' | 'cinders' | 'zap' | 'gore';
 
 export interface Fx {
   kind: FxKind;
@@ -48,7 +53,12 @@ export interface Fx {
   color?: string;
   text?: string;
   pts?: Point[];
+  /** Font size for floating text. */
+  size?: number;
 }
+
+/** How a monster died, for its death effect and corpse. */
+export type DeathKind = 'normal' | 'shatter' | 'burn' | 'shock' | 'melt' | 'gib';
 
 export interface Monster {
   id: number;
@@ -99,6 +109,7 @@ export interface Monster {
   /** A corpse that was raised or exploded and can't be used again. */
   used?: boolean;
   stuckT?: number;
+  deathKind?: DeathKind;
 }
 
 export interface Projectile {
@@ -322,8 +333,8 @@ export class World {
     this.area.fx.push({ ...f, t: 0 });
   }
 
-  floatText(x: number, y: number, text: string, color: string) {
-    this.fx({ kind: 'text', x, y, dur: 0.9, text, color });
+  floatText(x: number, y: number, text: string, color: string, size?: number) {
+    this.fx({ kind: 'text', x, y, dur: size ? 1.1 : 0.9, text, color, size });
   }
 
   get inTown() {
@@ -1738,7 +1749,13 @@ export class World {
     if (!o.minion) this.setFocus(m);
     if (total > 0) {
       this.fx({ kind: d.phys > 0 ? 'blood' : 'spark', x: m.x, y: m.y, dur: 0.35, color: elemColor(d) });
-      this.floatText(m.x, m.y, String(Math.round(total)), o.crit ? '#ffd040' : '#ffffff');
+      if (o.crit) this.floatText(m.x, m.y, `${Math.round(total)}!`, '#ffd040', 21);
+      else this.floatText(m.x, m.y, String(Math.round(total)), '#ffffff');
+      // Heavy blows land with a brief freeze and a jolt.
+      if (!o.minion && (o.crit || total > m.maxLife * 0.4)) {
+        this.emit({ type: 'hitstop', t: o.crit ? 0.06 : 0.04 });
+        this.emit({ type: 'shake', amount: o.crit ? 3 : 2 });
+      }
     }
     // Hit recovery: big hits briefly interrupt.
     if (total > m.maxLife * 0.12 && m.rarity !== 'boss') {
@@ -1750,7 +1767,7 @@ export class World {
       p.life = Math.min(this.stats.maxLife, p.life + (total * this.stats.lifeSteal) / 100);
       p.mana = Math.min(this.stats.maxMana, p.mana + (total * this.stats.manaSteal) / 100);
     }
-    if (m.life <= 0) this.killMonster(m);
+    if (m.life <= 0) this.killMonster(m, deathKindOf(d, m.res, -m.life > m.maxLife * 0.5));
     return true;
   }
 
@@ -1760,13 +1777,15 @@ export class World {
     for (const o of this.area.monsters) if (o.packId === m.packId && !o.dead && Math.hypot(o.x - m.x, o.y - m.y) < 10) o.alert = true;
   }
 
-  private killMonster(m: Monster) {
+  private killMonster(m: Monster, how: DeathKind = 'normal') {
     const a = this.area;
     m.dead = true;
     m.life = 0;
     m.deadT = 0;
     m.action = null;
+    m.deathKind = m.def.shape === 'wraith' || m.def.shape === 'bat' ? 'normal' : how;
     this.sound('death');
+    this.deathEffect(m);
     const mult = xpMultiplier(m.level, this.char.level) * (1 + this.player.xpBonus / 100);
     const gained = addXp(this.char, m.xp * mult);
     if (gained) this.levelUp();
@@ -1799,6 +1818,34 @@ export class World {
       this.setQuest('hollow', 'done');
       this.msg('The Hollow Cave has been cleansed! Return to Old Corvin.', '#e8c860');
       this.sound('quest');
+    }
+  }
+
+  /** The burst a monster dies in, by how it died, plus a jolt for elites and bosses. */
+  private deathEffect(m: Monster) {
+    const at = { x: m.x, y: m.y };
+    switch (m.deathKind) {
+      case 'shatter':
+        this.fx({ kind: 'shatter', ...at, dur: 0.7, r: m.def.scale });
+        this.sound('cold');
+        break;
+      case 'burn':
+        this.fx({ kind: 'cinders', ...at, dur: 1.4, r: m.def.scale });
+        break;
+      case 'shock':
+        this.fx({ kind: 'zap', ...at, dur: 0.45, r: m.def.scale });
+        break;
+      case 'gib':
+        this.fx({ kind: 'gore', ...at, dur: 0.8, r: m.def.scale });
+        break;
+    }
+    if (m.rarity === 'boss') {
+      this.emit({ type: 'hitstop', t: 0.35 });
+      this.emit({ type: 'shake', amount: 14 });
+      this.emit({ type: 'flash', color: '#ffffff', a: 0.45 });
+    } else if (m.rarity === 'unique' || m.rarity === 'champion') {
+      this.emit({ type: 'hitstop', t: 0.07 });
+      this.emit({ type: 'shake', amount: 4 });
     }
   }
 
@@ -1845,6 +1892,10 @@ export class World {
     p.hurt = 0.25;
     if (total >= 1) this.floatText(p.x, p.y, String(Math.round(total)), '#ff5050');
     if (total > st.maxLife * 0.08) this.sound('hurt');
+    if (total > st.maxLife * 0.2) {
+      this.emit({ type: 'hitstop', t: 0.05 });
+      this.emit({ type: 'shake', amount: 5 });
+    }
     const src = o.source;
     if (src && o.melee) {
       if (st.thorns > 0) this.damageMonster(src, { phys: st.thorns, fire: 0, cold: 0, light: 0, poison: 0 });
@@ -1943,7 +1994,7 @@ export class World {
         m.poison.t -= dt;
         m.life -= m.poison.dps * dt;
         if (m.life <= 0) {
-          this.killMonster(m);
+          this.killMonster(m, 'melt');
           continue;
         }
       }
@@ -2176,6 +2227,9 @@ export class World {
     const p = this.player;
     m.abilityCd = this.rng.range(4, 7);
     const dmg = (el: Element, k = 1) => elemDamage(el, roll(this.rng, m.dmgMin, m.dmgMax) * k);
+    // Telegraph the big moves with a flash in their colour.
+    const flash = { nova_fire: '#ff6020', nova_cold: '#60b0ff', fire_spread: '#ff8030', meteor_rain: '#ff3010', summon_imps: '#b040ff', summon_skeletons: '#b040ff', charge: '' }[pick];
+    if (flash) this.emit({ type: 'flash', color: flash, a: 0.22 });
     switch (pick) {
       case 'nova_fire':
       case 'nova_cold': {
@@ -2337,7 +2391,7 @@ export class World {
     let best: Monster | null = null;
     let bd = r;
     for (const m of this.area.monsters) {
-      if (!m.dead || m.used || m.deadT > 36 || m.rarity === 'boss') continue;
+      if (!m.dead || m.used || m.deadT > 36 || m.rarity === 'boss' || m.deathKind === 'shatter') continue;
       const d = Math.hypot(m.x - x, m.y - y);
       if (d <= bd) (bd = d), (best = m);
     }
@@ -2567,6 +2621,19 @@ export function elemDamage(el: Element, amount: number): Damage {
   const d: Damage = { phys: 0, fire: 0, cold: 0, light: 0, poison: 0 };
   d[el] = amount;
   return d;
+}
+
+/** The damage type that dealt most of the killing blow decides the death. */
+export function deathKindOf(d: Damage, res: Resists, overkill: boolean): DeathKind {
+  const parts = {
+    phys: d.phys * (1 - res.phys / 100), fire: d.fire * (1 - res.fire / 100), cold: d.cold * (1 - res.cold / 100), light: d.light * (1 - res.light / 100),
+  };
+  const top = (Object.entries(parts) as [keyof typeof parts, number][]).sort((a, b) => b[1] - a[1])[0];
+  if (top[1] <= 0) return 'normal';
+  if (top[0] === 'cold') return 'shatter';
+  if (top[0] === 'fire') return 'burn';
+  if (top[0] === 'light') return 'shock';
+  return overkill ? 'gib' : 'normal';
 }
 
 function elemColor(d: Damage): string {

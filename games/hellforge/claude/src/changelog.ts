@@ -1,6 +1,16 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.6.0',
+    date: '2026-11-07',
+    notes: [
+      'Heavier hits: critical strikes and huge blows land with a brief freeze frame and a jolt, and crit numbers pop up large in gold.',
+      'Monsters die by how you killed them: frozen ones shatter (and leave no corpse), burned ones char and smoulder, lightning crackles over them, poison melts them into a puddle, and huge physical overkills burst apart.',
+      'Bosses flash the screen in the colour of the attack they are about to unleash, and their deaths land with a long freeze, a white flash and a big shake.',
+      'New Shake & flashes switch in the menu turns off shaking, flashes and freeze frames.',
+    ],
+  },
+  {
     version: '0.5.0',
     date: '2026-11-07',
     notes: [

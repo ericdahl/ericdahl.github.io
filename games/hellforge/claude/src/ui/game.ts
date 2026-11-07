@@ -47,6 +47,7 @@ export class Game implements PanelHost {
     this.renderer = new Renderer(this.canvas);
     this.renderer.showLabels = this.settings.labels;
     this.renderer.showWeather = this.settings.weather;
+    this.renderer.screenFx = this.settings.screenFx;
     this.renderer.automap = this.settings.automap === 'full' ? 'mini' : this.settings.automap;
     this.audio.setEnabled(this.settings.sound);
     this.audio.setMusic(this.settings.music);
@@ -95,7 +96,11 @@ export class Game implements PanelHost {
     this.last = now;
     const w = this.world;
     this.paused = !!this.panel;
-    if (!this.paused) {
+    // A freeze frame holds the action (not the screen) for a beat after a heavy hit.
+    const frozen = this.freeze > 0;
+    if (frozen) this.freeze -= dt;
+    else this.freezeGap -= dt;
+    if (!this.paused && !frozen) {
       this.updateHeld();
       this.acc += dt;
       while (this.acc >= 1 / 60) {
@@ -105,7 +110,7 @@ export class Game implements PanelHost {
     } else this.acc = 0;
     this.drainEvents();
     this.updateMusic();
-    this.renderer.render(w, this.paused ? 0 : dt);
+    this.renderer.render(w, this.paused ? 0 : frozen ? dt * 0.1 : dt);
     this.updateHud();
     this.saveT += dt;
     if (this.saveT > 15) {
@@ -181,7 +186,17 @@ export class Game implements PanelHost {
           this.flashButton('skills');
           break;
         case 'shake':
-          this.renderer.cam.shake = Math.max(this.renderer.cam.shake, e.amount);
+          if (this.settings.screenFx) this.renderer.cam.shake = Math.max(this.renderer.cam.shake, e.amount);
+          break;
+        case 'hitstop':
+          // Small freezes need a gap between them, or rapid crits would stutter; big ones always land.
+          if (this.settings.screenFx && (e.t >= 0.2 || this.freezeGap <= 0)) {
+            this.freeze = Math.min(0.4, Math.max(this.freeze, e.t));
+            this.freezeGap = 0.4;
+          }
+          break;
+        case 'flash':
+          this.renderer.flash(e.color, e.a);
           break;
         case 'quest':
           this.save();
@@ -442,11 +457,12 @@ export class Game implements PanelHost {
     if (s) this.panelEl.querySelector('.detail .acts')?.scrollIntoView({ block: 'nearest' });
   }
 
-  toggleSetting(k: 'sound' | 'music' | 'weather' | 'labels' | 'numbers') {
+  toggleSetting(k: 'sound' | 'music' | 'weather' | 'screenFx' | 'labels' | 'numbers') {
     this.settings[k] = !this.settings[k];
     if (k === 'sound') this.audio.setEnabled(this.settings.sound);
     if (k === 'music') this.audio.setMusic(this.settings.music);
     if (k === 'weather') this.renderer.showWeather = this.settings.weather;
+    if (k === 'screenFx') this.renderer.screenFx = this.settings.screenFx;
     if (k === 'labels') this.renderer.showLabels = this.settings.labels;
     saveSettings(this.settings);
   }
@@ -660,6 +676,8 @@ export class Game implements PanelHost {
     w.cmdMoveTo(g.x, g.y);
   }
 
+  private freeze = 0;
+  private freezeGap = 0;
   private keysDown = new Set<string>();
   private pointer = { x: -1, y: -1 };
 

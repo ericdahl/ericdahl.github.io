@@ -44,6 +44,9 @@ export class Renderer {
   private mapCache = new WeakMap<AreaState, { canvas: HTMLCanvasElement; t: number; ox: number; oy: number }>();
   private time = 0;
   private weather = new Weather();
+  private flashFx = { color: '#fff', a: 0 };
+  /** Shake, flashes and freeze frames (the Screen effects setting). */
+  screenFx = true;
   /** Particle atmosphere (ash, fog, embers...). */
   showWeather = true;
 
@@ -51,6 +54,11 @@ export class Renderer {
     this.ctx = canvas.getContext('2d')!;
     this.dark = document.createElement('canvas');
     this.dctx = this.dark.getContext('2d')!;
+  }
+
+  flash(color: string, a: number) {
+    if (!this.screenFx) return;
+    this.flashFx = { color, a: Math.max(a, this.flashFx.a) };
   }
 
   resize(w: number, h: number) {
@@ -268,6 +276,15 @@ export class Renderer {
       ctx.fillRect(0, 0, cam.w, cam.h);
     }
     this.weather.drawVignettes(ctx, cam, w);
+    if (this.flashFx.a > 0.005) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = this.flashFx.a;
+      ctx.fillStyle = this.flashFx.color;
+      ctx.fillRect(0, 0, cam.w, cam.h);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      this.flashFx.a *= Math.pow(0.004, Math.max(dt, 1 / 120));
+    }
     if (this.automap !== 'off') this.drawAutomap(w);
   }
 
@@ -440,10 +457,40 @@ export class Renderer {
     if (m.dead) {
       const fade = m.deadT > 30 ? Math.max(0, 1 - (m.deadT - 30) / 10) : 1;
       const fall = Math.min(1, m.deadT / 0.35);
+      const how = m.rarity === 'boss' ? 'normal' : m.deathKind ?? 'normal';
       ctx.save();
       ctx.globalAlpha = fade;
-      if (m.deadT > 0.2 && !m.def.undead && m.def.shape !== 'wraith') {
-        ctx.fillStyle = 'rgba(90,0,0,0.55)';
+      if (how === 'shatter') {
+        // Nothing left but a scatter of ice on the ground.
+        ctx.fillStyle = `rgba(190,230,255,${0.6 * Math.max(0, 1 - m.deadT / 12)})`;
+        for (let i = 0; i < 7; i++) {
+          const a = i * 2.39 + m.id;
+          const d = (8 + (i % 3) * 7) * z * k;
+          ctx.fillRect(s.x + Math.cos(a) * d, s.y + Math.sin(a) * d * 0.5, 3 * z, 2 * z);
+        }
+        ctx.restore();
+        return;
+      }
+      if (how === 'melt') {
+        const g = Math.min(1, m.deadT / 1.5);
+        ctx.fillStyle = 'rgba(70,120,20,0.55)';
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, g * 22 * z * k, g * 10 * z * k, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (how === 'gib') {
+        ctx.fillStyle = 'rgba(110,0,0,0.6)';
+        for (let i = 0; i < 6; i++) {
+          const a = i * 1.7 + m.id;
+          const d = Math.min(1, m.deadT * 3) * (10 + (i % 3) * 9) * z * k;
+          ctx.beginPath();
+          ctx.ellipse(s.x + Math.cos(a) * d, s.y + Math.sin(a) * d * 0.5, 5 * z, 2.5 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      const scorched = how === 'burn' || how === 'shock';
+      if (m.deadT > 0.2 && (scorched || (!m.def.undead && m.def.shape !== 'wraith'))) {
+        ctx.fillStyle = scorched ? 'rgba(8,6,4,0.6)' : 'rgba(90,0,0,0.55)';
         ctx.beginPath();
         ctx.ellipse(s.x, s.y, Math.min(1, m.deadT) * 18 * z * k, Math.min(1, m.deadT) * 8 * z * k, 0, 0, Math.PI * 2);
         ctx.fill();
@@ -453,9 +500,21 @@ export class Renderer {
         return;
       }
       ctx.translate(s.x, s.y);
-      ctx.scale(z * k, z * k * (1 - fall * 0.45));
+      const sink = how === 'melt' ? Math.max(0.15, 1 - m.deadT / 2.5) : 1;
+      ctx.scale(z * k, z * k * (1 - fall * 0.45) * sink);
       ctx.rotate(-fall * Math.PI * 0.42);
-      drawMonsterShape(ctx, m.def.shape, shade(m.def.color, -0.35), this.pose(m.facing, 0, false, 0, 0), 0);
+      const col = how === 'burn' ? '#140e0a' : how === 'melt' ? '#4a6a20' : shade(m.def.color, -0.35);
+      drawMonsterShape(ctx, m.def.shape, col, this.pose(m.facing, 0, false, 0, 0), 0);
+      if (how === 'shock' && m.deadT < 0.8 && Math.sin(this.time * 60) > 0) {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.6 * (1 - m.deadT / 0.8);
+        drawMonsterShape(ctx, m.def.shape, '#80b0ff', this.pose(m.facing, 0, false, 0, 0), 0);
+      }
+      if (how === 'burn' && m.deadT < 1.5) {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.3 * (1 - m.deadT / 1.5);
+        drawMonsterShape(ctx, m.def.shape, '#ff5010', this.pose(m.facing, 0, false, 0, 0), 0);
+      }
       ctx.restore();
       return;
     }
@@ -1019,6 +1078,78 @@ export class Renderer {
         ctx.fillRect(s.x - wdt, s.y - hgt * (0.4 + k * 0.6), wdt * 2, hgt * (0.4 + k * 0.6));
         break;
       }
+      case 'shatter': {
+        // Ice shards flung outward, tumbling down.
+        ctx.fillStyle = `rgba(200,235,255,${1 - k})`;
+        const sc = (f.r ?? 1) * z;
+        for (let i = 0; i < 12; i++) {
+          const a = i * 0.52 + f.x * 7;
+          const sp = (20 + (i % 4) * 10) * sc;
+          const px = s.x + Math.cos(a) * sp * k;
+          const py = s.y - 24 * sc + Math.sin(a) * sp * k * 0.5 - (30 * k - 60 * k * k) * sc;
+          ctx.save();
+          ctx.translate(px, py);
+          ctx.rotate(a + k * 8);
+          ctx.fillRect(-3 * sc, -1.2 * sc, 6 * sc, 2.4 * sc);
+          ctx.restore();
+        }
+        lights.push({ x: f.x, y: f.y, r: 1.6, a: 0.5 * (1 - k) });
+        break;
+      }
+      case 'cinders': {
+        // A puff of dark smoke and embers floating up from the corpse.
+        const sc = (f.r ?? 1) * z;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = `rgba(30,25,22,${0.35 * (1 - k)})`;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y - (16 + k * 30) * sc, (10 + k * 14) * sc, (7 + k * 9) * sc, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 9; i++) {
+          const a = i * 0.7 + f.y * 5;
+          const px = s.x + Math.sin(a + k * 4) * (6 + i * 1.5) * sc;
+          const py = s.y - (10 + k * (30 + (i % 3) * 18)) * sc;
+          ctx.fillStyle = `rgba(255,${120 + (i % 3) * 40},40,${(1 - k) * 0.9})`;
+          ctx.fillRect(px, py, 2 * z, 2 * z);
+        }
+        lights.push({ x: f.x, y: f.y, r: 1.4, a: 0.4 * (1 - k) });
+        break;
+      }
+      case 'zap': {
+        ctx.strokeStyle = `rgba(200,225,255,${1 - k})`;
+        ctx.lineWidth = 1.6 * z;
+        const sc = (f.r ?? 1) * z;
+        ctx.beginPath();
+        for (let i = 0; i < 4; i++) {
+          let px = s.x;
+          let py = s.y - 22 * sc;
+          ctx.moveTo(px, py);
+          const a = Math.random() * Math.PI * 2;
+          for (let j = 0; j < 4; j++) {
+            px += Math.cos(a) * 7 * sc + (Math.random() - 0.5) * 8 * sc;
+            py += Math.sin(a) * 5 * sc + (Math.random() - 0.5) * 8 * sc;
+            ctx.lineTo(px, py);
+          }
+        }
+        ctx.stroke();
+        lights.push({ x: f.x, y: f.y, r: 2, a: 0.7 * (1 - k) });
+        break;
+      }
+      case 'gore': {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = `rgba(140,0,0,${1 - k})`;
+        const sc = (f.r ?? 1) * z;
+        for (let i = 0; i < 16; i++) {
+          const a = i * 0.39 + f.x * 3;
+          const sp = (18 + (i % 5) * 7) * sc;
+          const px = s.x + Math.cos(a) * sp * k;
+          const py = s.y - 22 * sc + Math.sin(a) * sp * k * 0.5 - (34 * k - 70 * k * k) * sc;
+          ctx.beginPath();
+          ctx.arc(px, py, (1.6 + (i % 3)) * z, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+      }
       case 'raise': {
         // Bone-green pillar rising from the ground.
         const hgt = 70 * z;
@@ -1071,7 +1202,9 @@ export class Renderer {
     const z = this.cam.zoom;
     const k = f.t / f.dur;
     this.ctx.globalAlpha = 1 - k * k;
-    this.text(f.text!, s.x + ((f.x * 97) % 1) * 10 - 5, s.y - 50 * z - k * 26 * z, f.color ?? '#fff', 13, true);
+    // Crits pop in large, then settle.
+    const pop = f.size ? 1 + Math.max(0, 1 - f.t / 0.12) * 0.7 : 1;
+    this.text(f.text!, s.x + ((f.x * 97) % 1) * 10 - 5, s.y - 50 * z - k * (f.size ? 34 : 26) * z, f.color ?? '#fff', Math.round((f.size ?? 13) * pop), true);
     this.ctx.globalAlpha = 1;
   }
 
