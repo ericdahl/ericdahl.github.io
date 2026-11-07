@@ -1,5 +1,6 @@
 import { CLASSES, createCharacter, DIFFICULTIES, type Character } from '../game/character';
 import type { ClassId } from '../game/items';
+import { CHANGELOG } from '../changelog';
 import { h } from './dom';
 import { deleteCharacter, importCharacters, loadCharacters, saveCharacter } from './save';
 import { bundleJson, decodeSave, downloadFile, encodeCode } from './transfer';
@@ -56,7 +57,8 @@ export function showMenu(root: HTMLElement, play: (c: Character) => void) {
           : null,
       ),
       h('div', { class: 'menu-actions' }, h('button', { class: 'btn', onclick: () => showTransfer(root, play) }, 'Export / Import')),
-      h('div', { class: 'credits dim' }, `All art and sound generated in code. v${__APP_VERSION__}`),
+      h('div', { class: 'credits dim' }, 'All art and sound generated in code. ',
+        h('button', { class: 'ver-link', title: "What's new", onclick: showChangelog }, `v${__APP_VERSION__}`)),
     );
   };
 
@@ -176,6 +178,20 @@ function showTransfer(root: HTMLElement, play: (c: Character) => void) {
       code,
       status,
       file,
+      h('button', { class: 'btn big', onclick: close }, 'Close')));
+  document.body.append(ov);
+}
+
+/** Small release-notes overlay opened from the version number. */
+function showChangelog() {
+  const close = () => ov.remove();
+  const ov = h('div', { class: 'overlay xfer', onclick: (e: Event) => e.target === ov && close() },
+    h('div', { class: 'ov-box xfer-box' },
+      h('div', { class: 'xfer-title' }, "What's new"),
+      h('div', { class: 'changelog' },
+        ...CHANGELOG.map((r) => h('div', { class: 'cl-rel' },
+          h('div', { class: 'cl-head' }, h('span', { class: 'cl-ver' }, `v${r.version}`), h('span', { class: 'dim' }, ` ${r.date}`)),
+          h('ul', {}, ...r.notes.map((n) => h('li', {}, n)))))),
       h('button', { class: 'btn big', onclick: close }, 'Close')));
   document.body.append(ov);
 }

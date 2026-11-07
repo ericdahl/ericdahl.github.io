@@ -34,5 +34,11 @@ test('export a hero as a code and import it back', async ({ page, context, brows
   await page.locator('.xfer-code').fill(code);
   await page.getByRole('button', { name: 'Import code' }).click();
   await expect(page.locator('.char-card')).toContainText('Mira');
+  // The version number opens the changelog.
+  await page.locator('.ver-link').click();
+  await expect(page.locator('.changelog .cl-ver').first()).toHaveText(/^v\d+\.\d+\.\d+$/);
+  await page.screenshot({ path: `test-results/${info.project.name}-changelog.png` });
+  await page.getByRole('button', { name: 'Close' }).click();
+  await expect(page.locator('.changelog')).toHaveCount(0);
   expect(errors).toEqual([]);
 });

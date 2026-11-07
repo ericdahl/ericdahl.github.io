@@ -40,11 +40,12 @@ Progress saves automatically to the browser's local storage. To move heroes to a
 
 ## Versions
 
-The version is shown at the bottom of the title screen.
+The version is shown at the bottom of the title screen; tap it for the player-facing changelog (`src/changelog.ts`, add an entry with each version bump).
 
 | Version | Commit | Notes |
 |---|---|---|
-| 0.2.0 | | Save export/import (file or copy/paste code) |
+| 0.3.0 | | Changelog viewer on the title screen |
+| 0.2.0 | `d6c3a2d` | Save export/import (file or copy/paste code) |
 | 0.1.0 | `0fffeff` | Initial release. Roll back with `git checkout 0fffeff -- games/hellforge/claude` |
 
 ## Development
