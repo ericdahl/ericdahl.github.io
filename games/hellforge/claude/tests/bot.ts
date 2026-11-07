@@ -9,9 +9,10 @@ export const ACT = ['cinder_fields', 'hollow_cave', 'gloomwood', 'sunken_chapel'
 const PLAN: Record<ClassId, string[]> = {
   reaver: ['bash', 'iron_skin', 'bash', 'bash', 'bash', 'weapon_mastery', 'war_cry', 'weapon_mastery', 'iron_skin', 'weapon_mastery', 'frenzy', 'frenzy', 'frenzy', 'frenzy', 'frenzy', 'weapon_mastery', 'frenzy', 'frenzy'],
   arcanist: ['fire_bolt', 'fire_bolt', 'fire_bolt', 'fire_bolt', 'ice_bolt', 'frost_shell', 'fire_bolt', 'fire_bolt', 'fire_bolt', 'fire_bolt', 'teleport', 'fire_bolt', 'fire_bolt', 'fire_bolt', 'fire_bolt', 'fire_bolt', 'fireball', 'fireball', 'fireball'],
+  necromancer: ['raise_skeleton', 'raise_skeleton', 'bone_shards', 'raise_skeleton', 'frailty', 'skeletal_mastery', 'skeletal_mastery', 'raise_skeleton', 'skeletal_mastery', 'bone_ward', 'raise_skeleton', 'grave_golem', 'skeletal_mastery', 'raise_skeleton', 'bone_shards', 'skeletal_mastery', 'raise_skeleton', 'corpse_burst', 'bone_lance', 'bone_lance', 'bone_lance'],
   huntress: ['power_shot', 'critical_eye', 'power_shot', 'power_shot', 'power_shot', 'multishot', 'multishot', 'multishot', 'multishot', 'multishot', 'evade', 'multishot', 'multishot', 'multishot', 'multishot', 'multishot', 'strafe', 'strafe'],
 };
-const MAIN: Record<ClassId, string[]> = { reaver: ['frenzy', 'bash'], arcanist: ['fireball', 'fire_bolt'], huntress: ['multishot', 'power_shot'] };
+const MAIN: Record<ClassId, string[]> = { reaver: ['frenzy', 'bash'], arcanist: ['fireball', 'fire_bolt'], huntress: ['multishot', 'power_shot'], necromancer: ['bone_lance', 'bone_shards'] };
 
 function score(w: World, it: Item): number {
   const b = baseOf(it);
@@ -27,13 +28,28 @@ function score(w: World, it: Item): number {
     const want = c.classId === 'huntress' ? 'bow' : c.classId === 'arcanist' ? 'staff' : null;
     if (want === 'bow' && b.cat !== 'bow') return -1;
     if (c.classId === 'reaver' && (b.cat === 'bow' || b.cat === 'wand' || b.cat === 'staff')) return -1;
-    if (c.classId === 'arcanist') return after.skillBonus - before.skillBonus + (after.maxLife - before.maxLife) / 20;
+    if (c.classId === 'arcanist' || c.classId === 'necromancer') return after.skillBonus - before.skillBonus + (after.maxLife - before.maxLife) / 20;
     return (after.minDmg + after.maxDmg) * after.attackSpeed - (before.minDmg + before.maxDmg) * before.attackSpeed;
   }
   if (b.kind === 'shield' && c.equipment.weapon && baseOf(c.equipment.weapon).twoHanded) return -1;
   const r = after.res;
   const r0 = before.res;
   return (after.def - before.def) / 4 + (after.maxLife - before.maxLife) + (r.fire + r.cold + r.light + r.poison - r0.fire - r0.cold - r0.light - r0.poison) / 3 + (after.skillBonus - before.skillBonus) * 30;
+}
+
+/** Keep the army up: raise skeletons from fresh corpses, re-make the golem, ward and curse. */
+function necroThink(w: World) {
+  const c = w.char;
+  const p = w.player;
+  const lvl = (id: string) => c.skills[id] ?? 0;
+  const skels = w.minions.filter((m) => m.ally === 'skeleton').length;
+  const max = lvl('raise_skeleton') ? SKILL_BY_ID.raise_skeleton.params(lvl('raise_skeleton')).count! : 0;
+  const corpse = w.findCorpse(p.x, p.y, 9);
+  if (lvl('bone_ward') && !p.buffs.bone_ward && p.mana > 30) return w.cmdSkill('bone_ward', p.x, p.y);
+  if (lvl('grave_golem') && !w.minions.some((m) => m.ally === 'golem') && p.mana > 40) return w.cmdSkill('grave_golem', p.x + 1, p.y);
+  if (corpse && skels < max) return w.cmdSkill('raise_skeleton', corpse.x, corpse.y);
+  const boss = w.area.monsters.find((m) => !m.dead && m.superId && Math.hypot(m.x - p.x, m.y - p.y) < 8);
+  if (lvl('frailty') && boss && !(boss.curse && boss.curse.t > 0)) w.cmdSkill('frailty', boss.x, boss.y);
 }
 
 export interface AreaReport {
@@ -94,6 +110,7 @@ export function playAct(classId: ClassId, seed: number, maxPerArea = 900): AreaR
           else if (b.kind !== 'potion') w.sell(e.item.uid);
         }
         if (c.skills.frost_shell && !p.buffs.frost_shell && p.mana > 20) w.cmdSkill('frost_shell', p.x, p.y);
+        if (classId === 'necromancer' && !p.action) necroThink(w);
         // Unstick: if we have not moved for a while, wander.
         if (Math.hypot(p.x - lastPos.x, p.y - lastPos.y) > 0.5) lastPos = { x: p.x, y: p.y, t };
       }

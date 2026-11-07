@@ -3,7 +3,8 @@ import type { ClassId } from './items';
 export type Element = 'phys' | 'fire' | 'cold' | 'light' | 'poison';
 export type SkillKind =
   | 'attack' | 'passive' | 'buff' | 'projectile' | 'nova' | 'teleport' | 'leap' | 'whirlwind'
-  | 'meteor' | 'multishot' | 'strafe' | 'bolts';
+  | 'meteor' | 'multishot' | 'strafe' | 'bolts'
+  | 'summon' | 'curse' | 'corpse' | 'shards' | 'ring';
 
 export interface SkillParams {
   /** Bonus % weapon damage for attack skills. */
@@ -20,6 +21,8 @@ export interface SkillParams {
   pct2?: number;
   stun?: number;
   chains?: number;
+  /** Minion stats for summons. */
+  life?: number;
 }
 
 export interface SkillDef {
@@ -201,6 +204,70 @@ export const SKILLS: SkillDef[] = [
     mana: (l) => 10 + l * 0.5, params: (l) => ({ min: 10 + 8 * l, max: 30 + 12 * l, chains: 2 + Math.floor(l / 3) }),
     desc: 'An arrow that unleashes chain lightning on impact.',
     lines: (p) => [`Lightning Damage: ${p.min}-${p.max}`, `Chains: ${p.chains}`], color: '#d6e6ff', glyph: 'ϟ',
+  },
+  // ------------------------------------------------------------ Necromancer
+  {
+    id: 'raise_skeleton', name: 'Raise Skeleton', classId: 'necromancer', reqLevel: 1, kind: 'summon',
+    mana: (l) => 5 + l * 0.5, params: (l) => ({ count: l <= 3 ? l : Math.min(12, 3 + Math.floor((l - 3) / 2)), pct: 10 * (l - 1), pct2: 8 * (l - 1) }),
+    desc: 'Raise a skeleton warrior from a corpse to fight at your side.',
+    lines: (p) => [`Skeletons: ${p.count}`, `+${p.pct}% Skeleton Damage`, `+${p.pct2}% Skeleton Life`, 'Needs a corpse'], color: '#e6dcc0', glyph: '☠',
+  },
+  {
+    id: 'bone_shards', name: 'Bone Shards', classId: 'necromancer', reqLevel: 1, kind: 'shards', element: 'phys',
+    mana: (l) => 2.5 + 0.25 * l, params: (l) => ({ min: 2 + 2 * (l - 1), max: 4 + 3 * (l - 1), count: Math.min(9, 2 + Math.ceil(l / 2)) }),
+    desc: 'Spit a fan of razor bone splinters that never miss.',
+    lines: (p) => [`Damage: ${p.min}-${p.max} each`, `Shards: ${p.count}`],
+    synergies: [{ skill: 'bone_lance', pct: 12 }, { skill: 'corpse_burst', pct: 8 }], color: '#efe6cc', glyph: '⋮',
+  },
+  {
+    id: 'frailty', name: 'Mark of Frailty', classId: 'necromancer', reqLevel: 1, kind: 'curse',
+    mana: () => 4, params: (l) => ({ pct: Math.min(100, 45 + 5 * l), radius: Math.min(5, 2 + 0.3 * l), duration: 8 + 2 * l }),
+    desc: 'Curse a group of enemies so they take more physical damage.',
+    lines: (p) => [`+${p.pct}% Physical Damage taken`, `Radius: ${p.radius!.toFixed(1)} yards`, `Duration: ${p.duration}s`], color: '#b05ad0', glyph: '⛧',
+  },
+  {
+    id: 'skeletal_mastery', name: 'Skeletal Mastery', classId: 'necromancer', reqLevel: 6, prereq: ['raise_skeleton'], kind: 'passive',
+    mana: () => 0, params: (l) => ({ pct: 12 * l, pct2: 15 * l }),
+    desc: 'Passive: your skeletons and golem hit harder and endure more.',
+    lines: (p) => [`+${p.pct}% Minion Damage`, `+${p.pct2}% Minion Life`], color: '#cfc6a6', glyph: '⚚',
+  },
+  {
+    id: 'bone_ward', name: 'Bone Ward', classId: 'necromancer', reqLevel: 6, prereq: ['bone_shards'], kind: 'buff',
+    mana: (l) => 10 + l, params: (l) => ({ min: 20 + 12 * l, duration: 180 }),
+    desc: 'A swirling cage of bone that absorbs damage until it breaks.',
+    lines: (p) => [`Absorbs ${p.min} damage`, `Duration: ${p.duration}s`], color: '#ddd3b5', glyph: '⛉',
+  },
+  {
+    id: 'corpse_burst', name: 'Corpse Burst', classId: 'necromancer', reqLevel: 6, prereq: ['frailty'], kind: 'corpse', element: 'fire',
+    mana: (l) => 12 + l * 0.5, params: (l) => ({ pct: 50 + 5 * l, pct2: 90 + 6 * l, radius: Math.min(5, 2.6 + 0.2 * l) }),
+    desc: "Detonate a corpse, blasting nearby enemies with fire and bone based on the dead creature's life.",
+    lines: (p) => [`Damage: ${p.pct}-${p.pct2}% of corpse life`, `Radius: ${p.radius!.toFixed(1)} yards`], color: '#ff7a4a', glyph: '✺',
+  },
+  {
+    id: 'blight_nova', name: 'Blight Nova', classId: 'necromancer', reqLevel: 12, prereq: ['bone_ward'], kind: 'nova', element: 'poison',
+    mana: (l) => 12 + l, params: (l) => ({ min: 18 + 12 * (l - 1), max: 30 + 16 * (l - 1), radius: 5.5 }),
+    desc: 'A ring of plague bursts from you, poisoning everything it touches.',
+    lines: (p) => [`Poison Damage: ${p.min}-${p.max} over 3s`, `Radius: ${p.radius} yards`], color: '#8ad040', glyph: '☣',
+  },
+  {
+    id: 'grave_golem', name: 'Grave Golem', classId: 'necromancer', reqLevel: 12, prereq: ['skeletal_mastery'], kind: 'summon',
+    mana: (l) => 15 + l, params: (l) => ({ count: 1, pct: 15 * (l - 1), pct2: 25 * (l - 1) }),
+    desc: 'Shape a hulking golem of grave earth that draws enemies to itself.',
+    lines: (p) => [`+${p.pct}% Golem Damage`, `+${p.pct2}% Golem Life`, 'One at a time'], color: '#a08060', glyph: '⛰',
+  },
+  {
+    id: 'bone_lance', name: 'Bone Lance', classId: 'necromancer', reqLevel: 18, prereq: ['bone_shards', 'corpse_burst'], kind: 'projectile', element: 'phys',
+    mana: (l) => 7 + 0.5 * l, params: (l) => ({ min: 16 + 10 * (l - 1), max: 26 + 13 * (l - 1) }),
+    desc: 'Hurl a spear of bone that pierces every enemy in its path.',
+    lines: (p) => [`Damage: ${p.min}-${p.max}`, 'Pierces'],
+    synergies: [{ skill: 'bone_shards', pct: 10 }, { skill: 'bone_ward', pct: 10 }], color: '#f4ecd2', glyph: '➹',
+  },
+  {
+    id: 'bone_storm', name: 'Bone Storm', classId: 'necromancer', reqLevel: 24, prereq: ['bone_lance', 'grave_golem'], kind: 'ring', element: 'phys',
+    mana: (l) => 18 + l, params: (l) => ({ min: 20 + 10 * (l - 1), max: 32 + 13 * (l - 1), count: Math.min(20, 10 + Math.floor(l / 2)) }),
+    desc: 'Erupt in a storm of bone lances flying in every direction.',
+    lines: (p) => [`Damage: ${p.min}-${p.max} each`, `Lances: ${p.count}`, 'Pierces'],
+    synergies: [{ skill: 'bone_lance', pct: 10 }], color: '#fff6dc', glyph: '✵',
   },
 ];
 

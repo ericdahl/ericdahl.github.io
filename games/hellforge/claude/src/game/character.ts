@@ -44,6 +44,12 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     desc: 'A swift archer from the deep woods. Rains arrows on her foes and slips away from danger.',
     start: ['short_bow'], starter: 'power_shot',
   },
+  necromancer: {
+    id: 'necromancer', name: 'Necromancer', str: 15, dex: 25, vit: 15, ene: 25, life: 45, lifePerLvl: 1.5, lifePerVit: 2,
+    mana: 25, manaPerLvl: 2, manaPerEne: 2, arBonus: -10, castTime: 0.5, color: '#6c8a5c',
+    desc: 'A pale scholar of the grave. Raises the dead as servants, curses foes and shatters them with bone.',
+    start: ['yew_wand'], starter: 'bone_shards',
+  },
 };
 
 export const INV_COLS = 10;

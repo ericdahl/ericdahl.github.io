@@ -307,7 +307,8 @@ function skillsPanel(host: PanelHost) {
   for (const s of classSkills(c.classId)) tiers.set(s.reqLevel, [...(tiers.get(s.reqLevel) ?? []), s]);
   const body = h('div', { class: 'skills' });
   for (const [lvl, list] of [...tiers.entries()].sort((a, b) => a[0] - b[0])) {
-    const row = h('div', { class: 'tier' }, h('div', { class: 'tier-l' }, `Lv ${lvl}`));
+    const cards = h('div', { class: 'tier-cards' });
+    const row = h('div', { class: 'tier' }, h('div', { class: 'tier-l' }, `Lv ${lvl}`), cards);
     for (const s of list) {
       const hard = c.skills[s.id] ?? 0;
       const eff = skillLevel(c, s.id);
@@ -335,7 +336,7 @@ function skillsPanel(host: PanelHost) {
         ),
         h('button', { class: 'plus big', disabled: !!why, title: why ?? 'Learn', 'aria-label': `Learn ${s.name}`, onclick: () => { learnSkill(c, s.id); w.refreshStats(); host.refresh(); } }, '+'),
       );
-      row.append(card);
+      cards.append(card);
     }
     body.append(row);
   }
@@ -449,6 +450,7 @@ function helpPanel(host: PanelHost) {
         'Explore the Cinder Fields east of camp, find waypoints, and push down through the Catacombs to the Hellforge.',
         'Gear drops in <span class="blue">magic</span>, <span class="gold2">rare</span>, <span class="green">set</span> and <span class="uniq">unique</span> qualities. Old Corvin identifies items for free. Insert gems into socketed gear.',
         'Each level grants 5 stat points and 1 skill point. Higher difficulties lower your resistances, so collect resist gear.',
+        'Necromancers raise skeletons from fresh corpses: cast Raise Skeleton near a body (or tap its button to use the nearest one). Servants follow you between areas.',
       ].map((t) => `<p>${t}</p>`).join('') }),
       h('button', { class: 'btn', onclick: () => host.open('menu') }, 'Back')),
   );

@@ -4,7 +4,7 @@ import { ACT, playAct } from './bot';
 // A simple bot (no kiting, no town trips) must be able to finish the act with every class.
 // This guards overall balance: monster scaling, item drops, skills and leveling together.
 describe('full act playthrough', () => {
-  for (const cls of ['reaver', 'arcanist', 'huntress'] as const) {
+  for (const cls of ['reaver', 'arcanist', 'huntress', 'necromancer'] as const) {
     it(`${cls} reaches and defeats Vhorza`, () => {
       const reports = playAct(cls, 99);
       expect(reports.map((r) => r.area)).toEqual(ACT);

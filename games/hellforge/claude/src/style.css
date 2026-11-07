@@ -501,7 +501,8 @@ button {
 .kv { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 2px 0; border-bottom: 1px solid rgba(90, 70, 48, 0.2); }
 
 .skills { display: flex; flex-direction: column; gap: 8px; }
-.tier { display: grid; grid-template-columns: 46px 1fr 1fr; gap: 8px; align-items: stretch; }
+.tier { display: grid; grid-template-columns: 46px 1fr; gap: 8px; align-items: start; }
+.tier-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .tier-l { color: var(--gold); font-size: 13px; padding-top: 8px; }
 .skill {
   display: flex;
@@ -537,7 +538,7 @@ button {
 @media (max-width: 560px) {
   .p-body.two, .p-body.three { grid-template-columns: 1fr; }
   .p-body.three > .detail { grid-column: auto; }
-  .tier { grid-template-columns: 1fr; }
+  .tier, .tier-cards { grid-template-columns: 1fr; }
   .tier-l { padding-top: 0; }
   .grid, .doll { align-self: center; }
   .vendor { max-height: 34vh; }

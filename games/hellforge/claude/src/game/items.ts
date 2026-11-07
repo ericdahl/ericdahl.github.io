@@ -8,7 +8,7 @@ export type StatKey =
   | 'fireRes' | 'coldRes' | 'lightRes' | 'poisonRes' | 'allRes'
   | 'fireMin' | 'fireMax' | 'coldMin' | 'coldMax' | 'lightMin' | 'lightMax' | 'poisonDmg'
   | 'lifeSteal' | 'manaSteal' | 'ias' | 'frw' | 'fcr' | 'mf' | 'gf' | 'thorns'
-  | 'lifeRegen' | 'manaRegen' | 'allSkills' | 'skills_reaver' | 'skills_arcanist' | 'skills_huntress'
+  | 'lifeRegen' | 'manaRegen' | 'allSkills' | 'skills_reaver' | 'skills_arcanist' | 'skills_huntress' | 'skills_necromancer'
   | 'block' | 'crit' | 'dmgReduce' | 'lifeOnKill' | 'manaOnKill';
 
 export interface Mod {
@@ -22,7 +22,7 @@ export type ItemKind =
 export type WeaponCat = 'sword' | 'axe' | 'mace' | 'dagger' | 'wand' | 'staff' | 'bow';
 export type Rarity = 'normal' | 'magic' | 'rare' | 'set' | 'unique';
 export type Slot = 'head' | 'body' | 'weapon' | 'offhand' | 'gloves' | 'belt' | 'boots' | 'amulet' | 'ring1' | 'ring2';
-export type ClassId = 'reaver' | 'arcanist' | 'huntress';
+export type ClassId = 'reaver' | 'arcanist' | 'huntress' | 'necromancer';
 
 export interface PotionInfo {
   type: 'hp' | 'mp' | 'rejuv';
@@ -290,6 +290,7 @@ export const AFFIXES: Affix[] = [
   P('berserkers', "Berserker's", 6, ['melee', 'amulet', 'helm'], 'skills', [m('skills_reaver', 1, 1)], 4),
   P('magus', "Magus's", 6, ['caster', 'amulet', 'helm'], 'skills', [m('skills_arcanist', 1, 1)], 4),
   P('rangers', "Ranger's", 6, ['bow', 'amulet', 'gloves'], 'skills', [m('skills_huntress', 1, 1)], 4),
+  P('gravecallers', "Gravecaller's", 6, ['caster', 'amulet', 'helm'], 'skills', [m('skills_necromancer', 1, 1)], 4),
   P('lucky', 'Lucky', 3, ['jewelry', 'boots', 'gloves', 'helm'], 'mf', [m('mf', 5, 12)]),
   P('fortuitous', 'Fortuitous', 12, ['jewelry', 'boots', 'gloves', 'helm'], 'mf', [m('mf', 13, 25)]),
   P('lapis', 'Lapis', 4, ['jewelry', 'helm', 'caster', 'shield'], 'mana', [m('mana', 5, 15)]),
@@ -373,6 +374,7 @@ export const UNIQUES: UniqueDef[] = [
   U('wyrmscale', 'Wyrmscale Ward', 'small_shield', 9, [m('block', 15, 15), m('allRes', 15, 15), m('defPct', 70, 90)]),
   U('coldheart', 'Coldheart Loop', 'ring', 10, [m('coldRes', 25, 25), m('mana', 20, 20), m('manaSteal', 4, 4), m('coldMin', 2, 2), m('coldMax', 6, 6)]),
   U('gloomshroud', 'Gloomshroud', 'studded_leather', 10, [m('defPct', 100, 120), m('frw', 10, 10), m('ias', 10, 10), m('dex', 10, 10), m('allRes', 10, 10)]),
+  U('marrowcall', 'Marrowcall', 'bone_wand', 11, [m('skills_necromancer', 2, 2), m('fcr', 20, 20), m('mana', 30, 30), m('poisonRes', 25, 25), m('life', 15, 15)]),
   U('stormcaller', 'Stormcaller', 'gnarled_staff', 12, [m('skills_arcanist', 2, 2), m('fcr', 20, 20), m('lightRes', 30, 30), m('mana', 40, 40)]),
   U('vaels_requiem', "Vael's Requiem", 'long_bow', 13, [m('edPct', 100, 140), m('skills_huntress', 1, 1), m('ias', 20, 20), m('lightMin', 1, 1), m('lightMax', 25, 25)]),
   U('butchers_oath', "Butcher's Oath", 'great_axe', 14, [m('edPct', 120, 160), m('crit', 15, 15), m('lifeSteal', 6, 6), m('str', 10, 10)]),
@@ -444,6 +446,7 @@ const CLASS_WEAPONS: Record<ClassId, WeaponCat[]> = {
   reaver: ['sword', 'axe', 'mace'],
   arcanist: ['wand', 'staff'],
   huntress: ['bow', 'dagger'],
+  necromancer: ['wand', 'dagger'],
 };
 
 export function makeItem(baseId: string, ilvl = 1, rarity: Rarity = 'normal'): Item {
@@ -684,6 +687,7 @@ const STAT_TEXT: Record<StatKey, (v: number) => string> = {
   skills_reaver: (v) => `+${v} to Reaver Skills`,
   skills_arcanist: (v) => `+${v} to Arcanist Skills`,
   skills_huntress: (v) => `+${v} to Huntress Skills`,
+  skills_necromancer: (v) => `+${v} to Necromancer Skills`,
   block: (v) => `${v}% Increased Chance of Blocking`,
   crit: (v) => `${v}% Chance of Deadly Strike`,
   dmgReduce: (v) => `Damage Reduced by ${v}`,
@@ -798,6 +802,10 @@ export function rollDrops(rng: Rng, mlvl: number, tier: DropTier, opts: { mf?: n
       if (forceMagic && item.rarity === 'normal') item = generateItem(rng, mlvl, { rarity: rng.chance(0.3) ? 'rare' : 'magic', classId: opts.classId });
       out.push({ kind: 'item', item });
     }
+  }
+  // Bosses and uniques always deliver their promised magic items, whatever the picks rolled.
+  for (; guaranteedMagic > 0; guaranteedMagic--) {
+    out.push({ kind: 'item', item: generateItem(rng, mlvl, { mf: opts.mf, bonus: t.bonus, classId: opts.classId, rarity: rng.chance(0.3) ? 'rare' : 'magic' }) });
   }
   return out;
 }
