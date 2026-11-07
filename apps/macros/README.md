@@ -102,7 +102,7 @@ node scripts/icons.mjs   # re-render the PNG icons from public/icon.svg
 
 Set `PW_CHROMIUM=/path/to/chrome` to run Playwright with an already-installed Chromium.
 
-It's Vite and TypeScript with no framework, like the other apps under `games/`, and the GitHub Pages workflow builds and publishes it with them. Source:
+It's Vite and TypeScript with no framework, like the other apps and games here, and the GitHub Pages workflow builds and publishes it with them. Source:
 
 - `src/parse.ts`: the quick-add parser and food matching
 - `src/nutrition.ts`: units and target maths

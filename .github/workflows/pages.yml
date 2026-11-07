@@ -1,10 +1,12 @@
-name: Deploy games to GitHub Pages
+name: Deploy to GitHub Pages
 
 on:
   push:
     branches: [master]
     paths:
+      - "apps/**"
       - "games/**"
+      - ".github/scripts/site.py"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -28,26 +30,26 @@ jobs:
         with:
           node-version: 22
 
-      - name: Build games
+      - name: Build apps and games
         run: |
           set -euo pipefail
           mkdir -p _site
-          : > _site/.games
+          : > _site/.dirs
 
           # npm projects with a build script are built and their dist/ published.
-          for pkg in $(find games -name package.json -not -path '*/node_modules/*' | sort); do
+          for pkg in $(find apps games -name package.json -not -path '*/node_modules/*' | sort); do
             dir=$(dirname "$pkg")
             if ! jq -e '.scripts.build' "$pkg" >/dev/null; then continue; fi
             echo "::group::Building $dir"
             (cd "$dir" && npm ci && npm run build)
             mkdir -p "_site/$dir"
             cp -R "$dir/dist/." "_site/$dir/"
-            echo "$dir" >> _site/.games
+            echo "$dir" >> _site/.dirs
             echo "::endgroup::"
           done
 
-          # Plain static games (an index.html not inside a built npm project) are copied as-is.
-          for html in $(find games -name index.html -not -path '*/node_modules/*' -not -path '*/dist/*' | sort); do
+          # Plain static pages (an index.html not inside a built npm project) are copied as-is.
+          for html in $(find apps games -name index.html -not -path '*/node_modules/*' -not -path '*/dist/*' | sort); do
             dir=$(dirname "$html")
             d="$dir"; skip=0
             while [ "$d" != "." ]; do
@@ -57,45 +59,16 @@ jobs:
             [ "$skip" = 1 ] && continue
             mkdir -p "_site/$dir"
             cp -R "$dir/." "_site/$dir/"
-            echo "$dir" >> _site/.games
+            echo "$dir" >> _site/.dirs
           done
 
-      - name: Generate index
+      # Writes the index, plus redirect stubs for paths that moved: everything under the
+      # old /scratch/ project-site prefix, and apps moved out of games/.
+      - name: Generate index and redirects
         run: |
           set -euo pipefail
-          {
-            echo '<!doctype html><html lang="en"><head><meta charset="utf-8">'
-            echo '<meta name="viewport" content="width=device-width, initial-scale=1">'
-            echo '<title>Games</title>'
-            echo '<style>body{font-family:system-ui,sans-serif;background:#0b0f17;color:#e6edf3;max-width:640px;margin:0 auto;padding:32px 16px}a{color:#5cc8ff;text-decoration:none}a:hover{text-decoration:underline}li{margin:10px 0}small{color:#8b949e;margin-left:8px}</style>'
-            echo '</head><body><h1>Games</h1><ul>'
-            sort -u _site/.games | while read -r dir; do
-              title=$(sed -n 's:.*<title>\(.*\)</title>.*:\1:p' "_site/$dir/index.html" | head -1)
-              echo "<li><a href=\"$dir/\">${title:-$dir}</a><small>$dir</small></li>"
-            done
-            echo '</ul></body></html>'
-          } > _site/index.html
-          cat _site/index.html
-
-      # The site used to be the project site ericdahl.github.io/scratch/. Old links,
-      # home-screen installs and the sudoku bookmarklet still point there, so each old
-      # path gets a stub that forwards to the new one, keeping the query and #hash.
-      - name: Generate redirects from old /scratch/ paths
-        run: |
-          set -euo pipefail
-          stub() { # $1 = old dir under _site/scratch, $2 = new absolute path
-            mkdir -p "_site/scratch/$1"
-            cat > "_site/scratch/$1/index.html" <<EOF
-          <!doctype html><html lang="en"><head><meta charset="utf-8">
-          <title>Moved</title><link rel="canonical" href="$2">
-          <meta http-equiv="refresh" content="0; url=$2">
-          <script>location.replace('$2' + location.search + location.hash)</script>
-          </head><body><p>Moved to <a href="$2">$2</a>.</p></body></html>
-          EOF
-          }
-          stub . /
-          sort -u _site/.games | while read -r dir; do stub "$dir" "/$dir/"; done
-          rm _site/.games
+          python3 .github/scripts/site.py _site $(sort -u _site/.dirs)
+          rm _site/.dirs
 
       - uses: actions/upload-pages-artifact@v3
 
