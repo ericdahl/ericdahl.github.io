@@ -29,14 +29,25 @@ Panels pause the game.
 
 ## The game
 
-- **Three classes.** The **Reaver** (melee: Bash, Frenzy, Leap Attack, Whirlwind, War Cry), the **Arcanist** (Fire Bolt, Ice Bolt, Charged Bolt, Frost Nova, Teleport, Fireball, Meteor) and the **Huntress** (bows: Power Shot, Multishot, Exploding and Storm Arrows, Strafe, plus Critical Eye and Evade). Each level gives 5 stat points and a skill point. Skill trees have level requirements, prerequisites and synergies.
+- **Four classes.** The **Reaver** (melee: Bash, Frenzy, Leap Attack, Whirlwind, War Cry), the **Arcanist** (Fire Bolt, Ice Bolt, Charged Bolt, Frost Nova, Teleport, Fireball, Meteor), the **Huntress** (bows: Power Shot, Multishot, Exploding and Storm Arrows, Strafe, plus Critical Eye and Evade) and the **Necromancer** (summons: Raise Skeleton from corpses, Grave Golem, Skeletal Mastery; curses and corpses: Mark of Frailty, Corpse Burst; bone and poison: Bone Shards, Bone Ward, Bone Lance, Bone Storm, Blight Nova). Servants follow you between areas, and monsters fight them as well as you. Each level gives 5 stat points and a skill point. Skill trees have level requirements, prerequisites and synergies.
 - **Loot.** Items drop as normal, socketed (grey), magic (blue), rare (yellow), set (green) or unique (gold). Magic and better items drop unidentified; the sage identifies them for free. Gems in seven types and five grades go into sockets, with different effects in weapons, armor and shields. Your inventory is a grid where items take up space by size. Magic find improves your odds.
 - **Monsters.** Imps that flee when a packmate dies and Hexers that raise them again, ghouls, skeletons, archers, bats, hounds, brutes, wraiths and cultists. Champion packs (blue) and uniques with modifiers like Fire Enchanted, Stone Skin and Extra Fast (gold). Bosses: Gorvath the Glutton, the Drowned Bishop, Ossuary Warden Krell, and Vhorza, Mother of Cinders.
 - **The world.** Emberwatch Camp (healer, blacksmith, sage, gambler, stash) and seven randomly generated areas: Cinder Fields, Hollow Cave, Gloomwood, Sunken Chapel, Catacombs 1-2 and the Hellforge. Activate waypoints to fast-travel, and cast Town Portal to restock and come back. Shrines, chests and (occasionally explosive) barrels are scattered around.
 - **Quests.** Cleanse the Hollow Cave (+1 skill point), slay the Drowned Bishop (+5 stat points), and destroy the Mother of Cinders to unlock **Nightmare**, then **Hell**: tougher monsters, immunities and resistance penalties.
 - **Hardcore** heroes die permanently. Softcore heroes respawn in town and lose some gold.
 
-Progress saves automatically to the browser's local storage.
+Progress saves automatically to the browser's local storage. To move heroes to another device, use **Export / Import** on the title screen: download a save file or copy a short save code, then load the file or paste the code on the other device. Importing replaces a hero with the same identity and keeps the rest.
+
+## Versions
+
+The version is shown at the bottom of the title screen; tap it for the player-facing changelog (`src/changelog.ts`, add an entry with each version bump).
+
+| Version | Commit | Notes |
+|---|---|---|
+| 0.4.0 | | Necromancer class |
+| 0.3.0 | `45bb4fd` | Changelog viewer on the title screen |
+| 0.2.0 | `d6c3a2d` | Save export/import (file or copy/paste code) |
+| 0.1.0 | `0fffeff` | Initial release. Roll back with `git checkout 0fffeff -- games/hellforge/claude` |
 
 ## Development
 

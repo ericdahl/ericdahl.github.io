@@ -200,8 +200,12 @@ export class Renderer {
 
     // Creatures.
     for (const m of a.monsters) {
-      if (!near(m.x, m.y, lightR + 1.5)) continue;
+      if (!near(m.x, m.y, lightR + 1.5) || (m.dead && m.used)) continue;
       add(m.x + m.y + (m.dead ? -0.4 : 0), () => this.drawMonster(m));
+    }
+    for (const m of w.minions) {
+      add(m.x + m.y, () => this.drawMonster(m));
+      lights.push({ x: m.x, y: m.y, r: 1.4, a: 0.25 });
     }
     for (const n of a.npcs) add(n.x + n.y, () => this.drawNpc(n, w));
     add(p.x + p.y, () => this.drawPlayer(w));
@@ -319,18 +323,20 @@ export class Renderer {
     const ab = eq.body ? baseOf(eq.body) : null;
     const hb = eq.head ? baseOf(eq.head) : null;
     const armorCol = ab ? (ab.qlvl >= 11 ? '#8f939c' : ab.qlvl >= 3 ? '#6b4a2e' : '#a8936a') : null;
+    const necro = c.classId === 'necromancer';
+    const caster = c.classId === 'arcanist' || necro;
     const look: HumanoidLook = {
-      body: armorCol ?? (c.classId === 'reaver' ? '#7a4a2a' : c.classId === 'arcanist' ? '#33508f' : '#3d5a32'),
-      trim: c.classId === 'arcanist' ? '#c8a858' : '#3a2a1a',
-      skin: c.classId === 'arcanist' ? '#e0c0a0' : '#c89878',
+      body: armorCol ?? (c.classId === 'reaver' ? '#7a4a2a' : c.classId === 'arcanist' ? '#33508f' : necro ? '#26262c' : '#3d5a32'),
+      trim: c.classId === 'arcanist' ? '#c8a858' : necro ? '#9aa87a' : '#3a2a1a',
+      skin: c.classId === 'arcanist' ? '#e0c0a0' : necro ? '#d8d2c4' : '#c89878',
       legs: c.classId === 'reaver' ? '#4a3020' : '#2e2a24',
-      head: hb ? (hb.id === 'cap' ? 'cap' : 'helm') : c.classId === 'arcanist' ? 'hood' : 'hair',
-      headColor: hb ? (hb.qlvl >= 11 ? '#9a9ea8' : '#7a5a3a') : c.classId === 'reaver' ? '#3a2410' : c.classId === 'arcanist' ? '#2a3f72' : '#b0702a',
+      head: hb ? (hb.id === 'cap' ? 'cap' : 'helm') : caster ? 'hood' : 'hair',
+      headColor: hb ? (hb.qlvl >= 11 ? '#9a9ea8' : '#7a5a3a') : c.classId === 'reaver' ? '#3a2410' : c.classId === 'arcanist' ? '#2a3f72' : necro ? '#1c1c22' : '#b0702a',
       weapon: wb ? (wb.cat === 'mace' && wb.id === 'club' ? 'club' : wb.cat!) : null,
       weaponColor: eq.weapon?.rarity === 'unique' ? '#e8c27a' : eq.weapon?.rarity === 'rare' ? '#f0e070' : undefined,
       shield: eq.offhand ? (baseOf(eq.offhand).qlvl >= 11 ? '#8a8e98' : '#6b4a2e') : null,
-      robe: c.classId === 'arcanist' && !ab,
-      cape: c.classId === 'huntress' ? '#2e4a2a' : c.classId === 'reaver' ? undefined : '#22305a',
+      robe: caster && !ab,
+      cape: c.classId === 'huntress' ? '#2e4a2a' : c.classId === 'reaver' ? undefined : necro ? '#141218' : '#22305a',
     };
     void cls;
     return look;
@@ -372,6 +378,19 @@ export class Renderer {
     if (act?.kind === 'whirl') ctx.scale(Math.cos(p.facing * 2) > 0 ? 1 : -1, 1);
     drawHumanoid(ctx, this.playerLook(w), pose);
     ctx.restore();
+    if (p.buffs.bone_ward) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(232,222,196,0.75)';
+      ctx.lineWidth = 2.5 * z;
+      ctx.setLineDash([4 * z, 5 * z]);
+      ctx.lineDashOffset = -this.time * 30 * z;
+      for (const [ry, hy] of [[9, -10], [8, -30]] as const) {
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y + hy * z, 17 * z, ry * z, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
     if (p.buffs.frost_shell) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
@@ -431,8 +450,8 @@ export class Renderer {
       ctx.restore();
       return;
     }
-    // Aura ring for special monsters.
-    const ring = m.rarity === 'champion' ? '#5c7cff' : m.rarity === 'unique' ? '#d8b050' : m.rarity === 'boss' ? '#ff4020' : null;
+    // Aura ring for special monsters; servants get a pale green one.
+    const ring = m.ally ? '#7ad070' : m.rarity === 'champion' ? '#5c7cff' : m.rarity === 'unique' ? '#d8b050' : m.rarity === 'boss' ? '#ff4020' : null;
     if (ring) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
@@ -456,13 +475,23 @@ export class Renderer {
     if (m.mods.includes('fireEnch')) color = '#d8602a';
     if (m.mods.includes('coldEnch')) color = '#7aa8d8';
     drawMonsterShape(ctx, m.def.shape, color, pose, this.time + m.id);
-    if (m.flash > 0 || m.chill > 0 || this.hoverId === m.id) {
+    const poisoned = m.poison.t > 0;
+    if (m.flash > 0 || m.chill > 0 || poisoned || this.hoverId === m.id) {
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = m.flash > 0 ? 0.55 : this.hoverId === m.id ? 0.25 : 0.35;
-      drawMonsterShape(ctx, m.def.shape, m.flash > 0 ? '#ffffff' : m.chill > 0 ? '#3080ff' : '#806040', pose, this.time + m.id);
+      drawMonsterShape(ctx, m.def.shape, m.flash > 0 ? '#ffffff' : m.chill > 0 ? '#3080ff' : poisoned ? '#40a010' : '#806040', pose, this.time + m.id);
     }
     ctx.restore();
     if (m.stun > 0.3) this.text('✦', s.x, s.y - 54 * z * k, '#ffe080', 12);
+    if (m.curse && m.curse.t > 0) this.text('⛧', s.x, s.y - 58 * z * k, '#c070e0', 13);
+    if (m.ally && m.life < m.maxLife) {
+      const bw = 26 * z;
+      const by = s.y - 50 * z * k;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(s.x - bw / 2, by, bw, 3 * z);
+      ctx.fillStyle = '#6ad060';
+      ctx.fillRect(s.x - bw / 2, by, (bw * m.life) / m.maxLife, 3 * z);
+    }
   }
 
   private drawProjectile(pr: Projectile) {
@@ -496,6 +525,31 @@ export class Renderer {
         ctx.arc(6 * z, 0, 6 * z, 0, Math.PI * 2);
         ctx.fill();
       }
+      ctx.restore();
+      return;
+    }
+    if (pr.kind === 'boneshard' || pr.kind === 'bonelance') {
+      const lance = pr.kind === 'bonelance';
+      ctx.rotate(ang);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = lance ? 'rgba(200,220,190,0.25)' : 'rgba(220,210,180,0.18)';
+      ctx.beginPath();
+      ctx.ellipse(-8 * z, 0, (lance ? 18 : 10) * z, (lance ? 5 : 3) * z, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = '#f2ead4';
+      ctx.strokeStyle = '#8a8070';
+      ctx.lineWidth = 0.8 * z;
+      const L = (lance ? 16 : 7) * z;
+      const W = (lance ? 3.2 : 2) * z;
+      ctx.beginPath();
+      ctx.moveTo(L, 0);
+      ctx.lineTo(-L * 0.6, -W);
+      ctx.lineTo(-L, 0);
+      ctx.lineTo(-L * 0.6, W);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
       ctx.restore();
       return;
     }
@@ -956,6 +1010,40 @@ export class Renderer {
         ctx.fillRect(s.x - wdt, s.y - hgt * (0.4 + k * 0.6), wdt * 2, hgt * (0.4 + k * 0.6));
         break;
       }
+      case 'raise': {
+        // Bone-green pillar rising from the ground.
+        const hgt = 70 * z;
+        const g = ctx.createLinearGradient(0, s.y - hgt, 0, s.y);
+        g.addColorStop(0, 'rgba(120,220,110,0)');
+        g.addColorStop(1, `rgba(150,230,130,${0.6 * (1 - k)})`);
+        ctx.fillStyle = g;
+        ctx.fillRect(s.x - 14 * z, s.y - hgt * (0.3 + k * 0.7), 28 * z, hgt * (0.3 + k * 0.7));
+        ctx.strokeStyle = `rgba(160,240,140,${1 - k})`;
+        ctx.lineWidth = 2 * z;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, 16 * z * (0.5 + k), 8 * z * (0.5 + k), 0, 0, Math.PI * 2);
+        ctx.stroke();
+        lights.push({ x: f.x, y: f.y, r: 2, a: 0.5 * (1 - k) });
+        break;
+      }
+      case 'curse': {
+        const r = (f.r ?? 2) * unitX * 1.4;
+        ctx.strokeStyle = `rgba(190,90,230,${0.9 * (1 - k)})`;
+        ctx.lineWidth = 2 * z;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, r * (0.6 + 0.4 * k), r * 0.5 * (0.6 + 0.4 * k), 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        for (let i = 0; i <= 5; i++) {
+          const a = -Math.PI / 2 + (i * 4 * Math.PI) / 5 + k;
+          const px = s.x + Math.cos(a) * r * 0.55;
+          const py = s.y + Math.sin(a) * r * 0.28;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        break;
+      }
       case 'whirl': {
         ctx.strokeStyle = `rgba(220,230,240,${0.7 * (1 - k)})`;
         ctx.lineWidth = 3 * z;
@@ -1102,6 +1190,7 @@ export class Renderer {
     const pp = w.portalPos();
     if (pp) mark(pp.x, pp.y, '#6aa8ff', 3);
     if (full) for (const m of w.area.monsters) if (!m.dead && Math.hypot(m.x - p.x, m.y - p.y) < w.area.def.light + 1) mark(m.x, m.y, '#ff4030', 2);
+    for (const m of w.minions) mark(m.x, m.y, '#7ad070', 2);
     mark(p.x, p.y, '#ffffff', 3);
     ctx.restore();
     if (full) this.text(w.area.def.name, cam.w / 2, 24, '#e8d9a8', 16, true);

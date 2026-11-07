@@ -61,3 +61,16 @@ export function loadSettings(): Settings {
 export function saveSettings(s: Settings) {
   write(SETTINGS, s);
 }
+
+/** Adds imported heroes, replacing any stored hero with the same id. Returns how many were replaced. */
+export function importCharacters(chars: Character[]): number {
+  const list = read<Character[]>(KEY, []);
+  let replaced = 0;
+  for (const c of chars) {
+    const i = list.findIndex((x) => x.id === c.id);
+    if (i >= 0) (list[i] = c), replaced++;
+    else list.push(c);
+  }
+  write(KEY, list);
+  return replaced;
+}

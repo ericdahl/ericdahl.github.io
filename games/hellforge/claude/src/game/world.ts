@@ -11,7 +11,7 @@ import {
 } from './items';
 import { floodDistances, generateLevel, idx, isWalkable, nearestFloor, type Level, type Point } from './map';
 import {
-  MONSTERS, monsterStats, rollUniqueMods, uniqueName, type MonsterDef, type MonsterRarity, type Resists, type UniqueMod,
+  baseDamage, baseLife, MONSTERS, monsterStats, rollUniqueMods, uniqueName, type MonsterDef, type MonsterRarity, type Resists, type UniqueMod,
 } from './monsters';
 import { FlowField, findPath, lineOfSight } from './path';
 import { hashSeed, Rng } from './rng';
@@ -36,7 +36,7 @@ export type GameEvent =
 
 export type FxKind =
   | 'blood' | 'spark' | 'nova' | 'explosion' | 'chain' | 'meteor_mark' | 'burn' | 'teleport' | 'levelup' | 'heal'
-  | 'shrine' | 'text' | 'shout' | 'revive' | 'whirl' | 'slam' | 'portal_open';
+  | 'shrine' | 'text' | 'shout' | 'revive' | 'whirl' | 'slam' | 'portal_open' | 'raise' | 'curse';
 
 export interface Fx {
   kind: FxKind;
@@ -91,6 +91,14 @@ export interface Monster {
   superId?: string;
   charge?: { dx: number; dy: number; t: number; hit: boolean };
   summoned?: boolean;
+  /** Set on the player's raised servants. */
+  ally?: 'skeleton' | 'golem';
+  /** Current opponent: a minion id for monsters, a monster id for minions. */
+  foe?: number;
+  curse?: { t: number; pct: number };
+  /** A corpse that was raised or exploded and can't be used again. */
+  used?: boolean;
+  stuckT?: number;
 }
 
 export interface Projectile {
@@ -259,6 +267,8 @@ export class World {
   seed: number;
   areas = new Map<string, AreaState>();
   area!: AreaState;
+  /** The player's raised servants. They follow the player between areas. */
+  minions: Monster[] = [];
   player: PlayerState;
   events: GameEvent[] = [];
   portal: Portal | null = null;
@@ -508,6 +518,8 @@ export class World {
     p.intent = null;
     p.action = null;
     p.invuln = 1.2;
+    this.minions = this.minions.filter((mi) => !mi.dead);
+    for (const mi of this.minions) this.placeMinion(mi);
     a.flow.update(p.x, p.y);
     this.markExplored(true);
     if (id === 'town') this.restockVendors();
@@ -604,8 +616,14 @@ export class World {
     const def = SKILL_BY_ID[skill];
     if (!def) return;
     const p = this.player;
-    const self = ['buff', 'nova'].includes(def.kind);
+    const self = ['buff', 'nova', 'ring'].includes(def.kind) || def.id === 'grave_golem';
     if (self) return this.cmdSkill(skill, p.x, p.y);
+    if (def.kind === 'summon' || def.kind === 'corpse') {
+      // Raise from the corpse nearest you; explode the corpse nearest your target.
+      const near = def.kind === 'corpse' ? this.autoTarget(11) ?? p : p;
+      const c = this.findCorpse(near.x, near.y, def.kind === 'corpse' ? 6 : 10);
+      return this.cmdSkill(skill, c?.x ?? p.x, c?.y ?? p.y);
+    }
     const range = def.kind === 'teleport' ? 0 : this.isMeleeSkill(def) ? 5 : 11;
     const target = range ? this.autoTarget(range) : null;
     if (target) return this.cmdSkill(skill, target.x, target.y, target.id);
@@ -1119,6 +1137,7 @@ export class World {
     this.updatePlayer(dt);
     a.flow.update(this.player.x, this.player.y);
     this.updateMonsters(dt);
+    this.updateMinions(dt);
     this.updateProjectiles(dt);
     this.updateHazards(dt);
     this.exploreT -= dt;
@@ -1310,8 +1329,9 @@ export class World {
         return;
       }
     }
-    // Ranged skills need line of sight to their target.
-    if (target && !melee && !lineOfSight(this.area.level, p, target) && def.kind !== 'teleport') {
+    // Ranged skills need line of sight to their target, and short-ranged ones need to get close.
+    const castRange = def.kind === 'shards' ? 6.5 : def.kind === 'curse' ? 10 : Infinity;
+    if (target && !melee && def.kind !== 'teleport' && (!lineOfSight(this.area.level, p, target) || Math.hypot(tx - p.x, ty - p.y) > castRange)) {
       p.pathT -= dt;
       if (p.pathT <= 0 || !p.path.length) this.repath(tx, ty);
       if (!this.followPath(dt, speed, { x: tx, y: ty })) p.intent = null;
@@ -1334,6 +1354,9 @@ export class World {
     if (!lvl) return;
     if (def.weapon === 'bow' && !st.isBow) return this.msg('Requires a bow', '#ff8a6a', 'bow');
     if (def.weapon === 'melee' && st.isBow) return this.msg('Requires a melee weapon', '#ff8a6a', 'melee');
+    if (def.id === 'raise_skeleton' || def.kind === 'corpse') {
+      if (!this.findCorpse(tx, ty, 2.5) && !this.findCorpse(p.x, p.y, 10)) return this.msg('No corpse nearby', '#c8b890', 'corpse');
+    }
     const cost = def.mana(lvl);
     if (p.mana < cost) {
       this.msg('Not enough mana', '#7f9fff', 'mana');
@@ -1489,12 +1512,73 @@ export class World {
     const spellDmg = (): Damage => elemDamage(el, roll(this.rng, pr.min ?? 0, pr.max ?? 0) * syn);
     switch (def.kind) {
       case 'projectile': {
-        const kind = def.id === 'fire_bolt' ? 'firebolt' : def.id === 'ice_bolt' ? 'icebolt' : 'fireball';
+        const kind = def.id === 'fire_bolt' ? 'firebolt' : def.id === 'ice_bolt' ? 'icebolt' : def.id === 'bone_lance' ? 'bonelance' : 'fireball';
         this.spawnProjectile({
           x: p.x, y: p.y, ang, speed: def.id === 'fireball' ? 9 : 11, ttl: 1.3, owner: 'player', dmg: spellDmg(), kind,
-          radius: 0.35, explode: pr.radius, chill: pr.chill, srcLevel: this.char.level,
+          radius: 0.35, explode: pr.radius, chill: pr.chill, srcLevel: this.char.level, pierce: def.id === 'bone_lance',
         });
-        this.sound(el === 'cold' ? 'cold' : 'fire');
+        this.sound(el === 'cold' ? 'cold' : el === 'phys' ? 'swing' : 'fire');
+        break;
+      }
+      case 'shards': {
+        const n = pr.count!;
+        const spread = Math.min(0.9, 0.11 * n);
+        for (let i = 0; i < n; i++) {
+          const a2 = ang + (n === 1 ? 0 : -spread / 2 + (spread * i) / (n - 1)) + this.rng.range(-0.04, 0.04);
+          this.spawnProjectile({ x: p.x, y: p.y, ang: a2, speed: 13, ttl: 0.6, owner: 'player', dmg: spellDmg(), kind: 'boneshard', radius: 0.25, srcLevel: this.char.level });
+        }
+        this.sound('swing');
+        break;
+      }
+      case 'ring': {
+        const n = pr.count!;
+        for (let i = 0; i < n; i++) {
+          this.spawnProjectile({
+            x: p.x, y: p.y, ang: ang + (i / n) * TAU, speed: 10, ttl: 0.9, owner: 'player', dmg: spellDmg(), kind: 'bonelance', radius: 0.35,
+            pierce: true, srcLevel: this.char.level,
+          });
+        }
+        this.fx({ kind: 'shout', x: p.x, y: p.y, dur: 0.4, r: 2, color: '#f0e6c8' });
+        this.sound('nova');
+        break;
+      }
+      case 'curse': {
+        this.fx({ kind: 'curse', x: act.x, y: act.y, dur: 0.6, r: pr.radius });
+        this.sound('nomana');
+        for (const m of this.monstersNear(act.x, act.y, pr.radius!)) {
+          m.curse = { t: pr.duration!, pct: pr.pct! };
+          this.alertPack(m);
+        }
+        break;
+      }
+      case 'corpse': {
+        const c = this.findCorpse(act.x, act.y, 2.5) ?? this.findCorpse(p.x, p.y, 10);
+        if (!c) break;
+        c.used = true;
+        const amt = c.maxLife * roll(this.rng, pr.pct!, pr.pct2!) / 100;
+        this.fx({ kind: 'explosion', x: c.x, y: c.y, dur: 0.5, r: pr.radius });
+        this.fx({ kind: 'blood', x: c.x, y: c.y, dur: 0.6, color: '#8a1010' });
+        this.emit({ type: 'shake', amount: 4 });
+        this.sound('boom');
+        for (const m of this.monstersNear(c.x, c.y, pr.radius!)) this.damageMonster(m, { phys: amt / 2, fire: amt / 2, cold: 0, light: 0, poison: 0 }, {});
+        break;
+      }
+      case 'summon': {
+        if (def.id === 'grave_golem') {
+          for (const g of this.minions) if (g.ally === 'golem') g.dead = true;
+          const at = isWalkable(this.area.level, act.x, act.y) && Math.hypot(act.x - p.x, act.y - p.y) < 8 ? { x: act.x, y: act.y } : { x: p.x + Math.cos(ang), y: p.y + Math.sin(ang) };
+          this.raiseMinion('golem', at.x, at.y, pr);
+        } else {
+          const c = this.findCorpse(act.x, act.y, 2.5) ?? this.findCorpse(p.x, p.y, 10);
+          if (!c) break;
+          c.used = true;
+          const skels = this.minions.filter((mi) => mi.ally === 'skeleton' && !mi.dead);
+          // At the cap, the oldest skeleton crumbles to make room.
+          if (skels.length >= pr.count!) skels[0].dead = true;
+          this.raiseMinion('skeleton', c.x, c.y, pr);
+        }
+        this.minions = this.minions.filter((mi) => !mi.dead);
+        this.sound('fire');
         break;
       }
       case 'bolts': {
@@ -1509,7 +1593,7 @@ export class World {
         break;
       }
       case 'nova': {
-        this.fx({ kind: el === 'cold' ? 'nova' : 'shout', x: p.x, y: p.y, dur: 0.45, r: pr.radius, color: el === 'cold' ? '#a8e8ff' : '#f0d070' });
+        this.fx({ kind: el === 'cold' ? 'nova' : 'shout', x: p.x, y: p.y, dur: 0.45, r: pr.radius, color: el === 'cold' ? '#a8e8ff' : el === 'poison' ? '#8ad040' : '#f0d070' });
         this.sound(el === 'cold' ? 'nova' : 'roar');
         for (const m of this.monstersNear(p.x, p.y, pr.radius!)) {
           const syn2 = synergyBonus(def, this.char.skills);
@@ -1551,8 +1635,9 @@ export class World {
       }
       case 'buff': {
         p.buffs[def.id] = { t: pr.duration!, p: pr };
-        this.fx({ kind: def.id === 'frost_shell' ? 'nova' : 'shout', x: p.x, y: p.y, dur: 0.6, r: 1.6, color: def.id === 'frost_shell' ? '#bfefff' : '#ffe080' });
-        this.sound(def.id === 'frost_shell' ? 'cold' : 'roar');
+        const col = def.id === 'frost_shell' ? '#bfefff' : def.id === 'bone_ward' ? '#e8dcc0' : '#ffe080';
+        this.fx({ kind: def.id === 'battle_shout' ? 'shout' : 'nova', x: p.x, y: p.y, dur: 0.6, r: 1.6, color: col });
+        this.sound(def.id === 'battle_shout' ? 'roar' : def.id === 'bone_ward' ? 'swing' : 'cold');
         this.refreshStats();
         break;
       }
@@ -1630,13 +1715,16 @@ export class World {
 
   // ---------------------------------------------------------------- damage
 
-  damageMonster(m: Monster, d: Damage, o: { ar?: number; chill?: number; stun?: number; knock?: { x: number; y: number; f: number }; crit?: boolean; leech?: boolean } = {}): boolean {
+  damageMonster(m: Monster, d: Damage, o: { ar?: number; chill?: number; stun?: number; knock?: { x: number; y: number; f: number }; crit?: boolean; leech?: boolean; minion?: Monster } = {}): boolean {
     if (m.dead) return false;
     this.alertPack(m);
-    if (o.ar !== undefined && !this.rng.chance(hitChance(o.ar, m.def_, this.char.level, m.level))) {
-      this.floatText(m.x, m.y, 'Miss', '#9a9a9a');
+    if (o.ar !== undefined && !this.rng.chance(hitChance(o.ar, m.def_, o.minion?.level ?? this.char.level, m.level))) {
+      if (!o.minion) this.floatText(m.x, m.y, 'Miss', '#9a9a9a');
       return false;
     }
+    if (m.curse && m.curse.t > 0 && d.phys > 0) d = { ...d, phys: d.phys * (1 + m.curse.pct / 100) };
+    // Struck by a servant: turn on it some of the time.
+    if (o.minion && (m.foe === undefined || this.rng.chance(0.3))) m.foe = o.minion.id;
     const { total, poison } = applyResists(d, m.res);
     if (poison > 0 && poison / 3 >= m.poison.dps * 0.9) m.poison = { dps: poison / 3, t: 3 };
     if (d.cold > 0 && m.res.cold < 100) m.chill = Math.max(m.chill, o.chill ?? 1.5);
@@ -1647,7 +1735,7 @@ export class World {
     }
     m.life -= total;
     m.flash = 0.12;
-    this.setFocus(m);
+    if (!o.minion) this.setFocus(m);
     if (total > 0) {
       this.fx({ kind: d.phys > 0 ? 'blood' : 'spark', x: m.x, y: m.y, dur: 0.35, color: elemColor(d) });
       this.floatText(m.x, m.y, String(Math.round(total)), o.crit ? '#ffd040' : '#ffffff');
@@ -1741,7 +1829,16 @@ export class World {
     }
     const res: Resists = { phys: 0, fire: st.res.fire, cold: st.res.cold, light: st.res.light, poison: st.res.poison };
     const dd = { ...d, phys: d.phys > 0 ? reducePhysical(d.phys, st.dmgReduce) : 0 };
-    const { total, poison } = applyResists(dd, res);
+    let { total, poison } = applyResists(dd, res);
+    const ward = p.buffs.bone_ward;
+    if (ward && total > 0) {
+      const ab = Math.min(total, ward.p.min ?? 0);
+      ward.p.min = (ward.p.min ?? 0) - ab;
+      total -= ab;
+      poison *= 0.5;
+      if (ward.p.min <= 0) delete p.buffs.bone_ward;
+      if (ab >= 1) this.floatText(p.x, p.y, String(Math.round(ab)), '#d8ccb0');
+    }
     if (poison > 0) p.poison = { dps: poison / 4, t: 4 };
     if (d.cold > 0) p.chill = 1.5;
     p.life -= total;
@@ -1765,6 +1862,7 @@ export class World {
     p.action = null;
     p.intent = null;
     p.path = [];
+    this.minions = [];
     this.sound('death');
     this.emit({ type: 'death' });
     if (this.char.hardcore) this.char.dead = true;
@@ -1839,6 +1937,7 @@ export class World {
         continue;
       }
       if (m.flash > 0) m.flash -= dt;
+      if (m.curse && m.curse.t > 0) m.curse.t -= dt;
       if (Math.abs(m.x - p.x) > 32 || Math.abs(m.y - p.y) > 32) continue;
       if (m.poison.t > 0) {
         m.poison.t -= dt;
@@ -1863,18 +1962,22 @@ export class World {
       m.atkCd -= dt * slow;
       m.abilityCd -= dt * slow;
       if (m.fleeT > 0) m.fleeT -= dt;
-      const dx = p.x - m.x;
-      const dy = p.y - m.y;
-      const d = Math.hypot(dx, dy);
+      // Fight the player or a servant, whichever is clearly closer (or already engaged).
+      const dp = Math.hypot(p.x - m.x, p.y - m.y);
+      const foe = safe ? undefined : this.monsterFoe(m, dp);
+      const tgt = foe ?? p;
+      const dx = tgt.x - m.x;
+      const dy = tgt.y - m.y;
+      const d = Math.hypot(dx, dy) || 0.001;
       if (!m.alert && !safe) {
-        const aggro = m.rarity === 'boss' ? 9 : 7.5;
-        if (d < aggro && lineOfSight(l, m, p)) {
+        const aggro = foe ? 5 : m.rarity === 'boss' ? 9 : 7.5;
+        if (d < aggro && lineOfSight(l, m, tgt)) {
           this.alertPack(m);
           if (m.rarity === 'boss') this.sound('roar');
         }
       }
       if (m.action) {
-        this.updateMonsterAction(m, dt * slow, d);
+        this.updateMonsterAction(m, dt * slow);
         continue;
       }
       if (m.charge) {
@@ -1892,13 +1995,13 @@ export class World {
         m.walk += dt * speed;
         continue;
       }
-      if (m.def.ai === 'boss' && m.abilityCd <= 0 && d < 11 && lineOfSight(l, m, p)) {
-        this.bossAbility(m, d);
+      if (m.def.ai === 'boss' && m.abilityCd <= 0 && dp < 11 && lineOfSight(l, m, p)) {
+        this.bossAbility(m, dp);
         continue;
       }
       const reach = m.def.radius + 0.3 + m.def.range;
       const ranged = m.def.ai === 'ranged' || m.def.ai === 'caster' || m.def.ai === 'hexer' || (m.def.ai === 'boss' && !!m.def.missile && d > 2.5);
-      const los = d < 14 && lineOfSight(l, m, p);
+      const los = d < 14 && lineOfSight(l, m, tgt);
       if (m.def.ai === 'hexer' && m.abilityCd <= 0 && this.tryRevive(m)) continue;
       if (ranged && los && d <= m.def.range + 1) {
         if (d < 3 && m.def.ai !== 'boss') {
@@ -1924,8 +2027,8 @@ export class World {
         continue;
       }
       // Chase: straight line when visible and close, else follow the flow field.
-      let tx = p.x;
-      let ty = p.y;
+      let tx = tgt.x;
+      let ty = tgt.y;
       if (m.def.ai === 'bat') {
         const wob = Math.sin(this.time * 6 + m.id) * 1.5;
         tx += (-dy / d) * wob;
@@ -1946,8 +2049,24 @@ export class World {
       m.facing = Math.atan2(my, mx);
       m.walk += dt * speed;
     }
-    this.separate(a.monsters);
+    this.separate(this.minions.length ? [...a.monsters, ...this.minions] : a.monsters);
     a.monsters = a.monsters.filter((m) => !m.dead || m.deadT < 40);
+  }
+
+  /** The servant a monster should fight instead of the player, if any. */
+  private monsterFoe(m: Monster, dp: number): Monster | undefined {
+    if (!this.minions.length) return undefined;
+    const cur = m.foe !== undefined ? this.minions.find((mi) => mi.id === m.foe && !mi.dead) : undefined;
+    if (cur && Math.hypot(cur.x - m.x, cur.y - m.y) < Math.min(8, dp + 3)) return cur;
+    let best: Monster | undefined;
+    let bd = Math.min(8, dp - 0.75);
+    for (const mi of this.minions) {
+      if (mi.dead) continue;
+      const d = Math.hypot(mi.x - m.x, mi.y - m.y) * (mi.ally === 'golem' ? 0.6 : 1);
+      if (d < bd) (bd = d), (best = mi);
+    }
+    m.foe = best?.id;
+    return best;
   }
 
   private wander(m: Monster, dt: number) {
@@ -1998,14 +2117,20 @@ export class World {
     }
   }
 
-  private updateMonsterAction(m: Monster, dt: number, d: number) {
+  private updateMonsterAction(m: Monster, dt: number) {
     const act = m.action!;
     const p = this.player;
     act.t += dt;
     if (!act.done && act.t >= act.hitAt) {
       act.done = true;
-      if (act.kind === 'melee') {
-        if (d <= m.def.radius + 0.3 + m.def.range + 0.5) {
+      const foe = m.foe !== undefined ? this.minions.find((mi) => mi.id === m.foe && !mi.dead) : undefined;
+      const reach = m.def.radius + 0.3 + m.def.range + 0.5;
+      if (act.kind === 'melee' && foe && Math.hypot(foe.x - m.x, foe.y - m.y) <= reach + foe.def.radius) {
+        const dmg = elemDamage(m.def.element ?? 'phys', roll(this.rng, m.dmgMin, m.dmgMax));
+        if (m.mods.includes('fireEnch')) dmg.fire += (m.dmgMin + m.dmgMax) * 0.4;
+        this.damageMinion(foe, dmg, { ar: m.ar, level: m.level });
+      } else if (act.kind === 'melee') {
+        if (Math.hypot(p.x - m.x, p.y - m.y) <= reach) {
           const dmg = elemDamage(m.def.element ?? 'phys', roll(this.rng, m.dmgMin, m.dmgMax));
           if (m.def.element && m.def.element !== 'phys') {
             dmg.phys = dmg[m.def.element] * 0.5;
@@ -2017,7 +2142,8 @@ export class World {
         }
       } else {
         const ms = m.def.missile!;
-        const ang = Math.atan2(p.y - m.y, p.x - m.x) + this.rng.range(-0.06, 0.06);
+        const aim = foe ?? p;
+        const ang = Math.atan2(aim.y - m.y, aim.x - m.x) + this.rng.range(-0.06, 0.06);
         const dmg = elemDamage(ms.element, roll(this.rng, m.dmgMin, m.dmgMax));
         this.spawnProjectile({
           x: m.x, y: m.y, ang, speed: ms.speed, ttl: 1.6, owner: 'monster', dmg, kind: ms.kind, radius: 0.3,
@@ -2030,7 +2156,7 @@ export class World {
   }
 
   private tryRevive(m: Monster): boolean {
-    const corpse = this.area.monsters.find((o) => o.dead && o.def.id === 'imp' && o.revived < 2 && o.deadT > 1.5 && o.deadT < 30 && Math.hypot(o.x - m.x, o.y - m.y) < 7);
+    const corpse = this.area.monsters.find((o) => o.dead && !o.used && o.def.id === 'imp' && o.revived < 2 && o.deadT > 1.5 && o.deadT < 30 && Math.hypot(o.x - m.x, o.y - m.y) < 7);
     if (!corpse) return false;
     m.abilityCd = 5;
     corpse.dead = false;
@@ -2170,6 +2296,8 @@ export class World {
             break;
           }
         }
+      } else if (this.minionHit(pr)) {
+        pr.ttl = 0;
       } else if (!p.dead && Math.hypot(p.x - pr.x, p.y - pr.y) < 0.3 + pr.radius) {
         if (pr.explode) this.explode(pr);
         else this.damagePlayer(pr.dmg, { ar: pr.ar, level: pr.srcLevel, missile: true });
@@ -2185,9 +2313,169 @@ export class World {
     this.sound('boom');
     if (pr.owner === 'player') {
       for (const m of this.monstersNear(pr.x, pr.y, r)) this.damageMonster(m, pr.dmg, {});
-    } else if (Math.hypot(this.player.x - pr.x, this.player.y - pr.y) < r + 0.3) {
-      this.damagePlayer(pr.dmg, { level: pr.srcLevel });
+    } else {
+      if (Math.hypot(this.player.x - pr.x, this.player.y - pr.y) < r + 0.3) this.damagePlayer(pr.dmg, { level: pr.srcLevel });
+      for (const mi of this.minions) if (!mi.dead && Math.hypot(mi.x - pr.x, mi.y - pr.y) < r + mi.def.radius) this.damageMinion(mi, pr.dmg, { level: pr.srcLevel });
     }
+  }
+
+  /** Monster missiles also strike servants in their way. */
+  private minionHit(pr: Projectile): boolean {
+    for (const mi of this.minions) {
+      if (mi.dead || Math.hypot(mi.x - pr.x, mi.y - pr.y) > mi.def.radius + pr.radius) continue;
+      if (pr.explode) this.explode(pr);
+      else this.damageMinion(mi, pr.dmg, { ar: pr.ar, level: pr.srcLevel });
+      return true;
+    }
+    return false;
+  }
+
+  // ---------------------------------------------------------------- servants
+
+  /** Nearest unused corpse within `r` of a point. Bosses leave no usable corpse. */
+  findCorpse(x: number, y: number, r: number): Monster | null {
+    let best: Monster | null = null;
+    let bd = r;
+    for (const m of this.area.monsters) {
+      if (!m.dead || m.used || m.deadT > 36 || m.rarity === 'boss') continue;
+      const d = Math.hypot(m.x - x, m.y - y);
+      if (d <= bd) (bd = d), (best = m);
+    }
+    return best;
+  }
+
+  private raiseMinion(kind: 'skeleton' | 'golem', x: number, y: number, pr: SkillParams): Monster {
+    const def = MONSTERS[kind === 'skeleton' ? 'raised_skeleton' : 'grave_golem'];
+    const lvl = this.char.level;
+    const ml = skillLevel(this.char, 'skeletal_mastery');
+    const mp = ml ? SKILL_BY_ID.skeletal_mastery.params(ml) : { pct: 0, pct2: 0 };
+    const dmgK = (1 + (pr.pct ?? 0) / 100) * (1 + (mp.pct ?? 0) / 100);
+    const lifeK = (1 + (pr.pct2 ?? 0) / 100) * (1 + (mp.pct2 ?? 0) / 100);
+    const life = Math.round(baseLife(lvl) * def.lifeMul * lifeK);
+    const dmg = baseDamage(lvl) * def.dmgMul * dmgK;
+    const pos = isWalkable(this.area.level, x, y) ? { x, y } : { x: this.player.x, y: this.player.y };
+    const mi: Monster = {
+      id: this.id(), def, x: pos.x, y: pos.y, life, maxLife: life, level: lvl, dmgMin: Math.max(1, Math.round(dmg * 0.6)), dmgMax: Math.max(2, Math.round(dmg * 1.25)),
+      ar: Math.round(20 + lvl * 13), def_: Math.round(10 + lvl * 9 * (kind === 'golem' ? 1.5 : 1)), res: { phys: 0, fire: 0, cold: 0, light: 0, poison: 0, ...def.res },
+      speed: def.speed, xp: 0, rarity: 'normal', name: def.name, mods: [], alert: true, homeX: pos.x, homeY: pos.y, wanderT: 0, wanderTo: null,
+      atkCd: 0.4, action: null, abilityCd: 0, chill: 0, stun: 0, poison: { dps: 0, t: 0 }, fleeT: 0, knock: { x: 0, y: 0 }, dead: false, deadT: 0,
+      packId: -1, facing: this.player.facing, walk: 0, flash: 0, revived: 0, ally: kind,
+    };
+    this.minions.push(mi);
+    this.fx({ kind: 'raise', x: pos.x, y: pos.y, dur: 0.8 });
+    return mi;
+  }
+
+  /** Put a servant on a free tile next to the player (area change, or when it falls far behind). */
+  private placeMinion(mi: Monster) {
+    const p = this.player;
+    const ang = this.rng.range(0, TAU);
+    const s = nearestFloor(this.area.level, { x: p.x + Math.cos(ang) * 1.2, y: p.y + Math.sin(ang) * 1.2 });
+    mi.x = s.x + 0.5;
+    mi.y = s.y + 0.5;
+    mi.foe = undefined;
+    mi.action = null;
+    mi.knock = { x: 0, y: 0 };
+  }
+
+  damageMinion(mi: Monster, d: Damage, o: { ar?: number; level: number }) {
+    if (mi.dead) return;
+    if (o.ar !== undefined && !this.rng.chance(hitChance(o.ar, mi.def_, o.level, mi.level))) return;
+    const { total } = applyResists(d, mi.res);
+    mi.life -= total;
+    mi.flash = 0.12;
+    if (d.cold > 0) mi.chill = 1.5;
+    if (mi.life <= 0) {
+      mi.dead = true;
+      mi.life = 0;
+      mi.action = null;
+      this.fx({ kind: 'spark', x: mi.x, y: mi.y, dur: 0.5, color: '#e8e0c8' });
+      this.sound('death');
+    }
+  }
+
+  private updateMinions(dt: number) {
+    if (!this.minions.length) return;
+    const p = this.player;
+    const l = this.area.level;
+    const calm = this.inTown || p.dead;
+    for (const mi of this.minions) {
+      if (mi.dead) continue;
+      if (mi.flash > 0) mi.flash -= dt;
+      if (mi.chill > 0) mi.chill -= dt;
+      if (mi.knock.x || mi.knock.y) mi.knock = { x: 0, y: 0 };
+      const slow = mi.chill > 0 ? 0.5 : 1;
+      mi.atkCd -= dt * slow;
+      const dp = Math.hypot(p.x - mi.x, p.y - mi.y);
+      if (dp > 16) {
+        this.placeMinion(mi);
+        this.fx({ kind: 'raise', x: mi.x, y: mi.y, dur: 0.5 });
+        continue;
+      }
+      let foe = mi.foe !== undefined ? this.area.monsters.find((m) => m.id === mi.foe && !m.dead) : undefined;
+      if (foe && Math.hypot(foe.x - p.x, foe.y - p.y) > 11) foe = undefined;
+      mi.wanderT -= dt;
+      if (!calm && (!foe || mi.wanderT <= 0)) {
+        mi.wanderT = 0.6;
+        let bd = foe ? Math.hypot(foe.x - mi.x, foe.y - mi.y) - 1 : 7;
+        for (const m of this.area.monsters) {
+          if (m.dead || Math.abs(m.x - mi.x) > bd || Math.abs(m.y - mi.y) > bd) continue;
+          const d = Math.hypot(m.x - mi.x, m.y - mi.y);
+          if (d < bd && Math.hypot(m.x - p.x, m.y - p.y) < 10 && lineOfSight(l, mi, m)) (bd = d), (foe = m);
+        }
+        if (foe?.id !== mi.foe) mi.stuckT = 0;
+      }
+      if (calm) foe = undefined;
+      mi.foe = foe?.id;
+      if (mi.action) {
+        const act = mi.action;
+        act.t += dt * slow;
+        if (!act.done && act.t >= act.hitAt) {
+          act.done = true;
+          if (foe && Math.hypot(foe.x - mi.x, foe.y - mi.y) <= mi.def.radius + foe.def.radius + mi.def.range + 0.4) {
+            this.damageMonster(foe, elemDamage('phys', roll(this.rng, mi.dmgMin, mi.dmgMax)), { ar: mi.ar, minion: mi });
+          }
+        }
+        if (act.t >= act.dur) mi.action = null;
+        continue;
+      }
+      let goal: Point | null = null;
+      let speed = mi.speed * slow;
+      if (foe) {
+        const d = Math.hypot(foe.x - mi.x, foe.y - mi.y);
+        mi.facing = Math.atan2(foe.y - mi.y, foe.x - mi.x);
+        if (d <= mi.def.radius + foe.def.radius + mi.def.range) {
+          if (mi.atkCd <= 0) {
+            mi.action = { t: 0, hitAt: 0.3, dur: 0.55, done: false, kind: 'melee' };
+            mi.atkCd = 1 / mi.def.attackRate;
+          }
+          continue;
+        }
+        goal = foe;
+      } else if (dp > 2.6) {
+        goal = p;
+        if (dp > 6) speed *= 1.4;
+      }
+      if (!goal) continue;
+      let tx = goal.x;
+      let ty = goal.y;
+      if (!lineOfSight(l, mi, goal)) {
+        // Route around walls using the flow field toward the player.
+        const n = this.area.flow.next(mi.x, mi.y);
+        if (n) (tx = n.x), (ty = n.y);
+      }
+      const mx = tx - mi.x;
+      const my = ty - mi.y;
+      const ml = Math.hypot(mx, my) || 1;
+      const moved = this.moveEntity(mi, (mx / ml) * speed * dt, (my / ml) * speed * dt, mi.def.radius);
+      mi.facing = Math.atan2(my, mx);
+      mi.walk += dt * speed;
+      if (!moved && foe) {
+        mi.stuckT = (mi.stuckT ?? 0) + dt;
+        if (mi.stuckT > 1.5) (mi.foe = undefined), (mi.wanderT = 2);
+      }
+    }
+    this.minions = this.minions.filter((mi) => !mi.dead);
   }
 
   private chainLightning(from: Monster, n: number, dmg: Damage) {
