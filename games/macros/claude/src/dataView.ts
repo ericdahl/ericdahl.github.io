@@ -4,6 +4,8 @@ import { carbTarget } from './nutrition';
 import { parseText } from './parse';
 import { entryFor, makeEntry } from './sheets';
 import * as store from './store';
+import * as sync from './sync';
+import { syncCard } from './syncView';
 import { copyText, download, fmt, h, numberInput, readNum, toast } from './ui';
 
 function exportText(days: number | null): string {
@@ -153,9 +155,11 @@ function importCard(): HTMLElement {
 }
 
 export function openData(root: HTMLElement): () => void {
+  const sc = syncCard();
   root.replaceChildren(
     h('header', { class: 'top' }, h('h1', {}, 'Targets & data')),
     targetsCard(),
+    sc.el,
     exportCard(),
     importCard(),
     h(
@@ -165,12 +169,16 @@ export function openData(root: HTMLElement): () => void {
       h('button', {
         class: 'btn danger',
         onclick: () => {
-          if (!confirm('Delete every entry, food, saved meal and target in this browser? Export first if you want a copy.')) return;
+          const msg = sync.isConnected()
+            ? 'Delete every entry, food, saved meal and target in this browser, and disconnect GitHub sync? The repository is not changed.'
+            : 'Delete every entry, food, saved meal and target in this browser? Export first if you want a copy.';
+          if (!confirm(msg)) return;
+          sync.disconnect();
           store.clearAll();
           location.hash = '#/';
         },
       }, 'Delete all data'),
     ),
   );
-  return () => {};
+  return sc.dispose;
 }

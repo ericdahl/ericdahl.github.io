@@ -6,6 +6,7 @@ import { entryFor, entrySheet, foodSheet, macroLine, makeEntry, MEAL_LABEL, quic
 import * as store from './store';
 import { fmt, h, icon, sheet, toast } from './ui';
 import { routineEditor } from './foodsView';
+import { syncPill } from './syncView';
 
 export function prettyDate(date: string): string {
   const today = store.localDate();
@@ -153,7 +154,10 @@ function quickAdd(date: string, getMeal: () => Meal, setMeal: (m: Meal) => void)
     const ok = items.filter((i) => i.food || i.quick);
     if (!ok.length) return;
     const meal = getMeal();
-    const entries = ok.map((i) => (i.food ? entryFor(i.food, i.qty, i.unit, date, meal) : makeEntry(undefined, i.quick!.name, 1, 'serving', undefined, i.macros, date, meal)));
+    const entries = ok.map((i) => ({
+      ...(i.food ? entryFor(i.food, i.qty, i.unit, date, meal) : makeEntry(undefined, i.quick!.name, 1, 'serving', undefined, i.macros, date, meal)),
+      raw: i.text,
+    }));
     store.addEntries(entries);
     const unmatched = items.filter((i) => !i.food && !i.quick).map((i) => i.text);
     input.value = unmatched.join(', ');
@@ -241,7 +245,7 @@ function routineMacros(r: Routine): Macros {
 export function logRoutine(r: Routine, date: string, meal: Meal): void {
   const entries = r.items.flatMap((i) => {
     const f = store.getFood(i.foodId);
-    return f ? [entryFor(f, i.qty, i.unit, date, meal)] : [];
+    return f ? [{ ...entryFor(f, i.qty, i.unit, date, meal), raw: `saved meal: ${r.name}` }] : [];
   });
   store.addEntries(entries);
   toast(`Added ${r.name}`, { label: 'Undo', run: () => entries.forEach((e) => store.deleteEntry(e.id)) });
@@ -261,7 +265,8 @@ function shortcuts(date: string, getMeal: () => Meal): HTMLElement[] {
         class: 'chip',
         onclick: () => {
           const meal = getMeal();
-          const e = food ? entryFor(food, f.qty, f.unit, date, meal) : { ...f.sample, id: store.uid('e:'), date, meal, at: new Date().toISOString() };
+          const base = food ? entryFor(food, f.qty, f.unit, date, meal) : { ...f.sample, id: store.uid('e:'), date, meal, at: new Date().toISOString(), ts: undefined };
+          const e = { ...base, raw: `tap: ${f.unit === 'serving' ? '' : describeQty(f.qty, f.unit) + ' '}${food?.name ?? f.name}`, source: 'app' };
           store.addEntries([e]);
           toast(`Added ${e.name}`, { label: 'Undo', run: () => store.deleteEntry(e.id) });
         },
@@ -330,6 +335,7 @@ export function openToday(root: HTMLElement, date: string): () => void {
     shortcutsHost.replaceChildren(...shortcuts(date, () => meal));
   };
 
+  const pill = syncPill();
   root.replaceChildren(
     h(
       'header',
@@ -338,6 +344,7 @@ export function openToday(root: HTMLElement, date: string): () => void {
       h('label', { class: 'date-label' }, h('span', {}, prettyDate(date)), dateIn),
       h('a', { class: 'icon-btn', href: `#/day/${store.shiftDate(date, 1)}`, 'aria-label': 'Next day' }, icon('next')),
     ),
+    pill.el,
     summaryHost,
     quick,
     mealsHost,
@@ -350,6 +357,7 @@ export function openToday(root: HTMLElement, date: string): () => void {
   render();
   return () => {
     unsub();
+    pill.dispose();
     cancelAnimationFrame(pending);
   };
 }

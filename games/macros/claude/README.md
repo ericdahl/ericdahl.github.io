@@ -87,7 +87,54 @@ USDA FoodData Central's API was left out because it needs an API key, and the sh
 
 ## Storage
 
-Everything is in `localStorage` on this device and browser. Nothing is sent anywhere, except Open Food Facts searches and lookups. Clearing site data deletes the log, so export now and then.
+By default everything is in `localStorage` on this device and browser. Nothing is sent anywhere, except Open Food Facts searches and lookups. Clearing site data deletes the log, so export now and then, or turn on GitHub sync.
+
+## GitHub sync (optional)
+
+On the Data page you can connect a GitHub repository. Each food entry is then also a line in that day's file, `<folder>/YYYY/MM/DD.jsonl`, with `db` as the default folder. That suits a repo that already logs workouts as one JSON line per item in per-day files, and gives an AI one place to read training and diet together.
+
+```jsonl
+{"ts": "2026-11-07T07:10:00-08:00", "type": "cardio", "modality": "run", "distance_miles": 3.1, "source": "cli", "raw": "/log run 3.1"}
+{"ts": "2026-11-07T08:05:12-08:00", "type": "food", "id": "e:9f2c41d0-7b1", "meal": "breakfast", "food": "Rolled oats (dry)", "food_id": "b:oats-dry", "qty": 86, "unit": "g", "grams": 86, "kcal": 326, "protein_g": 11.4, "fat_g": 5.6, "carbs_g": 58.2, "fiber_g": 8.7, "source": "app", "raw": "86g oatmeal dry"}
+```
+
+**Setup:**
+
+- **Token.** Create a [fine-grained token](https://github.com/settings/personal-access-tokens/new) with access to that one repository and **Contents: read and write**, then paste it in.
+- **Where it's kept.** The token stays in this browser's storage and is sent only to `api.github.com`.
+- **Public repos.** The app warns you if the repository is public.
+
+**What the app writes:**
+
+- **Food lines only.** It only writes `"type": "food"` lines. Every other line in a day file is written back byte for byte, and food lines are slotted in by timestamp so the file stays in time order.
+- **Lines from other tools.** Food lines written some other way, for example by Claude in that repo, show up in the app. They stay as written unless you edit them in the app.
+  - A line with no `id` gets a stable one from its content.
+  - A line with no macros has them looked up from the food name.
+- **Format.** Lines use the same `ts` (with UTC offset), `source` and `raw` conventions as the workout lines:
+  - `source` is `"app"`.
+  - `raw` is what you typed, or `saved meal: …` / `tap: …` for one-tap adds.
+- **Commits.** There's one commit per day changed, e.g. `food: 2026-11-07 Rolled oats (dry), Blueberries +2 more`.
+
+**When it syncs:**
+
+- After each change (2 s later)
+- When the app opens or comes back to the foreground
+- When the device comes back online
+- When you tap the status line under the date
+
+**How it stays safe:**
+
+- **Downloads.** Each sync reads the repo's file list in one request and downloads only day files whose content changed.
+- **Uploads.** It only writes days you changed. Each write carries the file's current hash, so if anything else committed to that file in between, GitHub rejects the write and the app reads and merges again.
+- **Merging.** The merge is three-way per entry: what the last sync saw, what the device has now, and what the repo has now.
+  - Additions on either side are kept.
+  - Deletions on either side are applied, except that an entry you edited here survives a deletion in the repo.
+  - An entry changed on both sides takes the device's version.
+- **Offline.** Edits wait and are pushed later.
+- **Connecting.** Connecting uploads the food already on the device, merged with whatever the repo has.
+- **Disconnect and Delete all data.** Disconnect forgets the token and keeps your entries. "Delete all data" also disconnects. Neither changes the repo.
+
+Not synced: your own foods, saved meals and targets. These stay on the device; use Export to back them up.
 
 ## Development
 
@@ -108,5 +155,6 @@ It's Vite and TypeScript with no framework, like the other apps under `games/`, 
 - `src/nutrition.ts`: units and target maths
 - `src/jsonl.ts`: export and import
 - `src/off.ts`: Open Food Facts
+- `src/sync.ts`, `src/github.ts` and `src/repoLines.ts`: GitHub sync, the GitHub API calls, and the line format and merge
 - `src/store.ts`: storage
 - the `*View.ts` files and `today.ts`: the pages

@@ -6,7 +6,7 @@ import { DEFAULT_TARGETS } from './types';
 const memory = new Map<string, string>();
 const PREFIX = 'macros.v1.';
 
-function load<T>(key: string, fallback: T): T {
+export function load<T>(key: string, fallback: T): T {
   let raw: string | null = null;
   try {
     raw = localStorage.getItem(PREFIX + key);
@@ -21,7 +21,7 @@ function load<T>(key: string, fallback: T): T {
   }
 }
 
-function save(key: string, value: unknown): void {
+export function save(key: string, value: unknown): void {
   const raw = JSON.stringify(value);
   memory.set(key, raw);
   try {
@@ -156,6 +156,23 @@ export function deleteFood(id: string): void {
 
 // ---- entries ----
 
+/** Called with the dates whose entries changed through the UI (not through sync), so they can be pushed. */
+const dayListeners = new Set<(dates: string[]) => void>();
+export function onDaysEdited(fn: (dates: string[]) => void): () => void {
+  dayListeners.add(fn);
+  return () => dayListeners.delete(fn);
+}
+function edited(dates: (string | undefined)[]): void {
+  const ds = [...new Set(dates.filter((d): d is string => !!d))];
+  if (ds.length) for (const fn of dayListeners) fn(ds);
+}
+
+/** Replace one day's entries with what sync settled on. Doesn't count as an edit. */
+export function replaceDay(date: string, entries: Entry[]): void {
+  state.entries = [...state.entries.filter((e) => e.date !== date), ...entries];
+  changed('entries');
+}
+
 export function entriesFor(date: string): Entry[] {
   return state.entries.filter((e) => e.date === date);
 }
@@ -165,20 +182,26 @@ export function allEntries(): Entry[] {
 }
 
 export function addEntries(entries: Entry[]): void {
-  state.entries.push(...entries);
+  state.entries.push(...entries.map(({ remoteLine: _, ...e }) => e));
   changed('entries');
+  edited(entries.map((e) => e.date));
 }
 
+/** Save an edited entry. It's no longer the line that was synced, so the repo copy gets rewritten. */
 export function updateEntry(entry: Entry): void {
   const i = state.entries.findIndex((e) => e.id === entry.id);
-  if (i >= 0) state.entries[i] = entry;
+  const before = state.entries[i]?.date;
+  const { remoteLine: _, ...fresh } = entry;
+  if (i >= 0) state.entries[i] = { ...fresh, source: 'app', ts: before === entry.date ? entry.ts : undefined };
   changed('entries');
+  edited([before, entry.date]);
 }
 
 export function deleteEntry(id: string): Entry | undefined {
   const e = state.entries.find((x) => x.id === id);
   state.entries = state.entries.filter((x) => x.id !== id);
   changed('entries');
+  edited([e?.date]);
   return e;
 }
 
@@ -270,8 +293,10 @@ export function merge(data: { entries?: Entry[]; foods?: Food[]; routines?: Rout
   }
   if (data.targets) state.targets = data.targets;
   changed('entries', 'foods', 'routines', 'targets');
+  edited((data.entries ?? []).map((e) => e.date));
 }
 
+/** Wipe this device's data. Deliberately not an edit: a connected repo is left as it is. */
 export function clearAll(): void {
   state.entries = [];
   state.foods = [];

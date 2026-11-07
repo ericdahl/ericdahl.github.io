@@ -3,6 +3,7 @@ import { openData } from './dataView';
 import { openFoods } from './foodsView';
 import { openHistory } from './historyView';
 import * as store from './store';
+import { startAutoSync } from './sync';
 import { openToday } from './today';
 import { h, icon } from './ui';
 
@@ -45,6 +46,7 @@ function route(): void {
 
 window.addEventListener('hashchange', route);
 route();
+startAutoSync();
 
 // A new day while the app sits open on "Today": move to it.
 let lastDay = store.localDate();

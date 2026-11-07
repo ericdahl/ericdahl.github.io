@@ -46,6 +46,14 @@ export interface Entry extends Macros {
   grams?: number;
   /** When it was logged, ISO 8601. */
   at: string;
+  /** What was typed or tapped to log it, kept verbatim for the repo's `raw` field. */
+  raw?: string;
+  /** What wrote it: "app", or "claude"/"cli" for lines that came from the synced repo. */
+  source?: string;
+  /** Timestamp with UTC offset as written in the repo, kept so an unchanged line round-trips. */
+  ts?: string;
+  /** The repo line this entry was read from, written back verbatim until the entry is edited. */
+  remoteLine?: string;
 }
 
 /** A saved group of items added with one tap, e.g. "Usual breakfast". */

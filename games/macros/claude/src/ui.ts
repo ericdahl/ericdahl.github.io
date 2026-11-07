@@ -34,6 +34,7 @@ const PATHS: Record<string, string> = {
   copy: '<rect x="8" y="8" width="11" height="11" rx="2" /><path d="M5 15V6a1 1 0 011-1h9" />',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16z" />',
   bolt: '<path d="M13 3L5 13h6l-1 8 8-10h-6z" />',
+  cloud: '<path d="M7 18a4 4 0 01-.6-7.96A5.5 5.5 0 0117 8.5a3.75 3.75 0 01.5 7.47V16H7z" />',
   sparkle: '<path d="M12 4l1.8 4.6L18 10l-4.2 1.4L12 16l-1.8-4.6L6 10l4.2-1.4z" /><path d="M18 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" />',
 };
 
