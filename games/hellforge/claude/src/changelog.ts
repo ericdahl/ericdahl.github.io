@@ -1,6 +1,14 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.4.1',
+    date: '2026-11-07',
+    notes: [
+      'Item shortcuts on desktop: hover an item and press E to equip or unequip, U to use, S to sell, B to buy, D to drop, X to move between stash and inventory, or G to socket a gem (R equips a ring on the right hand).',
+      'Right-click an item for its main action. Item buttons show their key.',
+    ],
+  },
+  {
     version: '0.4.0',
     date: '2026-11-07',
     notes: [
