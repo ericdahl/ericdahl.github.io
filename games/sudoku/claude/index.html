@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sudoku Coach</title>
+  <meta name="description" content="Paste a screenshot of a sudoku and get step-by-step hints with explanations.">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#14161a" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23226cf5'/%3E%3Cpath d='M11 4v24M21 4v24M4 11h24M4 21h24' stroke='%23fff' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <h1>Sudoku Coach</h1>
+    <nav class="top-actions">
+      <button id="btn-import" class="primary" title="Import a puzzle (screenshot, digits, or NYT bookmarklet)">Import</button>
+      <button id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+      <button id="btn-redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button>
+      <button id="btn-menu" aria-haspopup="true" aria-expanded="false" title="More">⋯</button>
+      <div id="menu" class="menu" hidden>
+        <button data-act="enter">Type in a new puzzle</button>
+        <button data-act="copy">Copy puzzle as digits</button>
+        <button data-act="link">Copy link to this position</button>
+        <button data-act="reset-cands">Reset pencil marks</button>
+        <button data-act="check">Check for mistakes</button>
+        <button data-act="restart">Restart (clear my entries)</button>
+        <label class="menu-toggle"><input type="checkbox" id="opt-marks" checked> Show pencil marks</label>
+      </div>
+    </nav>
+  </header>
+
+  <main class="layout">
+    <section class="board-col">
+      <div id="banner" class="banner" hidden></div>
+      <div class="board-wrap">
+        <div id="board" class="board" role="grid" aria-label="Sudoku board"></div>
+        <svg id="links" class="links" viewBox="0 0 900 900" aria-hidden="true"></svg>
+      </div>
+      <div class="pad">
+        <div class="mode" role="group" aria-label="Input mode">
+          <button id="mode-normal" class="seg on">Normal</button>
+          <button id="mode-pencil" class="seg">Pencil</button>
+        </div>
+        <div id="numpad" class="numpad"></div>
+      </div>
+    </section>
+
+    <section class="side-col">
+      <div class="hint-actions">
+        <button id="btn-hint" class="primary big">Hint</button>
+        <button id="btn-singles" title="Fill in every naked/hidden single">Fill singles</button>
+      </div>
+      <div id="hint" class="card hint-card" hidden></div>
+      <div id="empty-hint" class="card muted">
+        <p><b>Stuck?</b> Press <kbd>Hint</kbd> (or <kbd>H</kbd>). You'll first get a nudge — which technique and where to look. Ask again to see the full explanation, then apply it.</p>
+        <p class="small">Get a puzzle in: paste a screenshot anywhere on this page (<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd>), drop an image, or use <a href="#" id="link-import">Import</a> for the NYT one-click bookmarklet.</p>
+      </div>
+      <details id="history-box" class="card history">
+        <summary>Steps taken <span id="history-count"></span></summary>
+        <ol id="history"></ol>
+      </details>
+      <p class="small muted keys">Keys: <kbd>1</kbd>–<kbd>9</kbd> place · <kbd>Shift</kbd>+digit or pencil mode toggles a mark · <kbd>⌫</kbd> erase · arrows move · <kbd>Space</kbd> switch mode · <kbd>H</kbd> hint · <kbd>A</kbd> apply</p>
+    </section>
+  </main>
+
+  <dialog id="import-dlg" class="dlg">
+    <form method="dialog" class="dlg-head">
+      <h2>Import a puzzle</h2>
+      <button class="icon" aria-label="Close">✕</button>
+    </form>
+    <div id="drop" class="drop" tabindex="0">
+      <div class="drop-big">📋 Paste a screenshot</div>
+      <div class="small">Press <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>V</kbd> here (or anywhere), or drop an image file.</div>
+      <label class="file-btn">Choose image / photo<input type="file" id="file" accept="image/*" hidden></label>
+      <div class="small muted">Recognises the digits <i>and</i> your pencil marks. Everything runs in your browser.</div>
+    </div>
+    <div class="dlg-sec">
+      <h3>NYT one-click import</h3>
+      <p class="small">Drag this button to your bookmarks bar, then click it while on the NYT Sudoku page. It sends the board — clues, your entries and pencil marks — straight here.</p>
+      <p><a id="bookmarklet" class="bookmarklet" href="#">→ Sudoku Coach</a></p>
+    </div>
+    <div class="dlg-sec">
+      <h3>Digits</h3>
+      <p class="small">81 characters, row by row; <code>0</code> or <code>.</code> for blanks.</p>
+      <textarea id="digits" rows="3" spellcheck="false" placeholder="008320079702940005…"></textarea>
+      <div class="row-btns">
+        <button id="btn-load-digits" class="primary">Load</button>
+        <button id="btn-enter">Type it in on the board instead</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
