@@ -7,7 +7,7 @@ highlighted on the board, then it applies it for you.
 
 Static site, no build step, no server: everything (including the OCR) runs in the
 browser. Deployed with the other games by `.github/workflows/pages.yml`, at
-`https://<user>.github.io/scratch/games/sudoku/claude/`.
+`https://ericdahl.github.io/games/sudoku/claude/`.
 
 ## Getting a puzzle in
 

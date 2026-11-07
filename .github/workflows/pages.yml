@@ -75,8 +75,27 @@ jobs:
             done
             echo '</ul></body></html>'
           } > _site/index.html
-          rm _site/.games
           cat _site/index.html
+
+      # The site used to be the project site ericdahl.github.io/scratch/. Old links,
+      # home-screen installs and the sudoku bookmarklet still point there, so each old
+      # path gets a stub that forwards to the new one, keeping the query and #hash.
+      - name: Generate redirects from old /scratch/ paths
+        run: |
+          set -euo pipefail
+          stub() { # $1 = old dir under _site/scratch, $2 = new absolute path
+            mkdir -p "_site/scratch/$1"
+            cat > "_site/scratch/$1/index.html" <<EOF
+          <!doctype html><html lang="en"><head><meta charset="utf-8">
+          <title>Moved</title><link rel="canonical" href="$2">
+          <meta http-equiv="refresh" content="0; url=$2">
+          <script>location.replace('$2' + location.search + location.hash)</script>
+          </head><body><p>Moved to <a href="$2">$2</a>.</p></body></html>
+          EOF
+          }
+          stub . /
+          sort -u _site/.games | while read -r dir; do stub "$dir" "/$dir/"; done
+          rm _site/.games
 
       - uses: actions/upload-pages-artifact@v3
 
