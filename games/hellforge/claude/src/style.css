@@ -450,6 +450,30 @@ button {
 .s-boot { grid-area: boot; }
 
 .detail { min-width: 0; }
+.equip-box {
+  background: linear-gradient(rgba(70, 50, 28, 0.35), rgba(30, 20, 12, 0.5));
+  border: 1px solid #6a5434;
+  border-radius: 4px;
+  padding: 4px 8px 8px;
+  margin-bottom: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.equip-box .sub { border-bottom-color: #5a4630; }
+.equip-box .slot { background: rgba(20, 14, 8, 0.9); box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.7); }
+.cmp { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; align-items: start; }
+.cmp-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.cmp-h { color: var(--gold); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; text-align: center; }
+.tt.empty { color: var(--dim); font-style: italic; }
+.delta { margin-top: 8px; padding: 6px 10px; border: 1px solid #3a2e1e; background: rgba(0, 0, 0, 0.5); font-size: 13px; }
+.drow { display: flex; justify-content: space-between; gap: 10px; padding: 1px 0; }
+.drow .dl { color: #b8a888; }
+.drow .dv { white-space: nowrap; color: #d8d0c0; }
+.drow.up .dv b { color: #6ad060; }
+.drow.down .dv b { color: #ff6a5a; }
+.drow.up .dv { color: #a8c8a0; }
+.drow.down .dv { color: #d0a098; }
 .detail .hint { color: var(--dim); font-style: italic; padding: 10px; text-align: center; }
 .tt {
   text-align: center;
@@ -461,6 +485,14 @@ button {
 }
 .tt-name { font-size: 15px; font-weight: bold; }
 .set-title { color: #e8c860; margin-top: 6px; }
+.acts kbd {
+  margin-left: 6px;
+  padding: 0 4px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font: 11px/1.3 ui-monospace, monospace;
+  opacity: 0.6;
+}
 .acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; justify-content: center; }
 .goldrow { font-size: 13px; }
 

@@ -7,7 +7,7 @@ import { baseIconUrl, skillIconUrl } from '../render/icons';
 import { Renderer } from '../render/renderer';
 import { Audio } from './audio';
 import { h, isTouch } from './dom';
-import { renderPanel, type PanelHost, type PanelKind, type Selection } from './panels';
+import { itemActions, panelItemContext, renderPanel, type PanelHost, type PanelKind, type Selection } from './panels';
 import { loadSettings, saveCharacter, saveSettings, type Settings } from './save';
 
 const TOUCH_JOY_ZONE = 0.42;
@@ -235,7 +235,19 @@ export class Game implements PanelHost {
       skills,
       ctxBtn,
     );
-    this.panelEl = h('div', { class: 'panel-wrap hidden', onpointerdown: (e: Event) => e.stopPropagation(), onclick: (e: Event) => { if (e.target === this.panelEl) this.close(); } });
+    this.panelEl = h('div', {
+      class: 'panel-wrap hidden',
+      onpointerdown: (e: Event) => e.stopPropagation(),
+      onclick: (e: Event) => { if (e.target === this.panelEl) this.close(); },
+      onpointermove: (e: PointerEvent) => { this.pointer = { x: e.clientX, y: e.clientY }; },
+      // Right-click an item for its main action (equip, drink, buy, sell, move to/from the stash).
+      oncontextmenu: (e: MouseEvent) => {
+        const sel = this.itemAt(e.clientX, e.clientY);
+        if (!sel) return;
+        e.preventDefault();
+        this.runItemAction(sel, (a) => !!a.primary);
+      },
+    });
     this.overlayEl = h('div', { class: 'overlay hidden' });
     this.root.append(hud, this.panelEl, this.overlayEl);
     const q = (s: string) => hud.querySelector(s) as HTMLElement;
@@ -407,6 +419,8 @@ export class Game implements PanelHost {
   select(s: Selection | null) {
     this.sel = s;
     this.refresh();
+    // On small screens the detail sits below the grids: bring the stat changes and buttons into view.
+    if (s) this.panelEl.querySelector('.detail .acts')?.scrollIntoView({ block: 'nearest' });
   }
 
   toggleSetting(k: 'sound' | 'labels' | 'numbers') {
@@ -626,6 +640,25 @@ export class Game implements PanelHost {
   }
 
   private keysDown = new Set<string>();
+  private pointer = { x: -1, y: -1 };
+
+  /** The item tile or vendor row under a screen point, if any. */
+  private itemAt(x: number, y: number): Selection | null {
+    const el = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>('[data-uid]');
+    if (!el || !this.panelEl.contains(el)) return null;
+    return { uid: Number(el.dataset.uid), from: el.dataset.from as Selection['from'], slot: (el.dataset.slot || undefined) as Selection['slot'] };
+  }
+
+  /** Runs the first action of an item that matches; returns whether one ran. */
+  private runItemAction(sel: Selection, match: (a: ReturnType<typeof itemActions>[number]) => boolean): boolean {
+    const ctx = panelItemContext(this.panel);
+    if (!ctx) return false;
+    const a = itemActions(this, sel, ctx).find(match);
+    if (!a) return false;
+    a.run();
+    this.refresh();
+    return true;
+  }
   private onKeyUp = (e: KeyboardEvent) => {
     this.keysDown.delete(e.code);
     if (/^Key[QWER]$/.test(e.code) && this.held && this.held.slot === 'QWER'.indexOf(e.code[3])) this.held = null;
@@ -648,6 +681,11 @@ export class Game implements PanelHost {
       return;
     }
     if (repeat && !/^Key[QWER]$/.test(code)) return;
+    // Item shortcuts: act on the hovered item, or the selected one.
+    if (this.panel && /^Key[A-Z]$/.test(code) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const sel = this.itemAt(this.pointer.x, this.pointer.y) ?? this.sel;
+      if (sel && this.runItemAction(sel, (a) => a.key === code[3])) return;
+    }
     switch (code) {
       case 'KeyI':
       case 'KeyB':

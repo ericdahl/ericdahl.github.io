@@ -7,7 +7,8 @@ import { baseOf, buyPrice, displayName, gamblePrice, itemColor, sellPrice, type 
 import { classSkills, SKILL_BY_ID } from '../game/skills';
 import { GAMBLE_KINDS, NPC_INFO, type World } from '../game/world';
 import { itemIconUrl, skillIconUrl } from '../render/icons';
-import { h } from './dom';
+import { h, isTouch } from './dom';
+import { compareEquip, defaultSlot } from './compare';
 import { itemTooltip } from './tooltip';
 
 export type PanelKind = 'inventory' | 'character' | 'skills' | 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'menu' | 'help';
@@ -61,6 +62,8 @@ function itemTile(host: PanelHost, it: Item, opts: { x?: number; y?: number; fro
       class: `itm ${rarityClass(it)}${selected ? ' sel' : ''}${opts.bad ? ' bad' : ''}${!it.identified ? ' unid' : ''}`,
       title: displayName(it),
       'data-uid': it.uid,
+      'data-from': opts.from,
+      'data-slot': opts.slot,
       style: opts.x !== undefined ? { left: `calc(var(--cell) * ${opts.x})`, top: `calc(var(--cell) * ${opts.y})`, width: `calc(var(--cell) * ${b.w})`, height: `calc(var(--cell) * ${b.h})` } : undefined,
       onclick: (e: Event) => {
         e.stopPropagation();
@@ -104,14 +107,9 @@ function detail(host: PanelHost, context: 'inventory' | 'vendor' | 'stash'): HTM
     box.append(h('div', { class: 'hint' }, context === 'vendor' ? 'Tap an item to buy or sell it.' : context === 'stash' ? 'Tap an item to move it between stash and inventory.' : 'Tap an item to see it.'));
     return box;
   }
-  let it: Item | undefined;
-  let vendor: 'healer' | 'smith' | undefined;
-  if (sel.from === 'vendor') {
-    for (const v of ['healer', 'smith'] as const) {
-      const f = w.vendors[v].find((x) => x.uid === sel.uid);
-      if (f) (it = f), (vendor = v);
-    }
-  } else it = w.findItem(sel.uid)?.item;
+  const it: Item | undefined = sel.from === 'vendor'
+    ? w.vendors.healer.find((x) => x.uid === sel.uid) ?? w.vendors.smith.find((x) => x.uid === sel.uid)
+    : w.findItem(sel.uid)?.item;
   if (!it) {
     box.append(h('div', { class: 'hint' }, 'Tap an item to see it.'));
     return box;
@@ -119,38 +117,114 @@ function detail(host: PanelHost, context: 'inventory' | 'vendor' | 'stash'): HTM
   const item = it;
   const b = baseOf(item);
   const price = sel.from === 'vendor' ? `<div class="gold">Cost: ${buyPrice(item)} gold</div>` : context === 'vendor' && sel.from === 'inv' ? `<div class="gold">Sell value: ${sellPrice(item)} gold</div>` : '';
-  box.append(h('div', { class: 'tt', html: itemTooltip(item, c, price) }));
+  const tip = h('div', { class: 'tt', html: itemTooltip(item, c, price) });
+  const slot = sel.from === 'equip' ? null : defaultSlot(c, item);
+  if (slot) box.append(...compareView(host, item, slot, tip));
+  else box.append(tip);
   const btns = h('div', { class: 'acts' });
-  const act = (label: string, fn: () => void, cls = '') => btns.append(h('button', { class: `btn ${cls}`, onclick: () => { fn(); host.refresh(); } }, label));
-  if (sel.from === 'vendor' && vendor) {
-    act('Buy', () => {
-      const err = w.buy(vendor!, item.uid);
-      if (err) host.toast(err, '#ff8a6a');
-      else if (!['potion', 'scroll'].includes(b.kind)) host.select(null);
-    }, 'primary');
-  } else if (sel.from === 'inv') {
-    if (['weapon', 'shield', 'armor', 'helm', 'gloves', 'boots', 'belt', 'ring', 'amulet'].includes(b.kind)) {
-      if (b.kind === 'ring') {
-        act('Equip Left', () => w.equip(item.uid, 'ring1') || host.select(null), 'primary');
-        act('Equip Right', () => w.equip(item.uid, 'ring2') || host.select(null), 'primary');
-      } else act('Equip', () => w.equip(item.uid) || host.select(null), 'primary');
-    }
-    if (b.kind === 'potion' || b.kind === 'scroll') act(b.kind === 'potion' ? 'Drink' : 'Read', () => w.useItem(item.uid) && host.select(null), 'primary');
-    if (b.kind === 'gem') {
-      const targets = w.socketTargets();
-      if (!targets.length) btns.append(h('div', { class: 'dim small' }, 'No socketed item with free sockets.'));
-      for (const t of targets) act(`Socket into ${displayName(t)}`, () => w.socketGem(item.uid, t.uid) && host.select(null));
-    }
-    if (context === 'vendor') act(`Sell (${sellPrice(item)})`, () => { w.sell(item.uid); host.select(null); }, 'gold-btn');
-    if (context === 'stash') act('To Stash', () => w.toStash(item.uid) && host.select(null));
-    if (context === 'inventory') act('Drop', () => { w.dropFromInventory(item.uid); host.select(null); }, 'danger');
-  } else if (sel.from === 'equip' && sel.slot) {
-    act('Unequip', () => w.unequip(sel.slot!) || host.select(null));
-  } else if (sel.from === 'stash') {
-    act('To Inventory', () => w.fromStash(item.uid) && host.select(null), 'primary');
+  const keys = !isTouch();
+  for (const a of itemActions(host, sel, context)) {
+    btns.append(h('button', { class: `btn ${a.cls ?? ''}`, onclick: () => { a.run(); host.refresh(); } }, a.label, keys && a.key ? h('kbd', {}, a.key) : null));
   }
+  if (sel.from === 'inv' && b.kind === 'gem' && !w.socketTargets().length) btns.append(h('div', { class: 'dim small' }, 'No socketed item with free sockets.'));
   box.append(btns);
   return box;
+}
+
+const SLOT_NAMES: Record<Slot, string> = {
+  head: 'helm', body: 'armor', weapon: 'weapon', offhand: 'shield', gloves: 'gloves', belt: 'belt', boots: 'boots', amulet: 'amulet', ring1: 'left ring', ring2: 'right ring',
+};
+
+/** The selected item next to what is worn in its slot, and what swapping would change. */
+function compareView(host: PanelHost, item: Item, slot: Slot, tip: HTMLElement): HTMLElement[] {
+  const w = host.world;
+  const c = w.char;
+  const cmp = compareEquip(c, item, slot, w.buffTotals());
+  const worn = cmp.replaced.length
+    ? cmp.replaced.map((r) => h('div', { class: 'tt', html: itemTooltip(r, c) }))
+    : [h('div', { class: 'tt empty' }, `No ${SLOT_NAMES[slot]} equipped`)];
+  const sides = h('div', { class: 'cmp' },
+    h('div', { class: 'cmp-col' }, h('div', { class: 'cmp-h' }, 'Selected'), tip),
+    h('div', { class: 'cmp-col' }, h('div', { class: 'cmp-h' }, `Equipped${slot.startsWith('ring') ? ` (${SLOT_NAMES[slot]})` : ''}`), ...worn));
+  const err = requirementError(c, item, w.stats);
+  const delta = h('div', { class: 'delta' }, h('div', { class: 'cmp-h' }, 'If you equip it'));
+  if (err) delta.append(h('div', { class: 'red small' }, `Can't equip yet: ${err}`));
+  else if (!item.identified) delta.append(h('div', { class: 'dim small' }, 'Unidentified: magic properties unknown.'));
+  if (!cmp.changes.length) delta.append(h('div', { class: 'dim small' }, 'No change to your stats.'));
+  for (const ch of cmp.changes) {
+    delta.append(h('div', { class: `drow ${ch.better > 0 ? 'up' : ch.better < 0 ? 'down' : ''}` },
+      h('span', { class: 'dl' }, ch.label),
+      h('span', { class: 'dv' }, `${ch.before} → `, h('b', {}, ch.after), ` ${ch.better > 0 ? '▲' : ch.better < 0 ? '▼' : ''}`)));
+  }
+  return [sides, delta];
+}
+
+export type ItemContext = 'inventory' | 'vendor' | 'stash';
+
+export interface ItemAction {
+  label: string;
+  /** Keyboard shortcut (a letter) while the item is hovered or selected. */
+  key?: string;
+  cls?: string;
+  /** The right-click action. */
+  primary?: boolean;
+  run: () => void;
+}
+
+/** Which item actions a panel offers: the inventory, a vendor (healer, smith, gambler) or the stash. */
+export function panelItemContext(kind: PanelKind | null): ItemContext | null {
+  if (kind === 'inventory') return 'inventory';
+  if (kind === 'healer' || kind === 'smith' || kind === 'fence') return 'vendor';
+  if (kind === 'stash') return 'stash';
+  return null;
+}
+
+/** Everything that can be done with an item; shared by the buttons, the keyboard and right-click. */
+export function itemActions(host: PanelHost, sel: Selection, context: ItemContext): ItemAction[] {
+  const w = host.world;
+  const out: ItemAction[] = [];
+  const act = (label: string, key: string | undefined, run: () => void, cls = '', primary = false) => out.push({ label, key, run, cls, primary });
+  if (sel.from === 'vendor') {
+    for (const v of ['healer', 'smith'] as const) {
+      const item = w.vendors[v].find((x) => x.uid === sel.uid);
+      if (!item) continue;
+      act('Buy', 'B', () => {
+        const err = w.buy(v, item.uid);
+        if (err) host.toast(err, '#ff8a6a');
+        else if (!['potion', 'scroll'].includes(baseOf(item).kind)) host.select(null);
+      }, 'primary', true);
+    }
+    return out;
+  }
+  const found = w.findItem(sel.uid);
+  if (!found) return out;
+  const item = found.item;
+  const b = baseOf(item);
+  if (sel.from === 'inv') {
+    if (['weapon', 'shield', 'armor', 'helm', 'gloves', 'boots', 'belt', 'ring', 'amulet'].includes(b.kind)) {
+      const equip = (slot?: Slot) => {
+        const err = w.equip(item.uid, slot);
+        if (err) host.toast(err, '#ff8a6a');
+        else host.select(null);
+      };
+      if (b.kind === 'ring') {
+        act('Equip Left', 'E', () => equip('ring1'), 'primary', context !== 'vendor');
+        act('Equip Right', 'R', () => equip('ring2'), 'primary');
+      } else act('Equip', 'E', () => equip(), 'primary', context !== 'vendor');
+    }
+    if (b.kind === 'potion' || b.kind === 'scroll') act(b.kind === 'potion' ? 'Drink' : 'Read', 'U', () => w.useItem(item.uid) && host.select(null), 'primary', context !== 'vendor');
+    if (b.kind === 'gem') {
+      w.socketTargets().forEach((t, i) => act(`Socket into ${displayName(t)}`, i === 0 ? 'G' : undefined, () => w.socketGem(item.uid, t.uid) && host.select(null), '', i === 0 && context !== 'vendor'));
+    }
+    if (context === 'vendor') act(`Sell (${sellPrice(item)})`, 'S', () => { w.sell(item.uid); host.select(null); }, 'gold-btn', true);
+    if (context === 'stash') act('To Stash', 'X', () => w.toStash(item.uid) && host.select(null), '', true);
+    if (context === 'inventory') act('Drop', 'D', () => { w.dropFromInventory(item.uid); host.select(null); }, 'danger');
+  } else if (sel.from === 'equip' && sel.slot) {
+    act('Unequip', 'E', () => { const err = w.unequip(sel.slot!); if (err) host.toast(err, '#ff8a6a'); else host.select(null); }, '', true);
+  } else if (sel.from === 'stash') {
+    act('To Inventory', 'X', () => w.fromStash(item.uid) && host.select(null), 'primary', true);
+  }
+  return out;
 }
 
 export function renderPanel(host: PanelHost, kind: PanelKind): HTMLElement {
@@ -190,7 +264,13 @@ function inventoryPanel(host: PanelHost) {
     'div',
     { class: 'panel inv' },
     header(host, 'Inventory'),
-    h('div', { class: 'p-body two' }, h('div', { class: 'col' }, paperDoll(host), grid(host, c.inventory, INV_COLS, INV_ROWS, 'inv'), goldRow(host)), detail(host, 'inventory')),
+    h('div', { class: 'p-body two' },
+      h('div', { class: 'col' },
+        h('div', { class: 'equip-box' }, h('div', { class: 'sub' }, 'Equipped'), paperDoll(host)),
+        h('div', { class: 'sub' }, 'Backpack'),
+        grid(host, c.inventory, INV_COLS, INV_ROWS, 'inv'),
+        goldRow(host)),
+      detail(host, 'inventory')),
   );
 }
 
@@ -205,7 +285,7 @@ function vendorPanel(host: PanelHost, kind: 'healer' | 'smith') {
     list.append(
       h(
         'button',
-        { class: `vrow ${sel ? 'sel' : ''}`, onclick: () => host.select(sel ? null : { uid: it.uid, from: 'vendor' }) },
+        { class: `vrow ${sel ? 'sel' : ''}`, 'data-uid': it.uid, 'data-from': 'vendor', onclick: () => host.select(sel ? null : { uid: it.uid, from: 'vendor' }) },
         h('img', { src: itemIconUrl(it), alt: '', style: { aspectRatio: `${b.w}/${b.h}` } }),
         h('span', { class: 'vname', style: { color: itemColor(it) } }, displayName(it)),
         h('span', { class: `vprice ${c.gold < buyPrice(it) ? 'red' : 'gold'}` }, String(buyPrice(it))),
@@ -439,6 +519,7 @@ function helpPanel(host: PanelHost) {
     ['Potions', 'Tap a belt slot', '1 2 3 4'],
     ['Town Portal', 'Portal button', 'T'],
     ['Panels', 'Bottom buttons', 'I inventory · C character · K skills · M/Tab map'],
+    ['Items', 'Tap an item, then a button', 'Hover an item: E equip/unequip · U use · S sell · B buy · D drop · X stash/inventory · G socket. Right-click for the main action'],
   ];
   return h(
     'div',
