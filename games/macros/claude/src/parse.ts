@@ -198,11 +198,11 @@ export function parseItem(chunk: string, foods: Food[], usage: Map<string, numbe
 function servingFromWords(food: Food, toks: string[]): string | null {
   const t = toks.map(singular);
   // "soft gels" should find "softgel", so also try each pair of words run together
-  const text = ' ' + [...t, ...t.slice(1).map((_, i) => singular(toks[i] + toks[i + 1]))].join(' ') + ' ';
+  const present = new Set([...t, ...t.slice(1).map((_, i) => singular(toks[i] + toks[i + 1]))]);
+  // longest names first; a multi-word serving matches when all its words appear ("4 mini corn tortillas")
   const byLength = [...food.servings].sort((a, b) => b.name.length - a.name.length);
   for (const s of byLength) {
-    const name = s.name.toLowerCase().split(' ').map(singular).join(' ');
-    if (text.includes(` ${name} `)) return s.name;
+    if (s.name.toLowerCase().split(' ').every((w) => present.has(singular(w)))) return s.name;
   }
   return null;
 }
