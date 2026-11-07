@@ -419,6 +419,8 @@ export class Game implements PanelHost {
   select(s: Selection | null) {
     this.sel = s;
     this.refresh();
+    // On small screens the detail sits below the grids: bring the stat changes and buttons into view.
+    if (s) this.panelEl.querySelector('.detail .acts')?.scrollIntoView({ block: 'nearest' });
   }
 
   toggleSetting(k: 'sound' | 'labels' | 'numbers') {

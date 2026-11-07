@@ -1,6 +1,14 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.4.2',
+    date: '2026-11-07',
+    notes: [
+      'Inventory: worn gear sits in its own Equipped box, apart from the Backpack.',
+      'Selecting gear shows it side by side with what you wear in that slot, plus every stat that would change if you equip it (green for better, red for worse). Works in the inventory, at vendors and in the stash.',
+    ],
+  },
+  {
     version: '0.4.1',
     date: '2026-11-07',
     notes: [

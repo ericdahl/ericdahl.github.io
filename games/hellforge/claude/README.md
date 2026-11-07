@@ -45,7 +45,8 @@ The version is shown at the bottom of the title screen; tap it for the player-fa
 
 | Version | Commit | Notes |
 |---|---|---|
-| 0.4.1 | | Item keyboard shortcuts and right-click |
+| 0.4.2 | | Equipped/Backpack separation and side-by-side gear comparison |
+| 0.4.1 | `d77a7a5` | Item keyboard shortcuts and right-click |
 | 0.4.0 | `12380da` | Necromancer class |
 | 0.3.0 | `45bb4fd` | Changelog viewer on the title screen |
 | 0.2.0 | `d6c3a2d` | Save export/import (file or copy/paste code) |

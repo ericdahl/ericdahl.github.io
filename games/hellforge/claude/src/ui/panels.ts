@@ -8,6 +8,7 @@ import { classSkills, SKILL_BY_ID } from '../game/skills';
 import { GAMBLE_KINDS, NPC_INFO, type World } from '../game/world';
 import { itemIconUrl, skillIconUrl } from '../render/icons';
 import { h, isTouch } from './dom';
+import { compareEquip, defaultSlot } from './compare';
 import { itemTooltip } from './tooltip';
 
 export type PanelKind = 'inventory' | 'character' | 'skills' | 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'menu' | 'help';
@@ -116,7 +117,10 @@ function detail(host: PanelHost, context: 'inventory' | 'vendor' | 'stash'): HTM
   const item = it;
   const b = baseOf(item);
   const price = sel.from === 'vendor' ? `<div class="gold">Cost: ${buyPrice(item)} gold</div>` : context === 'vendor' && sel.from === 'inv' ? `<div class="gold">Sell value: ${sellPrice(item)} gold</div>` : '';
-  box.append(h('div', { class: 'tt', html: itemTooltip(item, c, price) }));
+  const tip = h('div', { class: 'tt', html: itemTooltip(item, c, price) });
+  const slot = sel.from === 'equip' ? null : defaultSlot(c, item);
+  if (slot) box.append(...compareView(host, item, slot, tip));
+  else box.append(tip);
   const btns = h('div', { class: 'acts' });
   const keys = !isTouch();
   for (const a of itemActions(host, sel, context)) {
@@ -125,6 +129,34 @@ function detail(host: PanelHost, context: 'inventory' | 'vendor' | 'stash'): HTM
   if (sel.from === 'inv' && b.kind === 'gem' && !w.socketTargets().length) btns.append(h('div', { class: 'dim small' }, 'No socketed item with free sockets.'));
   box.append(btns);
   return box;
+}
+
+const SLOT_NAMES: Record<Slot, string> = {
+  head: 'helm', body: 'armor', weapon: 'weapon', offhand: 'shield', gloves: 'gloves', belt: 'belt', boots: 'boots', amulet: 'amulet', ring1: 'left ring', ring2: 'right ring',
+};
+
+/** The selected item next to what is worn in its slot, and what swapping would change. */
+function compareView(host: PanelHost, item: Item, slot: Slot, tip: HTMLElement): HTMLElement[] {
+  const w = host.world;
+  const c = w.char;
+  const cmp = compareEquip(c, item, slot, w.buffTotals());
+  const worn = cmp.replaced.length
+    ? cmp.replaced.map((r) => h('div', { class: 'tt', html: itemTooltip(r, c) }))
+    : [h('div', { class: 'tt empty' }, `No ${SLOT_NAMES[slot]} equipped`)];
+  const sides = h('div', { class: 'cmp' },
+    h('div', { class: 'cmp-col' }, h('div', { class: 'cmp-h' }, 'Selected'), tip),
+    h('div', { class: 'cmp-col' }, h('div', { class: 'cmp-h' }, `Equipped${slot.startsWith('ring') ? ` (${SLOT_NAMES[slot]})` : ''}`), ...worn));
+  const err = requirementError(c, item, w.stats);
+  const delta = h('div', { class: 'delta' }, h('div', { class: 'cmp-h' }, 'If you equip it'));
+  if (err) delta.append(h('div', { class: 'red small' }, `Can't equip yet: ${err}`));
+  else if (!item.identified) delta.append(h('div', { class: 'dim small' }, 'Unidentified: magic properties unknown.'));
+  if (!cmp.changes.length) delta.append(h('div', { class: 'dim small' }, 'No change to your stats.'));
+  for (const ch of cmp.changes) {
+    delta.append(h('div', { class: `drow ${ch.better > 0 ? 'up' : ch.better < 0 ? 'down' : ''}` },
+      h('span', { class: 'dl' }, ch.label),
+      h('span', { class: 'dv' }, `${ch.before} → `, h('b', {}, ch.after), ` ${ch.better > 0 ? '▲' : ch.better < 0 ? '▼' : ''}`)));
+  }
+  return [sides, delta];
 }
 
 export type ItemContext = 'inventory' | 'vendor' | 'stash';
@@ -232,7 +264,13 @@ function inventoryPanel(host: PanelHost) {
     'div',
     { class: 'panel inv' },
     header(host, 'Inventory'),
-    h('div', { class: 'p-body two' }, h('div', { class: 'col' }, paperDoll(host), grid(host, c.inventory, INV_COLS, INV_ROWS, 'inv'), goldRow(host)), detail(host, 'inventory')),
+    h('div', { class: 'p-body two' },
+      h('div', { class: 'col' },
+        h('div', { class: 'equip-box' }, h('div', { class: 'sub' }, 'Equipped'), paperDoll(host)),
+        h('div', { class: 'sub' }, 'Backpack'),
+        grid(host, c.inventory, INV_COLS, INV_ROWS, 'inv'),
+        goldRow(host)),
+      detail(host, 'inventory')),
   );
 }
 
