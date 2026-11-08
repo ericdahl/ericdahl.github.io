@@ -193,9 +193,36 @@ describe('items in the world', () => {
   it('potions heal over time', () => {
     const w = makeWorld();
     w.player.life = 10;
-    expect(w.usePotion(0)).toBe(true);
+    expect(w.usePotion('hp')).toBe(true);
     run(w, 3.5);
     expect(w.player.life).toBeGreaterThanOrEqual(Math.min(40, w.stats.maxLife));
+  });
+
+  it('drinks for what is missing, counting healing already on its way', () => {
+    const w = makeWorld();
+    w.char.potions = { hp1: 2, hp2: 1, hp3: 1 };
+    w.stats.maxLife = 500;
+    w.player.life = 450;
+    expect(w.nextPotion('hp')).toBe('hp2');
+    expect(w.usePotion('hp')).toBe(true);
+    expect(w.char.potions.hp2).toBeUndefined();
+    expect(w.nextPotion('hp')).toBe('hp1');
+    w.player.life = 100;
+    expect(w.nextPotion('hp')).toBe('hp3');
+  });
+
+  it('leaves potions on the ground when the pool has no room', () => {
+    const w = makeWorld();
+    w.char.potions = { hp1: 8 };
+    const bag = w.char.inventory.length;
+    w.dropToGround(makeItem('hp1'), w.player.x, w.player.y, false);
+    const g = w.area.ground[w.area.ground.length - 1];
+    w.pickup(g);
+    expect(w.area.ground).toContain(g);
+    expect(w.char.inventory.length).toBe(bag);
+    w.dropToGround(makeItem('hp2'), w.player.x, w.player.y, false);
+    w.pickup(w.area.ground[w.area.ground.length - 1]);
+    expect(w.char.potions).toEqual({ hp1: 7, hp2: 1 });
   });
 
   it('identify and socket at the sage', () => {

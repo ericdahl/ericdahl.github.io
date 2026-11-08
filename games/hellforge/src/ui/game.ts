@@ -1,5 +1,5 @@
 import { AREA_BY_ID } from '../game/areas';
-import type { Character } from '../game/character';
+import { POTION_POOLS, potionCount, potionSummary, potionTiers, type Character } from '../game/character';
 import { MOD_LABEL } from '../game/monsters';
 import { SKILL_BY_ID } from '../game/skills';
 import { World, type Interactable } from '../game/world';
@@ -214,8 +214,25 @@ export class Game implements PanelHost {
       h('button', { class: `hbtn hb-${id}`, title, 'aria-label': title, 'data-id': id, onpointerdown: (e: Event) => e.stopPropagation(), onclick: (e: Event) => { e.stopPropagation(); this.audio.unlock(); fn(); } }, label);
     const orb = (cls: string) => h('div', { class: `orb ${cls}` }, h('div', { class: 'orb-fill' }), h('div', { class: 'orb-shine' }), h('div', { class: 'orb-txt' }));
     const belt = h('div', { class: 'belt' });
-    for (let i = 0; i < 4; i++)
-      belt.append(h('button', { class: 'bslot', 'data-col': i, title: `Potion (${i + 1})`, onpointerdown: (e: Event) => e.stopPropagation(), onclick: (e: Event) => { e.stopPropagation(); this.world.usePotion(i); } }, h('img', { alt: '' }), h('span', { class: 'cnt' }), h('span', { class: 'key' }, String(i + 1))));
+    POTION_POOLS.forEach((pool, i) => {
+      // Touch has no hover, so a long press shows what the title shows on desktop.
+      let timer = 0;
+      let longPressed = false;
+      const release = () => clearTimeout(timer);
+      belt.append(h('button', {
+        class: 'bslot', 'data-col': i,
+        onpointerdown: (e: Event) => {
+          e.stopPropagation();
+          longPressed = false;
+          timer = window.setTimeout(() => { longPressed = true; this.toast(potionSummary(this.world.char, pool)); }, 450);
+        },
+        onpointerup: release,
+        onpointerleave: release,
+        onpointercancel: release,
+        oncontextmenu: (e: Event) => e.preventDefault(),
+        onclick: (e: Event) => { e.stopPropagation(); if (!longPressed) this.world.usePotion(pool); },
+      }, h('img', { alt: '' }), h('span', { class: 'cnt' }), h('span', { class: 'key' }, String(i + 1))));
+    });
     const skills = h('div', { class: 'skillbar' });
     for (let i = 0; i < 4; i++) {
       const b = h('button', { class: `sbtn s${i}`, 'data-slot': i, 'aria-label': `Skill ${i + 1}` }, h('img', { alt: '' }), h('span', { class: 'key' }, 'QWER'[i]), h('span', { class: 'sbadge' }));
@@ -321,19 +338,17 @@ export class Game implements PanelHost {
       this.hudCache.xp = xpk;
       H.xp.style.width = `${w.xpProgress * 100}%`;
     }
-    // Belt
-    const rows = s.beltRows;
-    const beltKey = c.belt.map((col) => col.join(',')).join('|') + rows;
+    // Potions
+    const nextPotions = POTION_POOLS.map((pool) => w.nextPotion(pool));
+    const beltKey = `${nextPotions.join()}|${JSON.stringify(c.potions)}|${s.potionCap}`;
     if (this.hudCache.belt !== beltKey) {
       this.hudCache.belt = beltKey;
       H.belt.querySelectorAll<HTMLElement>('.bslot').forEach((el, i) => {
-        const col = c.belt[i];
-        const img = el.querySelector('img') as HTMLImageElement;
-        if (col.length) {
-          img.src = baseIconUrl(col[0]);
-          img.style.visibility = 'visible';
-        } else img.style.visibility = 'hidden';
-        (el.querySelector('.cnt') as HTMLElement).textContent = col.length > 1 ? String(col.length) : '';
+        const pool = POTION_POOLS[i];
+        (el.querySelector('img') as HTMLImageElement).src = baseIconUrl(nextPotions[i] ?? potionTiers(pool)[0].id);
+        el.classList.toggle('empty', !nextPotions[i]);
+        (el.querySelector('.cnt') as HTMLElement).textContent = nextPotions[i] ? `×${potionCount(c, pool)}` : '';
+        el.title = `${potionSummary(c, pool)} (${i + 1})`;
       });
     }
     // Skills
@@ -763,8 +778,7 @@ export class Game implements PanelHost {
       case 'Digit1':
       case 'Digit2':
       case 'Digit3':
-      case 'Digit4':
-        w.usePotion(Number(code[5]) - 1);
+        w.usePotion(POTION_POOLS[Number(code[5]) - 1]);
         return;
     }
     if (/^Key[QWER]$/.test(code) && !this.panel) {

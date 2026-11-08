@@ -1,0 +1,367 @@
+{
+ "version": 1,
+ "id": "v1-fixture",
+ "name": "Old Hero",
+ "classId": "necromancer",
+ "level": 12,
+ "xp": 0,
+ "statPoints": 0,
+ "skillPoints": 0,
+ "alloc": {
+  "str": 0,
+  "dex": 0,
+  "vit": 0,
+  "ene": 0
+ },
+ "skills": {
+  "bone_shards": 1
+ },
+ "equipment": {
+  "weapon": {
+   "uid": 1,
+   "base": "yew_wand",
+   "rarity": "normal",
+   "ilvl": 1,
+   "identified": true,
+   "mods": [],
+   "sockets": 0,
+   "gems": [],
+   "reqLvl": 1
+  },
+  "belt": {
+   "uid": 2,
+   "base": "sash",
+   "rarity": "normal",
+   "ilvl": 1,
+   "identified": true,
+   "mods": [],
+   "sockets": 0,
+   "gems": [],
+   "reqLvl": 1,
+   "def": 2
+  }
+ },
+ "inventory": [
+  {
+   "item": {
+    "uid": 3,
+    "base": "hp1",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 0,
+   "y": 0
+  },
+  {
+   "item": {
+    "uid": 4,
+    "base": "hp1",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 0,
+   "y": 1
+  },
+  {
+   "item": {
+    "uid": 5,
+    "base": "hp1",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 0,
+   "y": 2
+  },
+  {
+   "item": {
+    "uid": 6,
+    "base": "hp3",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 0,
+   "y": 3
+  },
+  {
+   "item": {
+    "uid": 7,
+    "base": "mp2",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 1,
+   "y": 0
+  },
+  {
+   "item": {
+    "uid": 8,
+    "base": "mp2",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 1,
+   "y": 1
+  },
+  {
+   "item": {
+    "uid": 9,
+    "base": "mp2",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 1,
+   "y": 2
+  },
+  {
+   "item": {
+    "uid": 10,
+    "base": "mp2",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 1,
+   "y": 3
+  },
+  {
+   "item": {
+    "uid": 11,
+    "base": "mp2",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 2,
+   "y": 0
+  },
+  {
+   "item": {
+    "uid": 12,
+    "base": "mp2",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 2,
+   "y": 1
+  },
+  {
+   "item": {
+    "uid": 13,
+    "base": "mp2",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 2,
+   "y": 2
+  },
+  {
+   "item": {
+    "uid": 14,
+    "base": "mp2",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 2,
+   "y": 3
+  },
+  {
+   "item": {
+    "uid": 15,
+    "base": "mp2",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 3,
+   "y": 0
+  },
+  {
+   "item": {
+    "uid": 16,
+    "base": "mp2",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 3,
+   "y": 1
+  },
+  {
+   "item": {
+    "uid": 17,
+    "base": "mp2",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 3,
+   "y": 2
+  },
+  {
+   "item": {
+    "uid": 18,
+    "base": "mp2",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 3,
+   "y": 3
+  },
+  {
+   "item": {
+    "uid": 19,
+    "base": "gem_ruby_1",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 4,
+   "y": 0
+  },
+  {
+   "item": {
+    "uid": 20,
+    "base": "short_sword",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 4,
+   "y": 1
+  }
+ ],
+ "stash": [
+  {
+   "item": {
+    "uid": 21,
+    "base": "hp4",
+    "rarity": "normal",
+    "ilvl": 1,
+    "identified": true,
+    "mods": [],
+    "sockets": 0,
+    "gems": [],
+    "reqLvl": 1
+   },
+   "x": 0,
+   "y": 0
+  }
+ ],
+ "belt": [
+  [
+   "hp1",
+   "hp1"
+  ],
+  [
+   "hp2"
+  ],
+  [
+   "mp1"
+  ],
+  [
+   "rejuv"
+  ]
+ ],
+ "gold": 100,
+ "stashGold": 0,
+ "tpCharges": 2,
+ "hotbar": [
+  "attack",
+  "bone_shards",
+  null,
+  null
+ ],
+ "waypoints": [
+  "0:town"
+ ],
+ "quests": {},
+ "difficulty": 0,
+ "maxDifficulty": 0,
+ "hardcore": false,
+ "dead": false,
+ "created": 1,
+ "playTime": 0
+}

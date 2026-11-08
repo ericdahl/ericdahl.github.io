@@ -21,7 +21,7 @@ URL options: `?seed=123` fixes the world layout, `?autostart&class=huntress` ski
 | Attack | Big ⚔ button (auto-targets the nearest enemy, hold to keep attacking), or tap a monster | Left click a monster (Shift: attack in place) |
 | Skills | The three buttons around ⚔ | Right click (slot 2), or `Q` `W` `E` `R` for slots 1-4 |
 | Pick up, talk, take stairs | Tap the label / NPC / stairs, or the context button that appears nearby | Click it, or `F` for the nearest thing |
-| Potions | Tap a belt slot | `1` `2` `3` `4` |
+| Potions | Tap a potion slot (long-press for details) | `1` health, `2` mana, `3` rejuvenation |
 | Town Portal | ◎ button | `T` |
 | Panels | Buttons on the bottom bar | `I` inventory, `C` character, `K` skills, `Tab`/`M` automap, `Esc` menu |
 | Items | Tap an item, then a button | Hover an item and press `E` equip/unequip, `U` use, `S` sell, `B` buy, `D` drop, `X` stash/inventory, `G` socket; right-click for the main action |
@@ -47,6 +47,7 @@ The version is shown at the bottom of the title screen; tap it for the player-fa
 
 | Version | Commit | Notes |
 |---|---|---|
+| 0.7.0 | | Potion pools replace belt columns and backpack potions; first save migration (`migrateCharacter`, `SAVE_VERSION`) |
 | 0.6.1 | | Hollow Cave stragglers on the HUD and automap; skeleton count on the Raise Skeleton button |
 | 0.6.0 | | Hit feedback: freeze frames, crit pops, death effects by damage type, boss flashes |
 | 0.5.0 | `41e78b6` | Generated music, ambient sound, weather and status vignettes |

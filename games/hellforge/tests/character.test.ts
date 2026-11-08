@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addToBelt, addToInventory, addXp, allocStat, canLearn, computeStats, createCharacter, equipFromInventory, findSpace,
-  learnSkill, skillLevel, takeFromBelt, xpForLevel, INV_COLS, INV_ROWS,
+  addPotion, addToInventory, addXp, allocStat, canLearn, choosePotion, computeStats, createCharacter, equipFromInventory, findSpace,
+  learnSkill, migrateCharacter, potionCount, skillLevel, takePotion, xpForLevel, INV_COLS, INV_ROWS, SAVE_VERSION, type Character,
 } from '../src/game/character';
 import { makeItem } from '../src/game/items';
 import { SKILL_BY_ID } from '../src/game/skills';
+import { World } from '../src/game/world';
+import v1Save from './fixtures/save-v1.json';
 
 describe('character', () => {
   it('starts with class gear and a starter skill', () => {
@@ -79,18 +81,77 @@ describe('character', () => {
     expect(findSpace(c.inventory, INV_COLS, INV_ROWS, 2, 2)).toBeNull();
   });
 
-  it('belt stacks potions by column', () => {
+  it('potion pools are capped by the belt', () => {
     const c = createCharacter('A', 'arcanist');
-    c.belt = [[], [], [], []];
-    expect(addToBelt(c, 'hp1')).toBe(true);
-    expect(addToBelt(c, 'hp1')).toBe(true);
-    // Without a belt each column holds one potion.
-    expect(c.belt.filter((col) => col.length).length).toBe(2);
+    c.potions = { hp1: 8 };
+    expect(addPotion(c, 'hp1')).toBe(false);
+    expect(addPotion(c, 'gem_ruby_1')).toBe(false);
+    // Pools are separate.
+    expect(addPotion(c, 'mp1')).toBe(true);
     c.equipment.belt = makeItem('belt');
-    expect(addToBelt(c, 'hp1')).toBe(true);
-    expect(c.belt[0].length).toBe(2);
-    expect(takeFromBelt(c, 0)).toBe('hp1');
-    expect(addToBelt(c, 'gem_ruby_1')).toBe(false);
+    expect(addPotion(c, 'hp1')).toBe(true);
+    expect(potionCount(c, 'hp')).toBe(9);
+    takePotion(c, 'mp1');
+    expect(c.potions.mp1).toBeUndefined();
+  });
+
+  it('a full pool trades its weakest potion up but never down', () => {
+    const c = createCharacter('A', 'arcanist');
+    c.potions = { hp1: 1, hp2: 7 };
+    expect(addPotion(c, 'hp3')).toBe(true);
+    expect(c.potions).toEqual({ hp2: 7, hp3: 1 });
+    expect(addPotion(c, 'hp1')).toBe(false);
+    expect(addPotion(c, 'hp2')).toBe(false);
+    expect(c.potions).toEqual({ hp2: 7, hp3: 1 });
+  });
+
+  it('picks the smallest potion that covers the need, else the strongest', () => {
+    const c = createCharacter('A', 'arcanist');
+    c.potions = { hp1: 1, hp2: 1, hp3: 1 };
+    expect(choosePotion(c, 'hp', 25)).toBe('hp1');
+    expect(choosePotion(c, 'hp', 50)).toBe('hp2');
+    expect(choosePotion(c, 'hp', 300)).toBe('hp3');
+    expect(choosePotion(c, 'mp', 10)).toBeNull();
+  });
+
+  describe('migrating a version 1 save', () => {
+    const hero = () => structuredClone(v1Save) as unknown as Character & { belt?: string[][] };
+
+    it('moves belt and backpack potions into pools and keeps everything else', () => {
+      const c = hero();
+      expect(migrateCharacter(c)).toBe(true);
+      expect(c.version).toBe(SAVE_VERSION);
+      expect(c.belt).toBeUndefined();
+      expect(c.potions).toEqual({ hp1: 5, hp2: 1, hp3: 1, mp1: 1, mp2: 12, rejuv: 1 });
+      expect(c.inventory.map((e) => e.item.base)).toEqual(['gem_ruby_1', 'short_sword']);
+      expect(c.stash.map((e) => e.item.base)).toEqual(['hp4']);
+    });
+
+    it('keeps potions above the cap', () => {
+      const c = hero();
+      migrateCharacter(c);
+      expect(potionCount(c, 'mp')).toBe(13);
+      expect(computeStats(c).potionCap).toBe(12);
+    });
+
+    it('only runs once', () => {
+      const c = hero();
+      migrateCharacter(c);
+      const after = structuredClone(c);
+      expect(migrateCharacter(c)).toBe(false);
+      expect(c).toEqual(after);
+    });
+
+    it('produces a hero the game can play, drink and restock from the stash', () => {
+      const c = hero();
+      migrateCharacter(c);
+      const w = new World(c, 1);
+      w.step(1 / 30);
+      expect(w.usePotion('rejuv')).toBe(true);
+      expect(w.fromStash(c.stash[0].item.uid)).toBe(true);
+      expect(c.potions.hp4).toBe(1);
+      expect(c.stash).toEqual([]);
+    });
   });
 
   it('resistances suffer difficulty penalties and cap at 75', () => {

@@ -257,7 +257,8 @@ button {
   cursor: pointer;
   touch-action: manipulation;
 }
-.bslot img { width: 100%; height: 100%; object-fit: contain; }
+.bslot img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.bslot.empty img { opacity: 0.25; }
 .bslot .cnt { position: absolute; right: 2px; bottom: 0; font-size: 11px; text-shadow: 0 1px 2px #000; }
 .bslot .key, .sbtn .key { position: absolute; left: 3px; top: 0; font-size: 9px; color: #a89878; }
 

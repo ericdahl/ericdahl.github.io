@@ -1,8 +1,8 @@
 import { AREA_BY_ID, DIFFICULTY_LEVELS, QUEST_BY_ID, WAYPOINT_AREAS, type AreaDef } from './areas';
 import {
-  addToBelt, addToGrid, addToInventory, addXp, CLASSES, computeStats, equipFromInventory, INV_COLS, INV_ROWS,
-  removeFromGrid, skillLevel, STASH_COLS, STASH_ROWS, takeFromBelt, unequip, xpForLevel, xpMultiplier,
-  type Buffs, type Character, type Stats,
+  addPotion, addToGrid, addToInventory, addXp, choosePotion, CLASSES, computeStats, equipFromInventory, INV_COLS, INV_ROWS,
+  removeFromGrid, skillLevel, STASH_COLS, STASH_ROWS, takePotion, unequip, xpForLevel, xpMultiplier,
+  type Buffs, type Character, type PotionPool, type Stats,
 } from './character';
 import { applyResists, hitChance, reducePhysical, roll, type Damage } from './combat';
 import {
@@ -903,7 +903,11 @@ export class World {
       a.ground.splice(a.ground.indexOf(g), 1);
       return;
     }
-    if (b.kind === 'potion' && addToBelt(this.char, b.id)) {
+    if (b.kind === 'potion') {
+      if (!addPotion(this.char, b.id)) {
+        this.msg('No room for that potion', '#ff8a6a', 'potfull');
+        return;
+      }
       this.sound('potion');
       a.ground.splice(a.ground.indexOf(g), 1);
       return;
@@ -972,10 +976,23 @@ export class World {
     return err;
   }
 
-  usePotion(col: number): boolean {
+  /** The potion this pool's key would drink now, counting healing already on its way. */
+  nextPotion(pool: PotionPool): string | null {
+    const p = this.player;
+    const s = this.stats;
+    const queued = (k: 'hp' | 'mp') => p.heal.reduce((n, h) => n + (h[k] * h.t) / 3, 0);
+    const missing =
+      pool === 'hp' ? s.maxLife - p.life - queued('hp')
+      : pool === 'mp' ? s.maxMana - p.mana - queued('mp')
+      : Math.max(1 - p.life / s.maxLife, 1 - p.mana / s.maxMana) * 100;
+    return choosePotion(this.char, pool, missing);
+  }
+
+  usePotion(pool: PotionPool): boolean {
     if (this.player.dead) return false;
-    const id = takeFromBelt(this.char, col);
+    const id = this.nextPotion(pool);
     if (!id) return false;
+    takePotion(this.char, id);
     this.drink(id);
     return true;
   }
@@ -1055,6 +1072,14 @@ export class World {
   fromStash(uid: number): boolean {
     const it = this.char.stash.find((e) => e.item.uid === uid)?.item;
     if (!it) return false;
+    if (baseOf(it).kind === 'potion') {
+      if (!addPotion(this.char, it.base)) {
+        this.msg('No room for that potion', '#ff8a6a');
+        return false;
+      }
+      removeFromGrid(this.char.stash, uid);
+      return true;
+    }
     if (!addToGrid(this.char.inventory, INV_COLS, INV_ROWS, it)) {
       this.msg('Inventory is full', '#ff8a6a');
       return false;
@@ -1086,7 +1111,9 @@ export class World {
     // Consumables are restocked forever; equipment is one of a kind.
     const copy = b.kind === 'potion' || b.kind === 'scroll' ? makeItem(it.base) : it;
     if (b.kind === 'scroll' && this.char.tpCharges < 20) this.char.tpCharges++;
-    else if (!(b.kind === 'potion' && addToBelt(this.char, b.id)) && !addToInventory(this.char, copy)) return 'Inventory is full';
+    else if (b.kind === 'potion') {
+      if (!addPotion(this.char, b.id)) return 'No room for that potion';
+    } else if (!addToInventory(this.char, copy)) return 'Inventory is full';
     if (copy === it) list.splice(i, 1);
     this.char.gold -= price;
     this.sound('gold');
@@ -1260,7 +1287,7 @@ export class World {
         const b = baseOf(g.item);
         if (b.kind === 'potion' || b.kind === 'scroll') {
           // Only auto-grab consumables that fit somewhere without filling the bag.
-          if ((b.kind === 'scroll' && this.char.tpCharges < 20) || (b.kind === 'potion' && addToBelt(this.char, b.id))) {
+          if ((b.kind === 'scroll' && this.char.tpCharges < 20) || (b.kind === 'potion' && addPotion(this.char, b.id))) {
             if (b.kind === 'scroll') this.char.tpCharges++;
             this.sound('potion');
             a.ground.splice(a.ground.indexOf(g), 1);

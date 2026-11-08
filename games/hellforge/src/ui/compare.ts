@@ -79,7 +79,7 @@ const ROWS: { label: string; get: (s: Stats) => number; fmt?: (v: number, s: Sta
   { label: 'Mana per Kill', get: (s) => s.manaOnKill },
   { label: 'Magic Find', get: (s) => s.mf, fmt: pct },
   { label: 'Gold Find', get: (s) => s.gf, fmt: pct },
-  { label: 'Potion Belt Rows', get: (s) => s.beltRows },
+  { label: 'Potions Carried per Type', get: (s) => s.potionCap },
 ];
 
 export function statChanges(now: Stats, next: Stats): StatChange[] {

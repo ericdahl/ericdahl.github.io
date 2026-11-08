@@ -58,7 +58,7 @@ test('item shortcuts: hover and press a key, or right-click', async ({ page, isM
   await page.keyboard.press('Escape');
 
   // Stash: X moves the hovered item across.
-  await world(page, "w.char.inventory.push({ item: { uid: 9002, base: 'hp1', rarity: 'normal', ilvl: 1, identified: true, mods: [], sockets: 0, gems: [], reqLvl: 1 }, x: 0, y: 0 })");
+  await world(page, "w.char.inventory.push({ item: { uid: 9002, base: 'gem_ruby_1', rarity: 'normal', ilvl: 1, identified: true, mods: [], sockets: 0, gems: [], reqLvl: 1 }, x: 0, y: 0 })");
   await world(page, "w.cmdInteract({ kind: 'stash' })");
   await expect(page.locator('.panel.stash')).toBeVisible({ timeout: 15000 });
   await hover(page, '.col:nth-child(2) .grid .itm');
