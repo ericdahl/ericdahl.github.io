@@ -681,15 +681,17 @@ export class Renderer {
     }
     if (!item) return;
     const b = baseOf(item);
-    if (item.rarity === 'unique' || item.rarity === 'set') {
+    if (item.rarity === 'unique' || item.rarity === 'set' || item.rarity === 'rare') {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      const g = ctx.createLinearGradient(0, s.y - 120 * z, 0, s.y);
-      const c = item.rarity === 'unique' ? '200,160,90' : '60,210,80';
+      // Rares are the commonest of the three, so their beam is shorter.
+      const h = (item.rarity === 'rare' ? 85 : 120) * z;
+      const g = ctx.createLinearGradient(0, s.y - h, 0, s.y);
+      const c = item.rarity === 'unique' ? '200,160,90' : item.rarity === 'set' ? '60,210,80' : '245,225,90';
       g.addColorStop(0, `rgba(${c},0)`);
       g.addColorStop(1, `rgba(${c},0.45)`);
       ctx.fillStyle = g;
-      ctx.fillRect(s.x - 6 * z, s.y - 120 * z, 12 * z, 120 * z);
+      ctx.fillRect(s.x - 6 * z, s.y - h, 12 * z, h);
       ctx.restore();
     }
     const icon = baseIconCanvas(b.id);

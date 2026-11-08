@@ -19,7 +19,7 @@ import { SKILL_BY_ID, synergyBonus, type Element, type SkillDef, type SkillParam
 
 export type SoundId =
   | 'swing' | 'hit' | 'miss' | 'death' | 'hurt' | 'gold' | 'item' | 'unique' | 'potion' | 'levelup' | 'fire' | 'cold'
-  | 'light' | 'bow' | 'portal' | 'nova' | 'block' | 'shrine' | 'chest' | 'boom' | 'nomana' | 'roar' | 'quest' | 'step' | 'thud';
+  | 'light' | 'bow' | 'portal' | 'nova' | 'block' | 'shrine' | 'chest' | 'boom' | 'nomana' | 'roar' | 'quest' | 'step' | 'thud' | 'rare';
 
 /** Seconds a ground item takes to bounce when it lands or refuses to be picked up. */
 export const LOOT_BOUNCE = 0.4;
@@ -956,7 +956,7 @@ export class World {
       } else {
         this.dropToGround(d.item, x, y);
         if (d.item.rarity === 'unique' || d.item.rarity === 'set') this.sound('unique');
-        else if (d.item.rarity === 'rare') this.sound('item');
+        else if (d.item.rarity === 'rare') this.sound('rare');
       }
     }
   }

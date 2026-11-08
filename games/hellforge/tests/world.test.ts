@@ -213,6 +213,21 @@ describe('items in the world', () => {
   });
 
   describe('a pickup with no room', () => {
+    it('rare drops announce themselves with their own sound', () => {
+      const w = makeWorld();
+      const drop = w as unknown as { spawnDrops(x: number, y: number, mlvl: number, tier: 'boss'): void };
+      let rares = 0;
+      for (let i = 0; i < 60; i++) {
+        w.area.ground.length = 0;
+        w.events.length = 0;
+        drop.spawnDrops(w.player.x, w.player.y, 30, 'boss');
+        const dropped = w.area.ground.filter((g) => g.item?.rarity === 'rare').length;
+        rares += dropped;
+        expect(w.events.filter((e) => e.type === 'sound' && e.id === 'rare').length).toBe(dropped);
+      }
+      expect(rares).toBeGreaterThan(0);
+    });
+
     const thuds = (w: World) => w.events.filter((e) => e.type === 'sound' && e.id === 'thud').length;
     const settled = (w: World, base: string) => {
       w.dropToGround(makeItem(base), w.player.x, w.player.y, false);

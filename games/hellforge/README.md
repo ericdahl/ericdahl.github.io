@@ -47,6 +47,7 @@ The version is shown at the bottom of the title screen; tap it for the player-fa
 
 | Version | Commit | Notes |
 |---|---|---|
+| 0.8.2 | | Light beam and chime for rare drops |
 | 0.8.1 | | Loot with no room hops back up with a thud |
 | 0.8.0 | | Four class item sets; set pieces favour the hero's class |
 | 0.7.3 | | New uniques: Ironwrath (Reaver) and Cryptkeeper's Shroud (Necromancer) |

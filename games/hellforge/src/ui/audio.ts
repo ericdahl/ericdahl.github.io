@@ -99,6 +99,7 @@ export class Audio {
       case 'hurt': return this.tone('sawtooth', 160, 90, 0.18, 0.2);
       case 'gold': [1500, 2100, 2600].forEach((f, i) => this.tone('triangle', f, f * 0.98, 0.08, 0.08, i * 0.04)); return;
       case 'item': return this.tone('triangle', 520, 380, 0.12, 0.15);
+      case 'rare': this.hiss(0.25, 0.08, 6000, 1.5); [740, 1109].forEach((f, i) => this.tone('triangle', f, f, 0.32, 0.13, i * 0.1)); return;
       case 'unique': [660, 880, 1320].forEach((f, i) => this.tone('sine', f, f, 0.5, 0.12, i * 0.09)); return;
       case 'potion': this.hiss(0.2, 0.2, 900, 3); return this.tone('sine', 300, 600, 0.2, 0.1);
       case 'levelup': [392, 523, 659, 784].forEach((f, i) => this.tone('triangle', f, f, 0.6, 0.15, i * 0.12)); return;
