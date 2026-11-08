@@ -1,6 +1,11 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.7.2',
+    date: '2026-11-08',
+    notes: ['Skill bonuses for another class are now dimmed and marked "(no effect)" on items, so gear no longer looks better than it is.'],
+  },
+  {
     version: '0.7.1',
     date: '2026-11-08',
     notes: [
