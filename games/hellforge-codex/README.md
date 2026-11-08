@@ -4,7 +4,7 @@ A mobile friendly dark fantasy action RPG for GitHub Pages. Choose one of three 
 
 ## Play
 
-Open `index.html` directly in a browser, serve it locally, or visit the Pages deployment at `games/hellforge/codex/`.
+Open `index.html` directly in a browser, serve it locally, or visit the Pages deployment at `games/hellforge-codex/`.
 
 | Action | Desktop | Mobile |
 | --- | --- | --- |

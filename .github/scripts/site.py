@@ -3,7 +3,7 @@
 
 Usage: site.py <site dir> <published dir>...
 
-Each published dir is like "apps/macros" or "games/hellforge/claude": the first
+Each published dir is like "apps/macros" or "games/starforge/claude": the first
 segment is the section, the second the app, and an optional third the variant
 (the same game built more than once).
 """
@@ -19,13 +19,15 @@ SECTIONS = {"apps": "Apps", "games": "Games"}
 MOVED = {
     "games/macros/claude": "apps/macros",
     "games/tingdu/claude": "apps/tingdu",
+    "games/hellforge/claude": "games/hellforge",
+    "games/hellforge/codex": "games/hellforge-codex",
 }
 
 # Still published at their URLs, but only linked from the small list at the bottom
-# of the index. Add a whole app ("apps/foo") or one build ("games/foo/codex").
+# of the index, under the label given here.
 ARCHIVED = {
-    "games/hellforge/codex",
-    "games/starforge/codex",
+    "games/hellforge-codex": "Hellforge (codex)",
+    "games/starforge/codex": "Starforge (codex)",
 }
 
 STUB = """<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -78,7 +80,7 @@ def short(title: str) -> str:
 
 def main(site: Path, dirs: list[str]) -> None:
     groups: dict[str, dict[str, list[str]]] = {}
-    for d in sorted(set(dirs) - ARCHIVED):
+    for d in sorted(set(dirs) - set(ARCHIVED)):
         section, app, *_ = d.split("/")
         groups.setdefault(section, {}).setdefault(app, []).append(d)
 
@@ -99,12 +101,7 @@ def main(site: Path, dirs: list[str]) -> None:
         label = SECTIONS.get(section, html.escape(section.capitalize()))
         out.append(f"<section><h2>{label}</h2><ul>{''.join(items)}</ul></section>")
 
-    archived = []
-    for d in sorted(ARCHIVED.intersection(dirs)):
-        _, app, *variant = d.split("/")
-        name = short(meta(site / d / "index.html")[0]) or html.escape(app)
-        suffix = f" ({html.escape(variant[0])})" if variant else ""
-        archived.append(f'<a href="{d}/">{name}{suffix}</a>')
+    archived = [f'<a href="{d}/">{label}</a>' for d, label in sorted(ARCHIVED.items()) if d in dirs]
     if archived:
         out.append(f'<section class="archive"><h2>Archive</h2><p>{" · ".join(archived)}</p></section>')
 
