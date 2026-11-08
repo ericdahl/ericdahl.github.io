@@ -1,6 +1,15 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.8.0',
+    date: '2026-11-08',
+    notes: [
+      'Four new item sets, one for each class: Cinderguard Battlegear (Reaver), Starweave Vestments (Arcanist), Thornstalker\'s Kit (Huntress) and Bonewright\'s Shroud (Necromancer).',
+      'Wearing all four pieces of your class\'s set grants +2 to your class skills, on top of its 2- and 3-piece bonuses.',
+      'Set pieces made for your class drop more often than the others.',
+    ],
+  },
+  {
     version: '0.7.3',
     date: '2026-11-08',
     notes: ['New uniques: Ironwrath, a war axe for the Reaver (+2 Reaver skills), and Cryptkeeper\'s Shroud, armor for the Necromancer (+1 Necromancer skills).'],

@@ -3,6 +3,7 @@ import {
   AFFIXES, BASES, baseOf, describeMods, displayName, gamble, gemMods, generateItem, itemDefense, itemMods, makeItem,
   rollDrops, rollRarity, SETS, UNIQUES, type Rarity,
 } from '../src/game/items';
+import { computeStats, createCharacter, slotsFor } from '../src/game/character';
 import { Rng } from '../src/game/rng';
 
 describe('item data', () => {
@@ -15,6 +16,37 @@ describe('item data', () => {
     for (const cls of ['reaver', 'arcanist', 'huntress', 'necromancer']) {
       expect(UNIQUES.some((u) => u.mods.some((md) => md.stat === `skills_${cls}`))).toBe(true);
     }
+  });
+
+  it('set piece ids are unique', () => {
+    const ids = SETS.flatMap((s) => s.pieces.map((p) => p.id));
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  for (const cls of ['reaver', 'arcanist', 'huntress', 'necromancer'] as const) {
+    it(`the ${cls} has a full set that raises its skills by 2`, () => {
+      const set = SETS.find((s) => s.classId === cls)!;
+      const c = createCharacter('T', cls);
+      const before = computeStats(c).skillBonus;
+      for (const p of set.pieces) {
+        const it = makeItem(p.base, 20, 'set');
+        it.setId = set.id;
+        it.uniqueId = p.id;
+        it.identified = true;
+        c.equipment[slotsFor(it)[0]] = it;
+      }
+      expect(computeStats(c).skillBonus).toBe(before + 2);
+    });
+  }
+
+  it('set pieces favour the class they were made for', () => {
+    const rng = new Rng(3);
+    let own = 0;
+    const n = 2000;
+    for (let i = 0; i < n; i++) if (generateItem(rng, 30, { rarity: 'set', classId: 'necromancer' }).setId === 'bonewright') own++;
+    // 12 of the 31 weighted shares, against 4 of 23 without the bias.
+    expect(own / n).toBeGreaterThan(0.3);
+    expect(own / n).toBeLessThan(0.48);
   });
 
   it('affix groups do not repeat within an item', () => {

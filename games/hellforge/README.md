@@ -47,6 +47,7 @@ The version is shown at the bottom of the title screen; tap it for the player-fa
 
 | Version | Commit | Notes |
 |---|---|---|
+| 0.8.0 | | Four class item sets; set pieces favour the hero's class |
 | 0.7.3 | | New uniques: Ironwrath (Reaver) and Cryptkeeper's Shroud (Necromancer) |
 | 0.7.2 | | Other classes' skill bonuses marked "(no effect)" on items |
 | 0.7.1 | | Backpack and stash rearrange to fit items; Sort button |
