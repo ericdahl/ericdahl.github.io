@@ -3,14 +3,16 @@
 
 Usage: site.py <site dir> <published dir>...
 
-Each published dir is like "apps/macros" or "games/starforge/claude": the second
-segment is the app, and an optional third the variant (the same game built more
-than once).
+Each published dir is like "apps/macros" or "games/starforge/claude": the first
+segment is the section, the second the app, and an optional third the variant
+(the same game built more than once).
 """
 import html
 import re
 import sys
 from pathlib import Path
+
+SECTIONS = {"apps": "Apps", "games": "Games"}
 
 # Shown as cards at the top of the index, in this order: path -> (call to action,
 # accent class in the page's CSS). Each needs an icon.svg.
@@ -93,9 +95,10 @@ def short(title: str) -> str:
 
 
 def main(site: Path, dirs: list[str]) -> None:
-    groups: dict[str, list[str]] = {}
+    groups: dict[str, dict[str, list[str]]] = {}
     for d in sorted(set(dirs) - set(ARCHIVED) - set(FEATURED)):
-        groups.setdefault(d.split("/")[1], []).append(d)
+        section, app, *_ = d.split("/")
+        groups.setdefault(section, {}).setdefault(app, []).append(d)
 
     out = []
     cards = []
@@ -110,20 +113,21 @@ def main(site: Path, dirs: list[str]) -> None:
     if cards:
         out.append(f'<section class="featured" aria-label="Featured">{"".join(cards)}</section>')
 
-    items = []
-    for app, variants in sorted(groups.items()):
-        infos = [(d, *meta(site / d / "index.html")) for d in variants]
-        desc = next((ds for _, _, ds in infos if ds), "")
-        if len(infos) == 1:
-            d, title, _ = infos[0]
-            head = f'<a class="name" href="{d}/">{title or html.escape(app)}</a>'
-        else:
-            name = short(infos[0][1]) or html.escape(app)
-            links = "".join(f'<a href="{d}/">{html.escape(d.rsplit("/", 1)[1])}</a>' for d, _, _ in infos)
-            head = f'<span class="name">{name}</span><span class="variants">{links}</span>'
-        items.append(f"<li>{head}" + (f'<p class="desc">{desc}</p>' if desc else "") + "</li>")
-    if items:
-        out.append(f"<section><h2>More</h2><ul>{''.join(items)}</ul></section>")
+    for section in sorted(groups, key=lambda s: (list(SECTIONS).index(s) if s in SECTIONS else 99, s)):
+        items = []
+        for app, variants in sorted(groups[section].items()):
+            infos = [(d, *meta(site / d / "index.html")) for d in variants]
+            desc = next((ds for _, _, ds in infos if ds), "")
+            if len(infos) == 1:
+                d, title, _ = infos[0]
+                head = f'<a class="name" href="{d}/">{title or html.escape(app)}</a>'
+            else:
+                name = short(infos[0][1]) or html.escape(app)
+                links = "".join(f'<a href="{d}/">{html.escape(d.rsplit("/", 1)[1])}</a>' for d, _, _ in infos)
+                head = f'<span class="name">{name}</span><span class="variants">{links}</span>'
+            items.append(f"<li>{head}" + (f'<p class="desc">{desc}</p>' if desc else "") + "</li>")
+        label = SECTIONS.get(section, html.escape(section.capitalize()))
+        out.append(f"<section><h2>{label}</h2><ul>{''.join(items)}</ul></section>")
 
     archived =[f'<a href="{d}/">{label}</a>' for d, label in sorted(ARCHIVED.items()) if d in dirs]
     if archived:
