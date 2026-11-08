@@ -376,6 +376,8 @@ export const UNIQUES: UniqueDef[] = [
   U('coldheart', 'Coldheart Loop', 'ring', 10, [m('coldRes', 25, 25), m('mana', 20, 20), m('manaSteal', 4, 4), m('coldMin', 2, 2), m('coldMax', 6, 6)]),
   U('gloomshroud', 'Gloomshroud', 'studded_leather', 10, [m('defPct', 100, 120), m('frw', 10, 10), m('ias', 10, 10), m('dex', 10, 10), m('allRes', 10, 10)]),
   U('marrowcall', 'Marrowcall', 'bone_wand', 11, [m('skills_necromancer', 2, 2), m('fcr', 20, 20), m('mana', 30, 30), m('poisonRes', 25, 25), m('life', 15, 15)]),
+  U('cryptkeepers_shroud', "Cryptkeeper's Shroud", 'hard_leather', 7, [m('skills_necromancer', 1, 1), m('defPct', 60, 80), m('mana', 25, 25), m('poisonRes', 20, 20)]),
+  U('ironwrath', 'Ironwrath', 'war_axe', 12, [m('skills_reaver', 2, 2), m('edPct', 80, 110), m('ar', 60, 60), m('life', 20, 20)]),
   U('stormcaller', 'Stormcaller', 'gnarled_staff', 12, [m('skills_arcanist', 2, 2), m('fcr', 20, 20), m('lightRes', 30, 30), m('mana', 40, 40)]),
   U('vaels_requiem', "Vael's Requiem", 'long_bow', 13, [m('edPct', 100, 140), m('skills_huntress', 1, 1), m('ias', 20, 20), m('lightMin', 1, 1), m('lightMax', 25, 25)]),
   U('butchers_oath', "Butcher's Oath", 'great_axe', 14, [m('edPct', 120, 160), m('crit', 15, 15), m('lifeSteal', 6, 6), m('str', 10, 10)]),

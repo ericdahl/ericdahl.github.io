@@ -11,6 +11,12 @@ describe('item data', () => {
     for (const s of SETS) for (const p of s.pieces) expect(() => baseOf(p.base)).not.toThrow();
   });
 
+  it('every class has a unique that raises its skills', () => {
+    for (const cls of ['reaver', 'arcanist', 'huntress', 'necromancer']) {
+      expect(UNIQUES.some((u) => u.mods.some((md) => md.stat === `skills_${cls}`))).toBe(true);
+    }
+  });
+
   it('affix groups do not repeat within an item', () => {
     const rng = new Rng(9);
     for (let i = 0; i < 400; i++) {

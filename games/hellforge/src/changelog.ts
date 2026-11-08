@@ -1,6 +1,11 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.7.3',
+    date: '2026-11-08',
+    notes: ['New uniques: Ironwrath, a war axe for the Reaver (+2 Reaver skills), and Cryptkeeper\'s Shroud, armor for the Necromancer (+1 Necromancer skills).'],
+  },
+  {
     version: '0.7.2',
     date: '2026-11-08',
     notes: ['Skill bonuses for another class are now dimmed and marked "(no effect)" on items, so gear no longer looks better than it is.'],
