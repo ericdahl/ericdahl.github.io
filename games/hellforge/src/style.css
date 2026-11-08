@@ -278,6 +278,21 @@ button {
 .sbtn.nomana img { filter: grayscale(0.6) brightness(0.55) sepia(0.5) hue-rotate(190deg); }
 .sbtn.empty { border-style: dashed; opacity: 0.6; }
 .skillbar.town .sbtn { opacity: 0.35; }
+.sbadge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 13px;
+  font-weight: bold;
+  text-align: center;
+  pointer-events: none;
+}
+.sbadge:empty { display: none; }
+.sbadge.full { color: #8fe07a; }
 
 .touch .skillbar {
   right: calc(10px + var(--safe-r));

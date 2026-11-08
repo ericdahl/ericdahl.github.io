@@ -2409,6 +2409,13 @@ export class World {
     return best;
   }
 
+  /** Living skeletons against the current cap, or null before Raise Skeleton is learned. */
+  skeletonCount(): { alive: number; max: number } | null {
+    const lvl = skillLevel(this.char, 'raise_skeleton');
+    if (!lvl) return null;
+    return { alive: this.minions.filter((mi) => mi.ally === 'skeleton' && !mi.dead).length, max: SKILL_BY_ID.raise_skeleton.params(lvl).count! };
+  }
+
   private raiseMinion(kind: 'skeleton' | 'golem', x: number, y: number, pr: SkillParams): Monster {
     const def = MONSTERS[kind === 'skeleton' ? 'raised_skeleton' : 'grave_golem'];
     const lvl = this.char.level;
