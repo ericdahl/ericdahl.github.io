@@ -218,7 +218,7 @@ export class Game implements PanelHost {
       belt.append(h('button', { class: 'bslot', 'data-col': i, title: `Potion (${i + 1})`, onpointerdown: (e: Event) => e.stopPropagation(), onclick: (e: Event) => { e.stopPropagation(); this.world.usePotion(i); } }, h('img', { alt: '' }), h('span', { class: 'cnt' }), h('span', { class: 'key' }, String(i + 1))));
     const skills = h('div', { class: 'skillbar' });
     for (let i = 0; i < 4; i++) {
-      const b = h('button', { class: `sbtn s${i}`, 'data-slot': i, 'aria-label': `Skill ${i + 1}` }, h('img', { alt: '' }), h('span', { class: 'key' }, 'QWER'[i]));
+      const b = h('button', { class: `sbtn s${i}`, 'data-slot': i, 'aria-label': `Skill ${i + 1}` }, h('img', { alt: '' }), h('span', { class: 'key' }, 'QWER'[i]), h('span', { class: 'sbadge' }));
       b.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
         e.preventDefault();
@@ -359,6 +359,17 @@ export class Game implements PanelHost {
     if (this.hudCache.mk !== manaKey) {
       this.hudCache.mk = manaKey;
       H.skills.querySelectorAll<HTMLElement>('.sbtn').forEach((el, i) => el.classList.toggle('nomana', manaKey[i] === '1'));
+    }
+    const skels = w.skeletonCount();
+    const skelKey = `${c.hotbar.join(',')}:${skels?.alive}/${skels?.max}`;
+    if (this.hudCache.skel !== skelKey) {
+      this.hudCache.skel = skelKey;
+      H.skills.querySelectorAll<HTMLElement>('.sbtn').forEach((el, i) => {
+        const badge = el.querySelector('.sbadge') as HTMLElement;
+        const on = c.hotbar[i] === 'raise_skeleton' && skels;
+        badge.textContent = on ? `${skels.alive}/${skels.max}` : '';
+        badge.classList.toggle('full', !!on && skels.alive >= skels.max);
+      });
     }
     this.setText('tp', H.tp, `◎${c.tpCharges}`);
     H.skillsBtn.classList.toggle('badge', c.skillPoints > 0);

@@ -72,6 +72,16 @@ describe('necromancer', () => {
     expect(target.life).toBeLessThan(life);
   });
 
+  it('reports living skeletons against the cap', () => {
+    expect(makeWorld('necromancer').skeletonCount()).toBeNull();
+    const w = necro({ raise_skeleton: 3 });
+    expect(w.skeletonCount()).toEqual({ alive: 0, max: 3 });
+    const c = corpse(w);
+    w.cmdSkill('raise_skeleton', c.x, c.y);
+    run(w, 1);
+    expect(w.skeletonCount()).toEqual({ alive: 1, max: 3 });
+  });
+
   it('monsters fight servants that stand in their way', () => {
     const w = necro({ raise_skeleton: 3 });
     const c = corpse(w);
