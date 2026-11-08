@@ -1332,9 +1332,7 @@ export class Renderer {
     const pp = w.portalPos();
     if (pp) mark(pp.x, pp.y, '#6aa8ff', 3);
     if (full) for (const m of w.area.monsters) if (!m.dead && Math.hypot(m.x - p.x, m.y - p.y) < w.area.def.light + 1) mark(m.x, m.y, '#ff4030', 2);
-    // Reveal only the last few: they are what stalls the purge, and showing every pack would spoil the map.
-    const strays = w.questStrays();
-    if (strays.length <= 5) for (const m of strays) mark(m.x, m.y, '#ffb030', 3);
+    for (const m of w.questStrays()) mark(m.x, m.y, '#ffb030', 3);
     for (const m of w.minions) mark(m.x, m.y, '#7ad070', 2);
     mark(p.x, p.y, '#ffffff', 3);
     ctx.restore();
