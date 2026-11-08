@@ -1,7 +1,7 @@
 import { baseOf, type Item } from '../game/items';
 import { FLOOR, WALL, type Level, type Prop } from '../game/map';
 import { tileHash } from '../game/rng';
-import type { AreaState, Fx, Monster, Npc, Projectile, World } from '../game/world';
+import { LOOT_BOUNCE, type AreaState, type Fx, type Monster, type Npc, type Projectile, type World } from '../game/world';
 import { Camera, TILE_H, TILE_W } from './camera';
 import { baseIconCanvas } from './icons';
 import { Weather } from './weather';
@@ -669,7 +669,7 @@ export class Renderer {
     const ctx = this.ctx;
     const z = this.cam.zoom;
     const s = this.cam.toScreen(x, y);
-    const bounce = t < 0.4 ? Math.sin((t / 0.4) * Math.PI) * 18 * z : 0;
+    const bounce = t < LOOT_BOUNCE ? Math.sin((t / LOOT_BOUNCE) * Math.PI) * 18 * z : 0;
     if (gold) {
       ctx.fillStyle = '#e8c040';
       for (let i = 0; i < Math.min(6, 2 + Math.floor(gold / 20)); i++) {

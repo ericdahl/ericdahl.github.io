@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { addToInventory } from '../src/game/character';
 import { makeItem } from '../src/game/items';
-import { elemDamage } from '../src/game/world';
+import { elemDamage, LOOT_BOUNCE, type World } from '../src/game/world';
 import { makeWorld, nextToMonster, run } from './helpers';
 
 describe('town', () => {
@@ -209,6 +210,48 @@ describe('items in the world', () => {
     expect(w.nextPotion('hp')).toBe('hp1');
     w.player.life = 100;
     expect(w.nextPotion('hp')).toBe('hp3');
+  });
+
+  describe('a pickup with no room', () => {
+    const thuds = (w: World) => w.events.filter((e) => e.type === 'sound' && e.id === 'thud').length;
+    const settled = (w: World, base: string) => {
+      w.dropToGround(makeItem(base), w.player.x, w.player.y, false);
+      const g = w.area.ground[w.area.ground.length - 1];
+      g.t = 5;
+      return g;
+    };
+
+    it('hops the potion back up with one thud, however often it is clicked', () => {
+      const w = makeWorld();
+      w.char.potions = { hp1: 8 };
+      const g = settled(w, 'hp1');
+      w.pickup(g);
+      expect(g.t).toBe(0);
+      expect(thuds(w)).toBe(1);
+      w.pickup(g);
+      expect(thuds(w)).toBe(1);
+      g.t = LOOT_BOUNCE;
+      w.pickup(g);
+      expect(thuds(w)).toBe(2);
+    });
+
+    it('hops gear left behind by a full backpack', () => {
+      const w = makeWorld();
+      while (addToInventory(w.char, makeItem('quilted_armor')));
+      const g = settled(w, 'quilted_armor');
+      w.pickup(g);
+      expect(w.area.ground).toContain(g);
+      expect(g.t).toBe(0);
+      expect(thuds(w)).toBe(1);
+    });
+
+    it('stays quiet when the item fits', () => {
+      const w = makeWorld();
+      const g = settled(w, 'quilted_armor');
+      w.pickup(g);
+      expect(w.area.ground).not.toContain(g);
+      expect(thuds(w)).toBe(0);
+    });
   });
 
   it('leaves potions on the ground when the pool has no room', () => {

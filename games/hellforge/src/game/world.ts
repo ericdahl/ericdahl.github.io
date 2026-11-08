@@ -19,7 +19,10 @@ import { SKILL_BY_ID, synergyBonus, type Element, type SkillDef, type SkillParam
 
 export type SoundId =
   | 'swing' | 'hit' | 'miss' | 'death' | 'hurt' | 'gold' | 'item' | 'unique' | 'potion' | 'levelup' | 'fire' | 'cold'
-  | 'light' | 'bow' | 'portal' | 'nova' | 'block' | 'shrine' | 'chest' | 'boom' | 'nomana' | 'roar' | 'quest' | 'step';
+  | 'light' | 'bow' | 'portal' | 'nova' | 'block' | 'shrine' | 'chest' | 'boom' | 'nomana' | 'roar' | 'quest' | 'step' | 'thud';
+
+/** Seconds a ground item takes to bounce when it lands or refuses to be picked up. */
+export const LOOT_BOUNCE = 0.4;
 
 export type Panel = 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint';
 
@@ -904,20 +907,22 @@ export class World {
       return;
     }
     if (b.kind === 'potion') {
-      if (!addPotion(this.char, b.id)) {
-        this.msg('No room for that potion', '#ff8a6a', 'potfull');
-        return;
-      }
+      if (!addPotion(this.char, b.id)) return this.rejectPickup(g, 'No room for that potion', 'potfull');
       this.sound('potion');
       a.ground.splice(a.ground.indexOf(g), 1);
       return;
     }
-    if (!addToInventory(this.char, it)) {
-      this.msg('Inventory is full', '#ff8a6a', 'invfull');
-      return;
-    }
+    if (!addToInventory(this.char, it)) return this.rejectPickup(g, 'Inventory is full', 'invfull');
     this.sound('item');
     a.ground.splice(a.ground.indexOf(g), 1);
+  }
+
+  /** Replays the landing bounce with a thud. Clicks during a bounce don't restart it, so spam-clicking can't stutter. */
+  private rejectPickup(g: GroundItem, text: string, throttleKey: string) {
+    this.msg(text, '#ff8a6a', throttleKey);
+    if (g.t < LOOT_BOUNCE) return;
+    g.t = 0;
+    this.sound('thud');
   }
 
   dropToGround(item: Item, x: number, y: number, scatter = true) {
