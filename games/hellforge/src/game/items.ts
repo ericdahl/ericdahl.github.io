@@ -391,6 +391,8 @@ export const UNIQUE_BY_ID: Record<string, UniqueDef> = Object.fromEntries(UNIQUE
 export interface SetDef {
   id: string;
   name: string;
+  /** Pieces drop more often for this class. */
+  classId?: ClassId;
   pieces: { id: string; name: string; base: string; mods: { stat: StatKey; min: number; max: number }[] }[];
   /** bonuses[n] applies once n pieces are worn. */
   bonuses: Record<number, Mod[]>;
@@ -423,6 +425,70 @@ export const SETS: SetDef[] = [
     bonuses: {
       2: [{ stat: 'dex', value: 10 }],
       3: [{ stat: 'frw', value: 15 }, { stat: 'mf', value: 40 }, { stat: 'ias', value: 20 }],
+    },
+  },
+  {
+    id: 'cinderguard',
+    name: 'Cinderguard Battlegear',
+    classId: 'reaver',
+    pieces: [
+      { id: 'cinderguard_helm', name: 'Cinderguard Helm', base: 'helm', mods: [m('life', 25, 25), m('fireRes', 15, 15)] },
+      { id: 'cinderguard_mail', name: 'Cinderguard Mail', base: 'ring_mail', mods: [m('defPct', 60, 60), m('str', 8, 8)] },
+      { id: 'cinderguard_fists', name: 'Cinderguard Fists', base: 'heavy_gloves', mods: [m('ias', 15, 15), m('ar', 40, 40)] },
+      { id: 'cinderguard_treads', name: 'Cinderguard Treads', base: 'heavy_boots', mods: [m('frw', 15, 15), m('life', 15, 15)] },
+    ],
+    bonuses: {
+      2: [{ stat: 'edPct', value: 30 }],
+      3: [{ stat: 'lifeSteal', value: 4 }],
+      4: [{ stat: 'skills_reaver', value: 2 }, { stat: 'allRes', value: 20 }, { stat: 'life', value: 40 }],
+    },
+  },
+  {
+    id: 'starweave',
+    name: 'Starweave Vestments',
+    classId: 'arcanist',
+    pieces: [
+      { id: 'starweave_cowl', name: 'Starweave Cowl', base: 'skull_cap', mods: [m('mana', 25, 25), m('fcr', 10, 10)] },
+      { id: 'starweave_robe', name: 'Starweave Robe', base: 'studded_leather', mods: [m('defPct', 40, 40), m('lightRes', 20, 20), m('mana', 20, 20)] },
+      { id: 'starweave_wraps', name: 'Starweave Wraps', base: 'leather_gloves', mods: [m('ene', 8, 8), m('coldRes', 15, 15)] },
+      { id: 'starweave_sigil', name: 'Starweave Sigil', base: 'amulet', mods: [m('fireRes', 15, 15), m('manaRegen', 12, 12)] },
+    ],
+    bonuses: {
+      2: [{ stat: 'fcr', value: 15 }],
+      3: [{ stat: 'mana', value: 40 }],
+      4: [{ stat: 'skills_arcanist', value: 2 }, { stat: 'allRes', value: 15 }],
+    },
+  },
+  {
+    id: 'thornstalker',
+    name: "Thornstalker's Kit",
+    classId: 'huntress',
+    pieces: [
+      { id: 'thornstalker_hood', name: 'Thornstalker Hood', base: 'skull_cap', mods: [m('dex', 8, 8), m('life', 15, 15)] },
+      { id: 'thornstalker_jerkin', name: 'Thornstalker Jerkin', base: 'leather_armor', mods: [m('defPct', 50, 50), m('poisonRes', 20, 20)] },
+      { id: 'thornstalker_grips', name: 'Thornstalker Grips', base: 'heavy_gloves', mods: [m('ias', 15, 15), m('dex', 6, 6)] },
+      { id: 'thornstalker_stride', name: 'Thornstalker Stride', base: 'heavy_boots', mods: [m('frw', 20, 20), m('ar', 40, 40)] },
+    ],
+    bonuses: {
+      2: [{ stat: 'ar', value: 80 }],
+      3: [{ stat: 'crit', value: 10 }],
+      4: [{ stat: 'skills_huntress', value: 2 }, { stat: 'edPct', value: 40 }, { stat: 'ias', value: 15 }],
+    },
+  },
+  {
+    id: 'bonewright',
+    name: "Bonewright's Shroud",
+    classId: 'necromancer',
+    pieces: [
+      { id: 'bonewright_mask', name: 'Bonewright Mask', base: 'skull_cap', mods: [m('mana', 20, 20), m('poisonRes', 15, 15)] },
+      { id: 'bonewright_mantle', name: 'Bonewright Mantle', base: 'hard_leather', mods: [m('life', 25, 25), m('defPct', 40, 40)] },
+      { id: 'bonewright_girdle', name: 'Bonewright Girdle', base: 'light_belt', mods: [m('vit', 6, 6), m('mana', 15, 15)] },
+      { id: 'bonewright_talisman', name: 'Bonewright Talisman', base: 'amulet', mods: [m('fcr', 10, 10), m('life', 15, 15)] },
+    ],
+    bonuses: {
+      2: [{ stat: 'manaOnKill', value: 3 }],
+      3: [{ stat: 'allRes', value: 15 }],
+      4: [{ stat: 'skills_necromancer', value: 2 }, { stat: 'fcr', value: 20 }, { stat: 'mana', value: 40 }],
     },
   },
 ];
@@ -561,7 +627,7 @@ export function generateItem(rng: Rng, ilvl: number, opts: GenOpts = {}): Item {
       (p) => p.qlvl <= ilvl && (!opts.base || p.base === b.id) && (!opts.kinds || opts.kinds.includes(baseOf(p.base).kind)),
     );
     if (pool.length) {
-      const p = rng.pick(pool);
+      const p = rng.weighted(pool.map((v) => ({ w: opts.classId && SET_BY_ID[v.setId].classId === opts.classId ? 3 : 1, v })));
       const item = makeItem(p.base, ilvl, 'set');
       item.setId = p.setId;
       item.uniqueId = p.id;
