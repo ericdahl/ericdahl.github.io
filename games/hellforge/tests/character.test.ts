@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   addPotion, addToInventory, addXp, allocStat, canLearn, choosePotion, computeStats, createCharacter, equipFromInventory, findSpace,
-  learnSkill, migrateCharacter, potionCount, skillLevel, takePotion, xpForLevel, INV_COLS, INV_ROWS, SAVE_VERSION, type Character,
+  learnSkill, migrateCharacter, potionCount, skillLevel, sortGrid, takePotion, xpForLevel, INV_COLS, INV_ROWS, SAVE_VERSION, type Character,
 } from '../src/game/character';
-import { makeItem } from '../src/game/items';
+import { baseOf, makeItem } from '../src/game/items';
 import { SKILL_BY_ID } from '../src/game/skills';
 import { World } from '../src/game/world';
 import v1Save from './fixtures/save-v1.json';
@@ -79,6 +79,62 @@ describe('character', () => {
     expect(n).toBe(5);
     expect(findSpace(c.inventory, INV_COLS, INV_ROWS, 1, 1)).not.toBeNull();
     expect(findSpace(c.inventory, INV_COLS, INV_ROWS, 2, 2)).toBeNull();
+  });
+
+  describe('rearranging the grid', () => {
+    /** One gem in every odd column of row 1 leaves no 2x3 gap, with most of the bag empty. */
+    function scattered() {
+      const c = createCharacter('A', 'arcanist');
+      c.inventory = [1, 3, 5, 7, 9].map((x) => ({ item: makeItem('gem_ruby_1'), x, y: 1 }));
+      return c;
+    }
+    const expectValidLayout = (c: Character) => {
+      const cells = new Set<string>();
+      for (const e of c.inventory) {
+        const b = baseOf(e.item);
+        expect(e.x + b.w).toBeLessThanOrEqual(INV_COLS);
+        expect(e.y + b.h).toBeLessThanOrEqual(INV_ROWS);
+        for (let x = e.x; x < e.x + b.w; x++) for (let y = e.y; y < e.y + b.h; y++) cells.add(`${x},${y}`);
+      }
+      expect(cells.size).toBe(c.inventory.reduce((n, e) => n + baseOf(e.item).w * baseOf(e.item).h, 0));
+    };
+
+    it('makes room for an item that fits only after rearranging', () => {
+      const c = scattered();
+      const uids = c.inventory.map((e) => e.item.uid);
+      const armor = makeItem('quilted_armor');
+      expect(findSpace(c.inventory, INV_COLS, INV_ROWS, 2, 3)).toBeNull();
+      expect(addToInventory(c, armor)).toBe(true);
+      expect(c.inventory.map((e) => e.item.uid).sort((a, b) => a - b)).toEqual([...uids, armor.uid].sort((a, b) => a - b));
+      expectValidLayout(c);
+    });
+
+    it('leaves the layout alone when there is an open gap', () => {
+      const c = scattered();
+      const before = structuredClone(c.inventory);
+      expect(addToInventory(c, makeItem('gem_ruby_1'))).toBe(true);
+      expect(c.inventory.slice(0, 5)).toEqual(before);
+    });
+
+    it('leaves the layout alone when the item cannot fit at all', () => {
+      const c = createCharacter('A', 'arcanist');
+      while (addToInventory(c, makeItem('quilted_armor')));
+      const before = structuredClone(c.inventory);
+      expect(addToInventory(c, makeItem('quilted_armor'))).toBe(false);
+      expect(c.inventory).toEqual(before);
+    });
+
+    it('sorts into a compact layout and keeps every item', () => {
+      const c = scattered();
+      c.inventory.push({ item: makeItem('quilted_armor'), x: 3, y: 2 } as never);
+      c.inventory[5].y = 2;
+      expect(sortGrid(c.inventory, INV_COLS, INV_ROWS)).toBe(true);
+      expect(c.inventory.length).toBe(6);
+      expectValidLayout(c);
+      expect(baseOf(c.inventory[0].item).id).toBe('quilted_armor');
+      expect(c.inventory[0]).toMatchObject({ x: 0, y: 0 });
+      expect(c.inventory.slice(1).map((e) => [e.x, e.y])).toEqual([[0, 3], [1, 3], [2, 0], [2, 1], [2, 2]]);
+    });
   });
 
   it('potion pools are capped by the belt', () => {

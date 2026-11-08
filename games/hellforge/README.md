@@ -47,6 +47,7 @@ The version is shown at the bottom of the title screen; tap it for the player-fa
 
 | Version | Commit | Notes |
 |---|---|---|
+| 0.7.1 | | Backpack and stash rearrange to fit items; Sort button |
 | 0.7.0 | | Potion pools replace belt columns and backpack potions; first save migration (`migrateCharacter`, `SAVE_VERSION`) |
 | 0.6.1 | | Hollow Cave stragglers on the HUD and automap; skeleton count on the Raise Skeleton button |
 | 0.6.0 | | Hit feedback: freeze frames, crit pops, death effects by damage type, boss flashes |

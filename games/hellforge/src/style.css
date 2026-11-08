@@ -511,6 +511,7 @@ button {
 }
 .acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; justify-content: center; }
 .goldrow { font-size: 13px; }
+.sub-row { display: flex; justify-content: space-between; align-items: center; }
 
 .vendor { display: flex; flex-direction: column; gap: 3px; max-height: 62vh; overflow: auto; }
 .vrow {

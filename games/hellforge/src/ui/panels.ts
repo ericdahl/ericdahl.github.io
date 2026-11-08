@@ -1,6 +1,6 @@
 import { AREA_BY_ID, DIFFICULTY_LEVELS, QUESTS } from '../game/areas';
 import {
-  allocStat, canLearn, CLASSES, DIFFICULTIES, INV_COLS, INV_ROWS, learnSkill, requirementError, skillLevel, STASH_COLS,
+  allocStat, canLearn, CLASSES, DIFFICULTIES, INV_COLS, INV_ROWS, learnSkill, requirementError, skillLevel, sortGrid, STASH_COLS,
   STASH_ROWS, type GridEntry,
 } from '../game/character';
 import { baseOf, buyPrice, displayName, gamblePrice, itemColor, sellPrice, type Item, type Slot } from '../game/items';
@@ -258,6 +258,14 @@ function goldRow(host: PanelHost) {
   return h('div', { class: 'goldrow' }, h('span', { class: 'gold' }, `◉ ${c.gold.toLocaleString()} gold`), h('span', { class: 'dim' }, ` · Town Portal ×${c.tpCharges}`));
 }
 
+function gridHeading(host: PanelHost, title: string, entries: GridEntry[], cols: number, rows: number) {
+  const sort = () => {
+    if (!sortGrid(entries, cols, rows)) host.toast("Couldn't sort these items", '#ff8a6a');
+    host.refresh();
+  };
+  return h('div', { class: 'sub sub-row' }, title, h('button', { class: 'btn tiny', onclick: sort }, 'Sort'));
+}
+
 function inventoryPanel(host: PanelHost) {
   const c = host.world.char;
   return h(
@@ -267,7 +275,7 @@ function inventoryPanel(host: PanelHost) {
     h('div', { class: 'p-body two' },
       h('div', { class: 'col' },
         h('div', { class: 'equip-box' }, h('div', { class: 'sub' }, 'Equipped'), paperDoll(host)),
-        h('div', { class: 'sub' }, 'Backpack'),
+        gridHeading(host, 'Backpack', c.inventory, INV_COLS, INV_ROWS),
         grid(host, c.inventory, INV_COLS, INV_ROWS, 'inv'),
         goldRow(host)),
       detail(host, 'inventory')),
@@ -312,9 +320,9 @@ function stashPanel(host: PanelHost) {
     h(
       'div',
       { class: 'p-body three' },
-      h('div', { class: 'col' }, h('div', { class: 'sub' }, `Stash · ${c.stashGold.toLocaleString()} gold`), grid(host, c.stash, STASH_COLS, STASH_ROWS, 'stash'),
+      h('div', { class: 'col' }, gridHeading(host, `Stash · ${c.stashGold.toLocaleString()} gold`, c.stash, STASH_COLS, STASH_ROWS), grid(host, c.stash, STASH_COLS, STASH_ROWS, 'stash'),
         h('div', { class: 'acts' }, h('button', { class: 'btn', onclick: () => { w.depositGold(); host.refresh(); } }, 'Deposit gold'), h('button', { class: 'btn', onclick: () => { w.withdrawGold(); host.refresh(); } }, 'Withdraw gold'))),
-      h('div', { class: 'col' }, h('div', { class: 'sub' }, 'Inventory'), grid(host, c.inventory, INV_COLS, INV_ROWS, 'inv'), goldRow(host)),
+      h('div', { class: 'col' }, gridHeading(host, 'Inventory', c.inventory, INV_COLS, INV_ROWS), grid(host, c.inventory, INV_COLS, INV_ROWS, 'inv'), goldRow(host)),
       detail(host, 'stash'),
     ),
   );
