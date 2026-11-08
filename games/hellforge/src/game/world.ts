@@ -1,4 +1,4 @@
-import { AREA_BY_ID, DIFFICULTY_LEVELS, QUEST_BY_ID, WAYPOINT_AREAS, type AreaDef } from './areas';
+import { AREA_BY_ID, areaAct, DIFFICULTY_LEVELS, QUEST_BY_ID, TOWN_OF_ACT, WAYPOINT_AREAS, type AreaDef } from './areas';
 import {
   addPotion, addToGrid, addToInventory, addXp, choosePotion, CLASSES, computeStats, equipFromInventory, INV_COLS, INV_ROWS,
   removeFromGrid, skillLevel, STASH_COLS, STASH_ROWS, takePotion, unequip, xpForLevel, xpMultiplier,
@@ -11,11 +11,13 @@ import {
 } from './items';
 import { floodDistances, generateLevel, idx, isWalkable, nearestFloor, type Level, type Point } from './map';
 import {
-  baseDamage, baseLife, MONSTERS, monsterStats, rollUniqueMods, uniqueName, type MonsterDef, type MonsterRarity, type Resists, type UniqueMod,
+  baseDamage, baseLife, MONSTERS, monsterStats, rollUniqueMods, uniqueName,
+  type BossAbility, type MonsterDef, type MonsterRarity, type MonsterShape, type Resists, type UniqueMod,
 } from './monsters';
 import { FlowField, findPath, lineOfSight } from './path';
 import { hashSeed, Rng } from './rng';
 import { SKILL_BY_ID, synergyBonus, type Element, type SkillDef, type SkillParams } from './skills';
+import type { StoryId } from './story';
 
 export type SoundId =
   | 'swing' | 'hit' | 'miss' | 'death' | 'hurt' | 'gold' | 'item' | 'unique' | 'potion' | 'levelup' | 'fire' | 'cold'
@@ -24,7 +26,7 @@ export type SoundId =
 /** Seconds a ground item takes to bounce when it lands or refuses to be picked up. */
 export const LOOT_BOUNCE = 0.4;
 
-export type Panel = 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint';
+export type Panel = 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan';
 
 export type GameEvent =
   | { type: 'sound'; id: SoundId }
@@ -35,6 +37,7 @@ export type GameEvent =
   | { type: 'area'; id: string }
   | { type: 'quest'; id: string }
   | { type: 'victory' }
+  | { type: 'story'; id: StoryId }
   | { type: 'shake'; amount: number }
   /** Freeze the action for a moment to sell a heavy hit. */
   | { type: 'hitstop'; t: number }
@@ -44,7 +47,7 @@ export type GameEvent =
 export type FxKind =
   | 'blood' | 'spark' | 'nova' | 'explosion' | 'chain' | 'meteor_mark' | 'burn' | 'teleport' | 'levelup' | 'heal'
   | 'shrine' | 'text' | 'shout' | 'revive' | 'whirl' | 'slam' | 'portal_open' | 'raise' | 'curse'
-  | 'shatter' | 'cinders' | 'zap' | 'gore';
+  | 'shatter' | 'cinders' | 'zap' | 'gore' | 'shade_mark' | 'dust';
 
 export interface Fx {
   kind: FxKind;
@@ -113,6 +116,24 @@ export interface Monster {
   used?: boolean;
   stuckT?: number;
   deathKind?: DeathKind;
+  /** Seconds left underground. Buried monsters can't be hit or targeted. */
+  sub?: number;
+  /** The burrow ends in a boss's heavier strike. */
+  subStrike?: boolean;
+  /** A harmless copy: dies to any hit, drops nothing, and casts no shadow. */
+  illusion?: boolean;
+  ownerId?: number;
+  split?: boolean;
+  shield?: number;
+  shieldT?: number;
+  /** Already got back up once. */
+  rose?: boolean;
+  /** Current boss phase, and what it changed. */
+  phase?: number;
+  abilities?: BossAbility[];
+  shape?: MonsterShape;
+  color?: string;
+  invulnT?: number;
 }
 
 export interface Projectile {
@@ -160,7 +181,7 @@ const SHRINE_NAMES: Record<ShrineKind, string> = {
   armor: 'Armor Shrine', combat: 'Combat Shrine', refill: 'Refilling Shrine', experience: 'Experience Shrine',
 };
 
-export type NpcKind = 'healer' | 'smith' | 'sage' | 'fence';
+export type NpcKind = 'healer' | 'smith' | 'sage' | 'fence' | 'caravan';
 export interface Npc {
   id: number;
   kind: NpcKind;
@@ -176,6 +197,15 @@ export const NPC_INFO: Record<NpcKind, { name: string; title: string }> = {
   smith: { name: 'Brannoc', title: 'Blacksmith' },
   sage: { name: 'Old Corvin', title: 'Sage' },
   fence: { name: 'Mirela', title: 'Gambler' },
+  caravan: { name: 'Dov', title: 'Caravan Master' },
+};
+
+const NPC_ACT2: Record<NpcKind, { name: string; title: string }> = {
+  healer: { name: 'Nessa', title: 'Well-Keeper' },
+  smith: { name: 'Hadrun', title: 'Glasswright' },
+  sage: { name: 'Keeper Imre', title: 'Archivist' },
+  fence: { name: 'Sefa', title: 'Bonecaster' },
+  caravan: { name: 'Dov', title: 'Caravan Master' },
 };
 
 export interface Hazard {
@@ -190,6 +220,8 @@ export interface Hazard {
   burnDps: number;
   srcLevel: number;
   fired: boolean;
+  /** Skip the shake and boom, for attacks made of many small blasts. */
+  quiet?: boolean;
 }
 
 export interface AreaState {
@@ -294,6 +326,10 @@ export class World {
   private exploreT = 0;
   private msgCd: Record<string, number> = {};
   private regenAcc = 0;
+  /** 0..1 strength of the current sandstorm. */
+  storm = 0;
+  private stormIn = 25;
+  private stormLeft = 0;
 
   constructor(char: Character, seed = Date.now() >>> 0) {
     this.char = char;
@@ -307,7 +343,7 @@ export class World {
     this.refreshStats();
     this.player.life = this.stats.maxLife;
     this.player.mana = this.stats.maxMana;
-    this.enterArea('town', 'start');
+    this.enterArea(this.char.waypoints.includes(this.wpKey('tel_maresh')) ? 'tel_maresh' : 'town', 'start');
   }
 
   // ---------------------------------------------------------------- helpers
@@ -341,7 +377,21 @@ export class World {
   }
 
   get inTown() {
-    return this.area.def.id === 'town';
+    return !!this.area.def.town;
+  }
+
+  get act() {
+    return areaAct(this.area.def);
+  }
+
+  /** The town this act's portals and respawns lead to. */
+  get homeTown() {
+    return TOWN_OF_ACT[this.act];
+  }
+
+  /** Killing Vhorza opens the road south. */
+  get roadSouthOpen() {
+    return this.questState('forge') === 'done' || this.questState('forge') === 'rewarded';
   }
 
   get difficulty() {
@@ -354,6 +404,14 @@ export class World {
 
   questState(id: string) {
     return this.char.quests[this.wpKey(id)] ?? 'none';
+  }
+
+  /** Plays a story beat, once per difficulty. */
+  tellOnce(id: StoryId) {
+    const k = this.wpKey(`story_${id}`);
+    if (this.char.quests[k]) return;
+    this.char.quests[k] = 'done';
+    this.emit({ type: 'story', id });
   }
 
   setQuest(id: string, s: 'active' | 'done' | 'rewarded') {
@@ -417,16 +475,34 @@ export class World {
       if (o.kind === 'shrine') obj.shrine = rng.pick(['armor', 'combat', 'refill', 'experience'] as const);
       a.objects.push(obj);
     }
-    if (id === 'town') {
-      for (const k of ['healer', 'smith', 'sage', 'fence'] as NpcKind[]) {
-        const s = level.spots[k];
-        a.npcs.push({ id: this.id(), kind: k, ...NPC_INFO[k], x: s.x + 0.5, y: s.y + 0.5, facing: Math.PI / 2 });
-      }
+    if (def.town) {
+      for (const k of ['healer', 'smith', 'sage', 'fence'] as NpcKind[]) this.addNpc(a, k);
     } else {
       this.populate(a, rng);
     }
     this.areas.set(id, a);
     return a;
+  }
+
+  private addNpc(a: AreaState, k: NpcKind) {
+    const s = a.level.spots[k];
+    const info = areaAct(a.def) === 2 ? NPC_ACT2 : NPC_INFO;
+    a.npcs.push({ id: this.id(), kind: k, ...info[k], x: s.x + 0.5, y: s.y + 0.5, facing: Math.PI / 2 });
+  }
+
+  /** Who is in town depends on how the story has gone. */
+  private syncTownNpcs(a: AreaState) {
+    if (this.roadSouthOpen && !a.npcs.some((n) => n.kind === 'caravan')) this.addNpc(a, 'caravan');
+    const sage = a.npcs.find((n) => n.kind === 'sage');
+    if (a.def.id === 'town' && sage && this.questState('forge') === 'rewarded') {
+      sage.name = 'Wren';
+      sage.title = "Corvin's Apprentice";
+    }
+  }
+
+  npcInfo(kind: NpcKind) {
+    const n = this.area.npcs.find((x) => x.kind === kind);
+    return { name: n?.name ?? NPC_INFO[kind].name, title: n?.title ?? NPC_INFO[kind].title };
   }
 
   private mlvl(def: AreaDef) {
@@ -452,7 +528,9 @@ export class World {
   private populate(a: AreaState, rng: Rng) {
     const def = a.def;
     const l = a.level;
-    const spots = rng.shuffle(l.spawns.slice());
+    // Corvin is waiting alone, so packs keep out of his chamber.
+    const boss = def.superUnique === 'corvin' ? l.spots.boss : undefined;
+    const spots = rng.shuffle(l.spawns.filter((s) => !boss || Math.hypot(s.x - boss.x, s.y - boss.y) > 12));
     let packId = 1;
     const occupied = new Set<number>();
     const place = (cx: number, cy: number) => {
@@ -463,13 +541,14 @@ export class World {
     if (def.superUnique) {
       const sd = MONSTERS[def.superUnique];
       const spot = l.spots.boss ?? spots.pop() ?? l.start;
-      const isBoss = def.superUnique === 'mother';
+      const isBoss = def.superUnique === 'mother' || def.superUnique === 'corvin';
       const boss = this.spawnMonster(a, sd.id, spot.x + 0.5, spot.y + 0.5, 'boss', {
         packId, superId: sd.id, level: this.mlvl(def) + (isBoss ? 1 : 2), mods: isBoss || def.superUnique === 'glutton' ? [] : ['extraLife'],
       });
       boss.name = sd.name;
-      const escort = { glutton: 'ghoul', bishop: 'skeleton', warden: 'skeleton', mother: 'imp' }[sd.id] ?? 'imp';
-      for (let i = 0; i < 4; i++) {
+      const escort = { glutton: 'ghoul', bishop: 'skeleton', warden: 'skeleton', mother: 'imp', skarn: 'scorpion', karrik: 'kite', embalmer: 'mummy' }[sd.id] ?? 'imp';
+      // Corvin is waiting alone.
+      for (let i = 0; i < (sd.id === 'corvin' ? 0 : 4); i++) {
         const p = place(spot.x, spot.y);
         this.spawnMonster(a, escort, p.x, p.y, 'minion', { packId, name: `${MONSTERS[escort].name}` });
       }
@@ -503,8 +582,15 @@ export class World {
           const q = place(s.x, s.y);
           this.spawnMonster(a, 'imp', q.x, q.y, 'normal', { packId });
         }
+      } else if (MONSTERS[type].pack) {
+        const p = place(s.x, s.y);
+        this.spawnMonster(a, type, p.x, p.y, 'normal', { packId });
+        for (let k = 0; k < rng.int(3, 5); k++) {
+          const q = place(s.x, s.y);
+          this.spawnMonster(a, MONSTERS[type].pack!, q.x, q.y, 'normal', { packId });
+        }
       } else {
-        const n = type === 'brute' ? rng.int(1, 3) : rng.int(3, 6);
+        const n = type === 'brute' || type === 'colossus' ? rng.int(1, 3) : rng.int(3, 6);
         for (let k = 0; k < n; k++) {
           const q = place(s.x, s.y);
           this.spawnMonster(a, type, q.x, q.y, 'normal', { packId });
@@ -528,12 +614,12 @@ export class World {
     } else if (via === 'waypoint' && l.waypoint) {
       pos = nearestFloor(l, { x: l.waypoint.x, y: l.waypoint.y + 1 });
     } else if (via === 'portal') {
-      if (id === 'town') {
+      if (a.def.town) {
         const s = this.townPortalSpot();
         pos = nearestFloor(l, { x: s.x, y: s.y + 2 });
       }
       else if (this.portal) pos = nearestFloor(l, { x: this.portal.x + 1, y: this.portal.y });
-    } else if (id !== 'town') {
+    } else if (!a.def.town) {
       pos = this.arrivalNear(l, l.start);
     }
     const p = this.player;
@@ -547,7 +633,10 @@ export class World {
     for (const mi of this.minions) this.placeMinion(mi);
     a.flow.update(p.x, p.y);
     this.markExplored(true);
-    if (id === 'town') this.restockVendors();
+    if (a.def.town) {
+      this.restockVendors();
+      this.syncTownNpcs(a);
+    }
     if (a.def.quest && this.questState(a.def.quest) === 'none') this.setQuest(a.def.quest, 'active');
     this.emit({ type: 'area', id });
   }
@@ -567,7 +656,7 @@ export class World {
   }
 
   townPortalSpot(): Point {
-    const l = this.getArea('town').level;
+    const l = this.getArea(this.homeTown).level;
     const wp = l.waypoint!;
     return { x: wp.x + 3, y: wp.y + 1 };
   }
@@ -575,7 +664,7 @@ export class World {
   restockVendors() {
     const clvl = this.char.level;
     const rng = this.rng;
-    const ilvl = Math.max(1, Math.min(clvl + 2, this.mlvl(AREA_BY_ID.hellforge) + 3));
+    const ilvl = Math.max(1, Math.min(clvl + 2, this.mlvl(AREA_BY_ID.noon_vault) + 3));
     const healer: Item[] = [];
     for (const t of ['hp', 'mp'] as const) {
       const top = potionFor(t, clvl);
@@ -663,7 +752,7 @@ export class World {
     let bestScore = Infinity;
     const focus = this.area.monsters.find((m) => m.id === this.focusId && !m.dead);
     for (const m of this.area.monsters) {
-      if (m.dead) continue;
+      if (m.dead || m.sub) continue;
       const d = Math.hypot(m.x - p.x, m.y - p.y);
       if (d > range || !lineOfSight(this.area.level, p, m)) continue;
       const ang = Math.abs(angleDiff(Math.atan2(m.y - p.y, m.x - p.x), p.facing));
@@ -723,6 +812,7 @@ export class World {
   portalPos(): Point | null {
     if (!this.portal) return null;
     if (this.inTown) {
+      if (areaAct(AREA_BY_ID[this.portal.area]) !== this.act) return null;
       const s = this.townPortalSpot();
       return { x: s.x + 0.5, y: s.y + 0.5 };
     }
@@ -780,7 +870,7 @@ export class World {
     let best: Monster | undefined;
     let bd = Infinity;
     for (const m of this.area.monsters) {
-      if (m.dead) continue;
+      if (m.dead || m.sub) continue;
       // Hit-test slightly above the feet where the body is drawn.
       const d = Math.min(Math.hypot(m.x - x, m.y - y), Math.hypot(m.x - 0.35 * m.def.scale - x, m.y - 0.35 * m.def.scale - y));
       if (d < m.def.radius + 0.55 && d < bd) (bd = d), (best = m);
@@ -846,7 +936,19 @@ export class World {
   }
 
   waypointList() {
-    return WAYPOINT_AREAS.map((id) => ({ id, name: AREA_BY_ID[id].name, active: this.char.waypoints.includes(this.wpKey(id)) }));
+    return WAYPOINT_AREAS.filter((id) => areaAct(AREA_BY_ID[id]) === 1 || this.roadSouthOpen).map((id) => ({
+      id, name: AREA_BY_ID[id].name, act: areaAct(AREA_BY_ID[id]), active: this.char.waypoints.includes(this.wpKey(id)),
+    }));
+  }
+
+  /** The caravan runs between the two towns once the road south is open. */
+  travelCaravan() {
+    const dest = this.act === 1 ? 'tel_maresh' : 'town';
+    const k = this.wpKey(dest);
+    if (!this.char.waypoints.includes(k)) this.char.waypoints.push(k);
+    this.sound('portal');
+    this.enterArea(dest, 'start');
+    if (dest === 'tel_maresh') this.tellOnce('arrive');
   }
 
   useWaypoint(id: string): boolean {
@@ -884,7 +986,7 @@ export class World {
       this.enterArea(dest, 'portal');
       this.portal = null;
     } else {
-      this.enterArea('town', 'portal');
+      this.enterArea(this.homeTown, 'portal');
     }
   }
 
@@ -1170,9 +1272,16 @@ export class World {
       this.msg(`Quest complete: ${QUEST_BY_ID.bishop.name} (+5 Stat Points)`, '#e8c860');
       this.sound('quest');
     }
-    if (this.questState('forge') === 'done') {
-      this.setQuest('forge', 'rewarded');
-      c.maxDifficulty = Math.max(c.maxDifficulty, Math.min(2, c.difficulty + 1));
+    if (this.questState('forge') === 'done') this.setQuest('forge', 'rewarded');
+    if (this.act === 2) {
+      for (const [id, skill, stat] of [['cistern', 1, 0], ['mesa', 0, 5], ['embalmer', 1, 0], ['hollow_sun', 0, 0]] as const) {
+        if (this.questState(id) !== 'done') continue;
+        c.skillPoints += skill;
+        c.statPoints += stat;
+        this.setQuest(id, 'rewarded');
+        this.msg(`Quest complete: ${QUEST_BY_ID[id].name} (${QUEST_BY_ID[id].reward})`, '#e8c860');
+        this.sound('quest');
+      }
     }
   }
 
@@ -1194,6 +1303,7 @@ export class World {
     this.updateMinions(dt);
     this.updateProjectiles(dt);
     this.updateHazards(dt);
+    this.updateStorm(dt);
     this.exploreT -= dt;
     if (this.exploreT <= 0) {
       this.exploreT = 0.2;
@@ -1207,13 +1317,13 @@ export class World {
     const r = Math.ceil(a.def.light + 2);
     const px = Math.floor(this.player.x);
     const py = Math.floor(this.player.y);
-    if (!force && a.def.id === 'town') return;
+    if (!force && a.def.town) return;
     for (let y = py - r; y <= py + r; y++)
       for (let x = px - r; x <= px + r; x++) {
         if (x < 0 || y < 0 || x >= l.w || y >= l.h) continue;
         if ((x - px) ** 2 + (y - py) ** 2 <= r * r) a.explored[y * l.w + x] = 1;
       }
-    if (a.def.id === 'town') a.explored.fill(1);
+    if (a.def.town) a.explored.fill(1);
   }
 
   private updatePlayer(dt: number) {
@@ -1266,7 +1376,7 @@ export class World {
       return;
     }
 
-    const speed = st.moveSpeed * (p.chill > 0 ? 0.6 : 1);
+    const speed = st.moveSpeed * (p.chill > 0 ? 0.6 : 1) * (this.inQuicksand(p) ? 0.6 : 1);
     p.moving = false;
     if (p.moveDir) {
       const len = Math.hypot(p.moveDir.x, p.moveDir.y);
@@ -1751,7 +1861,7 @@ export class World {
 
   monstersNear(x: number, y: number, r: number): Monster[] {
     return this.area.monsters
-      .filter((m) => !m.dead && Math.hypot(m.x - x, m.y - y) <= r + m.def.radius)
+      .filter((m) => !m.dead && !m.sub && Math.hypot(m.x - x, m.y - y) <= r + m.def.radius)
       .sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y));
   }
 
@@ -1770,7 +1880,7 @@ export class World {
   // ---------------------------------------------------------------- damage
 
   damageMonster(m: Monster, d: Damage, o: { ar?: number; chill?: number; stun?: number; knock?: { x: number; y: number; f: number }; crit?: boolean; leech?: boolean; minion?: Monster } = {}): boolean {
-    if (m.dead) return false;
+    if (m.dead || m.sub || m.invulnT) return false;
     this.alertPack(m);
     if (o.ar !== undefined && !this.rng.chance(hitChance(o.ar, m.def_, o.minion?.level ?? this.char.level, m.level))) {
       if (!o.minion) this.floatText(m.x, m.y, 'Miss', '#9a9a9a');
@@ -1787,7 +1897,14 @@ export class World {
       const len = Math.hypot(o.knock.x, o.knock.y) || 1;
       m.knock = { x: (o.knock.x / len) * o.knock.f * 8, y: (o.knock.y / len) * o.knock.f * 8 };
     }
-    m.life -= total;
+    let dealt = total;
+    if (m.shield && dealt > 0) {
+      const ab = Math.min(m.shield, dealt);
+      m.shield -= ab;
+      dealt -= ab;
+      if (ab >= 1 && !o.minion) this.floatText(m.x, m.y, String(Math.round(ab)), '#ffd870');
+    }
+    m.life -= dealt;
     m.flash = 0.12;
     if (!o.minion) this.setFocus(m);
     if (total > 0) {
@@ -1822,6 +1939,8 @@ export class World {
 
   private killMonster(m: Monster, how: DeathKind = 'normal') {
     const a = this.area;
+    if (m.illusion) return this.dispelIllusion(m);
+    for (const o of a.monsters) if (o.illusion && o.ownerId === m.id && !o.dead) this.dispelIllusion(o);
     m.dead = true;
     m.life = 0;
     m.deadT = 0;
@@ -1842,16 +1961,34 @@ export class World {
       this.sound('boom');
       if (Math.hypot(p.x - m.x, p.y - m.y) < 2.2) this.damagePlayer(elemDamage('fire', (m.dmgMin + m.dmgMax) * 0.8), { level: m.level });
     }
+    if (m.def.burst) {
+      const dmg = (m.dmgMin + m.dmgMax) * 0.35;
+      for (let i = 0; i < m.def.burst; i++) {
+        this.spawnProjectile({ x: m.x, y: m.y, ang: (i / m.def.burst) * TAU + m.facing, speed: 7, ttl: 0.8, owner: 'monster', dmg: elemDamage('phys', dmg), kind: 'm_glass', radius: 0.22, srcLevel: m.level, srcId: m.id });
+      }
+      this.sound('cold');
+    }
+    if (m.def.rises && !m.rose && !m.summoned && m.deathKind !== 'burn') {
+      this.addTimer(3.5, () => {
+        if (this.area !== a || !m.dead || m.used) return;
+        m.rose = true;
+        m.xp = 0;
+        m.summoned = true;
+        this.reviveMonster(m, 0.5);
+      });
+    }
     if (m.def.flees || m.def.id === 'imp') {
       // Imps lose their nerve when a packmate falls.
       for (const o of a.monsters) if (!o.dead && o.def.flees && Math.hypot(o.x - m.x, o.y - m.y) < 6 && this.rng.chance(0.7)) o.fleeT = this.rng.range(1.5, 3);
     }
-    if (m.superId && a.def.quest && (m.superId === 'bishop' || m.superId === 'mother')) {
+    if (m.superId && a.def.quest && ['bishop', 'mother', 'skarn', 'karrik', 'embalmer', 'corvin'].includes(m.superId)) {
       if (this.questState(a.def.quest) !== 'rewarded' && this.questState(a.def.quest) !== 'done') {
         this.setQuest(a.def.quest, 'done');
         this.msg(`${m.name} has been slain!`, '#e8c860');
         this.sound('quest');
-        if (m.superId === 'mother') {
+        if (m.superId === 'mother') this.tellOnce('forge_end');
+        if (m.superId === 'embalmer') this.tellOnce('vizier');
+        if (m.superId === 'corvin') {
           this.char.maxDifficulty = Math.max(this.char.maxDifficulty, Math.min(2, this.char.difficulty + 1));
           this.emit({ type: 'victory' });
         }
@@ -1981,7 +2118,7 @@ export class World {
     this.refreshStats();
     p.life = this.stats.maxLife;
     p.mana = this.stats.maxMana;
-    this.enterArea('town', 'start');
+    this.enterArea(this.homeTown, 'start');
     if (lost) this.msg(`You lost ${lost} gold`, '#ff8a6a');
   }
 
@@ -2032,6 +2169,8 @@ export class World {
       }
       if (m.flash > 0) m.flash -= dt;
       if (m.curse && m.curse.t > 0) m.curse.t -= dt;
+      if (m.shieldT && (m.shieldT -= dt) <= 0) m.shield = m.shieldT = 0;
+      if (m.invulnT && (m.invulnT -= dt) <= 0) m.invulnT = 0;
       if (Math.abs(m.x - p.x) > 32 || Math.abs(m.y - p.y) > 32) continue;
       if (m.poison.t > 0) {
         m.poison.t -= dt;
@@ -2064,11 +2203,19 @@ export class World {
       const dy = tgt.y - m.y;
       const d = Math.hypot(dx, dy) || 0.001;
       if (!m.alert && !safe) {
-        const aggro = foe ? 5 : m.rarity === 'boss' ? 9 : 7.5;
+        // Monsters can't see far through a sandstorm either.
+        const aggro = (foe ? 5 : m.rarity === 'boss' ? 9 : 7.5) * (1 - 0.4 * this.storm);
         if (d < aggro && lineOfSight(l, m, tgt)) {
           this.alertPack(m);
           if (m.rarity === 'boss') this.sound('roar');
         }
+      }
+      if (m.superId === 'corvin' && m.alert) this.tellOnce('corvin');
+      if (m.invulnT) continue;
+      if (m.def.phases && !m.illusion && this.advancePhase(m)) continue;
+      if (m.sub) {
+        this.updateBurrow(m, dt, tgt);
+        continue;
       }
       if (m.action) {
         this.updateMonsterAction(m, dt * slow);
@@ -2082,14 +2229,29 @@ export class World {
         this.wander(m, dt);
         continue;
       }
-      const speed = m.speed * slow;
+      const speed = m.speed * slow * (m.def.ai !== 'bat' && this.inQuicksand(m) ? 0.6 : 1);
+      if (m.def.mirage && !m.split && !m.illusion) {
+        m.split = true;
+        this.spawnIllusions(m, 2);
+      }
+      if (m.def.ai === 'burrow' && m.abilityCd <= 0 && d < 9) {
+        m.sub = 1.8;
+        m.abilityCd = this.rng.range(5, 7);
+        continue;
+      }
+      if (m.def.support && m.abilityCd <= 0 && this.wardAlly(m)) continue;
+      if (m.def.feeds && m.abilityCd <= 0 && this.feedOnCorpse(m, dt, speed)) continue;
+      if (m.def.slam && m.abilityCd <= 0 && d < 4.5 && !m.illusion) {
+        this.slam(m, tgt);
+        continue;
+      }
       if (m.fleeT > 0) {
         this.moveEntity(m, (-dx / d) * speed * dt, (-dy / d) * speed * dt, m.def.radius);
         m.facing = Math.atan2(-dy, -dx);
         m.walk += dt * speed;
         continue;
       }
-      if (m.def.ai === 'boss' && m.abilityCd <= 0 && dp < 11 && lineOfSight(l, m, p)) {
+      if (m.def.ai === 'boss' && !m.illusion && m.abilityCd <= 0 && dp < 11 && lineOfSight(l, m, p)) {
         this.bossAbility(m, dp);
         continue;
       }
@@ -2215,6 +2377,7 @@ export class World {
     const act = m.action!;
     const p = this.player;
     act.t += dt;
+    if (!act.done && act.t >= act.hitAt && m.illusion) act.done = true;
     if (!act.done && act.t >= act.hitAt) {
       act.done = true;
       const foe = m.foe !== undefined ? this.minions.find((mi) => mi.id === m.foe && !mi.dead) : undefined;
@@ -2265,13 +2428,17 @@ export class World {
   }
 
   private bossAbility(m: Monster, d: number) {
-    const abilities = m.def.abilities ?? [];
+    const abilities = m.abilities ?? m.def.abilities ?? [];
     const pick = this.rng.pick(abilities);
     const p = this.player;
     m.abilityCd = this.rng.range(4, 7);
     const dmg = (el: Element, k = 1) => elemDamage(el, roll(this.rng, m.dmgMin, m.dmgMax) * k);
     // Telegraph the big moves with a flash in their colour.
-    const flash = { nova_fire: '#ff6020', nova_cold: '#60b0ff', fire_spread: '#ff8030', meteor_rain: '#ff3010', summon_imps: '#b040ff', summon_skeletons: '#b040ff', charge: '' }[pick];
+    const flash = ({
+      nova_fire: '#ff6020', nova_cold: '#60b0ff', fire_spread: '#ff8030', meteor_rain: '#ff3010', summon_imps: '#b040ff', summon_skeletons: '#b040ff', charge: '',
+      poison_spray: '#70c030', summon_scarabs: '#40b0a0', burrow_strike: '', summon_kites: '#806050', corpse_feast: '#a02020', sun_lance: '#ffc040',
+      summon_mummies: '#d8c890', raise_dead: '#d8c890', mirage_split: '#ffe0a0', summon_acolytes: '#ffc040', noon_burst: '#fff0c0',
+    } satisfies Record<BossAbility, string>)[pick];
     if (flash) this.emit({ type: 'flash', color: flash, a: 0.22 });
     switch (pick) {
       case 'nova_fire':
@@ -2298,8 +2465,12 @@ export class World {
         break;
       }
       case 'summon_imps':
-      case 'summon_skeletons': {
-        const kind = pick === 'summon_imps' ? 'imp' : 'skeleton';
+      case 'summon_skeletons':
+      case 'summon_scarabs':
+      case 'summon_kites':
+      case 'summon_mummies':
+      case 'summon_acolytes': {
+        const kind = { summon_imps: 'imp', summon_skeletons: 'skeleton', summon_scarabs: 'scarab', summon_kites: 'kite', summon_mummies: 'mummy', summon_acolytes: 'acolyte' }[pick];
         const alive = this.area.monsters.filter((o) => !o.dead && o.summoned && !o.def.abilities).length;
         if (alive >= 8) {
           m.abilityCd = 1;
@@ -2324,6 +2495,66 @@ export class World {
         this.sound('roar');
         break;
       }
+      case 'poison_spray': {
+        const base = Math.atan2(p.y - m.y, p.x - m.x);
+        for (let i = -3; i <= 3; i++) {
+          this.spawnProjectile({ x: m.x, y: m.y, ang: base + i * 0.17, speed: 7.5, ttl: 1.5, owner: 'monster', dmg: dmg('poison', 0.8), kind: 'm_poison', radius: 0.3, srcLevel: m.level, srcId: m.id });
+        }
+        this.sound('cold');
+        break;
+      }
+      case 'burrow_strike':
+        m.sub = 1.5;
+        m.subStrike = true;
+        m.abilityCd = this.rng.range(6, 9);
+        break;
+      case 'corpse_feast': {
+        const corpses = this.area.monsters.filter((o) => o.dead && !o.used && !o.illusion && Math.hypot(o.x - m.x, o.y - m.y) < 10).slice(0, 8);
+        if (!corpses.length) {
+          m.abilityCd = 1;
+          break;
+        }
+        for (const o of corpses) {
+          o.used = true;
+          this.fx({ kind: 'gore', x: o.x, y: o.y, dur: 0.6 });
+        }
+        m.life = Math.min(m.maxLife, m.life + m.maxLife * 0.05 * corpses.length);
+        this.floatText(m.x, m.y, 'Feasts', '#d04040', 18);
+        this.sound('roar');
+        break;
+      }
+      case 'sun_lance': {
+        const ang = Math.atan2(p.y - m.y, p.x - m.x);
+        for (let i = 1; i <= 8; i++) {
+          const x = m.x + Math.cos(ang) * i * 1.2;
+          const y = m.y + Math.sin(ang) * i * 1.2;
+          if (!isWalkable(this.area.level, x, y)) break;
+          const delay = 0.75 + i * 0.05;
+          this.area.hazards.push({ x, y, t: 0, delay, dur: 0.05, radius: 1, dmg: dmg('fire', 0.5), owner: 'monster', burnDps: 0, srcLevel: m.level, fired: false, quiet: true });
+          this.fx({ kind: 'meteor_mark', x, y, dur: delay, r: 1 });
+        }
+        this.sound('fire');
+        break;
+      }
+      case 'raise_dead': {
+        const dead = this.area.monsters.filter((o) => o.dead && !o.used && o.def.id === 'mummy' && Math.hypot(o.x - m.x, o.y - m.y) < 10).slice(0, 5);
+        if (!dead.length) {
+          m.abilityCd = 1;
+          break;
+        }
+        for (const o of dead) {
+          o.summoned = true;
+          o.xp = 0;
+          this.reviveMonster(o, 0.6);
+        }
+        break;
+      }
+      case 'mirage_split':
+        this.spawnIllusions(m, 2);
+        break;
+      case 'noon_burst':
+        this.noonBurst(m);
+        break;
       case 'meteor_rain': {
         for (let i = 0; i < 3; i++) {
           const x = p.x + this.rng.range(-2.5, 2.5);
@@ -2335,6 +2566,187 @@ export class World {
         break;
       }
     }
+  }
+
+  /** Enters the next boss phase once life has fallen far enough. Returns true while transforming. */
+  private advancePhase(m: Monster): boolean {
+    const next = m.def.phases![m.phase ?? 0];
+    if (!next || m.life / m.maxLife > next.at) return false;
+    m.phase = (m.phase ?? 0) + 1;
+    m.abilities = next.abilities;
+    if (next.shape) m.shape = next.shape;
+    if (next.color) m.color = next.color;
+    if (next.name) m.name = next.name;
+    m.action = null;
+    m.charge = undefined;
+    m.invulnT = 1.6;
+    m.abilityCd = 2;
+    this.msg(next.line, '#ffd870');
+    this.fx({ kind: 'revive', x: m.x, y: m.y, dur: 1.2 });
+    this.emit({ type: 'flash', color: m.color ?? m.def.color, a: 0.35 });
+    this.emit({ type: 'shake', amount: 10 });
+    this.sound('roar');
+    return true;
+  }
+
+  private updateBurrow(m: Monster, dt: number, tgt: { x: number; y: number }) {
+    const before = m.sub!;
+    m.sub = before - dt;
+    const WARNING = 0.6;
+    const strike = !!m.subStrike;
+    if (before > WARNING) {
+      const dx = tgt.x - m.x;
+      const dy = tgt.y - m.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const sp = m.speed * (strike ? 3 : 2) * dt;
+      if (d > 0.4) this.moveEntity(m, (dx / d) * sp, (dy / d) * sp, m.def.radius);
+      if (Math.floor(before * 9) !== Math.floor(m.sub * 9)) this.fx({ kind: 'dust', x: m.x, y: m.y, dur: 0.7 });
+      if (m.sub <= WARNING) this.fx({ kind: 'meteor_mark', x: m.x, y: m.y, dur: WARNING, r: strike ? 2.2 : 1.6 });
+    }
+    if (m.sub > 0) return;
+    m.sub = undefined;
+    m.subStrike = undefined;
+    m.atkCd = 0.7;
+    const r = strike ? 2.2 : 1.6;
+    this.fx({ kind: 'slam', x: m.x, y: m.y, dur: 0.45, r });
+    this.fx({ kind: 'dust', x: m.x, y: m.y, dur: 0.9 });
+    this.emit({ type: 'shake', amount: strike ? 9 : 5 });
+    this.sound('boom');
+    const dmg = elemDamage(m.def.element ?? 'phys', roll(this.rng, m.dmgMin, m.dmgMax) * (strike ? 1.6 : 1.25));
+    const p = this.player;
+    if (Math.hypot(p.x - m.x, p.y - m.y) < r + 0.3) this.damagePlayer(dmg, { level: m.level });
+    for (const mi of this.minions) if (!mi.dead && Math.hypot(mi.x - m.x, mi.y - m.y) < r + mi.def.radius) this.damageMinion(mi, dmg, { level: m.level });
+  }
+
+  /** Puts a shield on a nearby ally. The caster has to die first or the ward keeps coming. */
+  private wardAlly(m: Monster): boolean {
+    const ally = this.area.monsters.find((o) => !o.dead && o !== m && !o.illusion && !o.shield && o.alert && Math.hypot(o.x - m.x, o.y - m.y) < 7);
+    if (!ally) return false;
+    ally.shield = ally.maxLife * 0.45;
+    ally.shieldT = 7;
+    m.abilityCd = this.rng.range(3.5, 5.5);
+    this.fx({ kind: 'revive', x: ally.x, y: ally.y, dur: 0.6 });
+    this.sound('portal');
+    return true;
+  }
+
+  private feedOnCorpse(m: Monster, dt: number, speed: number): boolean {
+    const near = this.area.monsters.filter((o) => o.dead && !o.used && !o.illusion && o.deadT > 0.4 && Math.hypot(o.x - m.x, o.y - m.y) < 6);
+    if (!near.length) return false;
+    const c = near.reduce((a, b) => (Math.hypot(a.x - m.x, a.y - m.y) <= Math.hypot(b.x - m.x, b.y - m.y) ? a : b));
+    const dx = c.x - m.x;
+    const dy = c.y - m.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 0.6) {
+      c.used = true;
+      m.life = Math.min(m.maxLife, m.life + m.maxLife * 0.4);
+      m.abilityCd = 3;
+      this.fx({ kind: 'gore', x: c.x, y: c.y, dur: 0.6 });
+      return true;
+    }
+    this.moveEntity(m, (dx / d) * speed * dt, (dy / d) * speed * dt, m.def.radius);
+    m.facing = Math.atan2(dy, dx);
+    m.walk += dt * speed;
+    return true;
+  }
+
+  private slam(m: Monster, tgt: { x: number; y: number }) {
+    const delay = 0.95;
+    this.area.hazards.push({ x: tgt.x, y: tgt.y, t: 0, delay, dur: 0.05, radius: 2, dmg: elemDamage('phys', roll(this.rng, m.dmgMin, m.dmgMax) * 1.5), owner: 'monster', burnDps: 0, srcLevel: m.level, fired: false });
+    this.fx({ kind: 'meteor_mark', x: tgt.x, y: tgt.y, dur: delay, r: 2 });
+    m.action = { t: 0, hitAt: delay, dur: delay + 0.2, done: true, kind: 'melee' };
+    m.facing = Math.atan2(tgt.y - m.y, tgt.x - m.x);
+    m.abilityCd = this.rng.range(4.5, 6.5);
+  }
+
+  private spawnIllusions(m: Monster, n: number) {
+    const a = this.area;
+    for (let i = 0; i < n; i++) {
+      const ang = this.rng.range(0, TAU);
+      const s = nearestFloor(a.level, { x: m.x + Math.cos(ang) * 2.5, y: m.y + Math.sin(ang) * 2.5 });
+      const c = this.spawnMonster(a, m.def.id, s.x + 0.5, s.y + 0.5, m.rarity, { packId: m.packId, level: m.level, name: m.name });
+      Object.assign(c, { illusion: true, ownerId: m.id, split: true, summoned: true, alert: true, life: 1, maxLife: 1, xp: 0, shape: m.shape, color: m.color });
+      this.fx({ kind: 'teleport', x: c.x, y: c.y, dur: 0.5 });
+    }
+    this.sound('portal');
+  }
+
+  private dispelIllusion(m: Monster) {
+    m.dead = true;
+    m.life = 0;
+    m.used = true;
+    m.action = null;
+    m.deadT = 99;
+    this.fx({ kind: 'teleport', x: m.x, y: m.y, dur: 0.4 });
+  }
+
+  private reviveMonster(m: Monster, lifeK: number) {
+    m.dead = false;
+    m.deadT = 0;
+    m.deathKind = undefined;
+    m.life = m.maxLife * lifeK;
+    m.alert = true;
+    m.action = null;
+    this.fx({ kind: 'revive', x: m.x, y: m.y, dur: 0.7 });
+    this.sound('fire');
+  }
+
+  /** Three pools of shade appear. A moment later, the noon burns anyone outside them. */
+  private noonBurst(m: Monster) {
+    const a = this.area;
+    const p = this.player;
+    const R = 2;
+    const DELAY = 2.7;
+    m.abilityCd = 8;
+    // Measured by walking distance: a pool behind a wall could never be reached in time.
+    const l = a.level;
+    const dist = floodDistances(l, Math.floor(p.x), Math.floor(p.y));
+    const reachable: Point[] = [];
+    for (let y = 0; y < l.h; y++)
+      for (let x = 0; x < l.w; x++) {
+        const d = dist[idx(l, x, y)];
+        if (d >= 3 && d <= 8) reachable.push({ x: x + 0.5, y: y + 0.5 });
+      }
+    const spots: Point[] = [];
+    for (const s of this.rng.shuffle(reachable)) {
+      if (spots.every((o) => Math.hypot(o.x - s.x, o.y - s.y) > R * 1.8)) spots.push(s);
+      if (spots.length === 3) break;
+    }
+    if (!spots.length) spots.push({ x: p.x, y: p.y });
+    for (const s of spots) this.fx({ kind: 'shade_mark', ...s, dur: DELAY, r: R });
+    this.msg('Find the shade!', '#ffd870', 'noon');
+    this.sound('roar');
+    this.addTimer(DELAY, () => {
+      if (m.dead || this.area !== a || p.dead) return;
+      this.emit({ type: 'flash', color: '#fff4d0', a: 0.7 });
+      this.emit({ type: 'shake', amount: 12 });
+      this.sound('boom');
+      if (!spots.some((s) => Math.hypot(s.x - p.x, s.y - p.y) < R + 0.3)) this.damagePlayer(elemDamage('fire', this.stats.maxLife * 0.6), { level: m.level });
+    });
+  }
+
+  private inQuicksand(e: { x: number; y: number }) {
+    const l = this.area.level;
+    return l.slow.size > 0 && l.slow.has(idx(l, Math.floor(e.x), Math.floor(e.y)));
+  }
+
+  private updateStorm(dt: number) {
+    let target = 0;
+    if (this.area.def.storm) {
+      if (this.stormLeft > 0) {
+        this.stormLeft -= dt;
+        if (this.stormLeft <= 0) this.stormIn = this.rng.range(35, 70);
+        else target = 1;
+      } else {
+        this.stormIn -= dt;
+        if (this.stormIn <= 0) {
+          this.stormLeft = this.rng.range(12, 20);
+          this.msg('A sandstorm rolls in', '#e0c080', 'storm');
+          target = 1;
+        }
+      }
+    }
+    this.storm += Math.max(-dt / 2.5, Math.min(dt / 2.5, target - this.storm));
   }
 
   private updateCharge(m: Monster, dt: number) {
@@ -2377,7 +2789,7 @@ export class World {
       }
       if (pr.owner === 'player') {
         for (const m of a.monsters) {
-          if (m.dead || pr.hit.has(m.id)) continue;
+          if (m.dead || m.sub || pr.hit.has(m.id)) continue;
           if (Math.hypot(m.x - pr.x, m.y - pr.y) > m.def.radius + pr.radius) continue;
           pr.hit.add(m.id);
           if (pr.explode) {
@@ -2523,7 +2935,7 @@ export class World {
         mi.wanderT = 0.6;
         let bd = foe ? Math.hypot(foe.x - mi.x, foe.y - mi.y) - 1 : 7;
         for (const m of this.area.monsters) {
-          if (m.dead || Math.abs(m.x - mi.x) > bd || Math.abs(m.y - mi.y) > bd) continue;
+          if (m.dead || m.sub || Math.abs(m.x - mi.x) > bd || Math.abs(m.y - mi.y) > bd) continue;
           const d = Math.hypot(m.x - mi.x, m.y - mi.y);
           if (d < bd && Math.hypot(m.x - p.x, m.y - p.y) < 10 && lineOfSight(l, mi, m)) (bd = d), (foe = m);
         }
@@ -2607,8 +3019,10 @@ export class World {
       if (!h.fired && h.t >= h.delay) {
         h.fired = true;
         this.fx({ kind: 'explosion', x: h.x, y: h.y, dur: 0.6, r: h.radius });
-        this.emit({ type: 'shake', amount: 7 });
-        this.sound('boom');
+        if (!h.quiet) {
+          this.emit({ type: 'shake', amount: 7 });
+          this.sound('boom');
+        }
         if (h.owner === 'player') for (const m of this.monstersNear(h.x, h.y, h.radius)) this.damageMonster(m, h.dmg, {});
         else if (Math.hypot(p.x - h.x, p.y - h.y) < h.radius) this.damagePlayer(h.dmg, { level: h.srcLevel });
       }

@@ -4,7 +4,7 @@ export const VOID = 0;
 export const FLOOR = 1;
 export const WALL = 2;
 
-export type ThemeId = 'town' | 'fields' | 'cave' | 'forest' | 'chapel' | 'crypt' | 'hell';
+export type ThemeId = 'town' | 'fields' | 'cave' | 'forest' | 'chapel' | 'crypt' | 'hell' | 'oasis' | 'desert' | 'glass' | 'mesa' | 'cistern' | 'ruins' | 'vault';
 export type ExitKind = 'path' | 'down' | 'up';
 
 export interface Point {
@@ -25,7 +25,9 @@ export interface Exit extends Point {
   kind: ExitKind;
 }
 
-export type PropKind = 'torch' | 'bones' | 'pillar' | 'tent' | 'campfire' | 'grave' | 'brazier' | 'banner' | 'lava';
+export type PropKind =
+  | 'torch' | 'bones' | 'pillar' | 'tent' | 'campfire' | 'grave' | 'brazier' | 'banner' | 'lava'
+  | 'scrub' | 'shards' | 'urn' | 'quicksand' | 'well';
 export interface Prop extends Point {
   kind: PropKind;
 }
@@ -49,6 +51,8 @@ export interface Level {
   rooms: Rect[];
   /** Named spots for handcrafted maps (town NPCs, boss lair). */
   spots: Record<string, Point>;
+  /** Tile indexes of quicksand, which slows anything walking through it. */
+  slow: Set<number>;
 }
 
 export interface LinkSpec {
@@ -98,6 +102,7 @@ function newLevel(w: number, h: number, theme: ThemeId, fill: number): Level {
     objects: [],
     rooms: [],
     spots: {},
+    slow: new Set(),
   };
 }
 
@@ -358,11 +363,18 @@ function finishLevel(l: Level, spec: LevelSpec, rng: Rng, entry: Point, exitPts:
   }
   // Decorations and interactables.
   const decorKinds: PropKind[] =
-    l.theme === 'fields' || l.theme === 'forest' ? ['bones', 'grave'] : l.theme === 'hell' ? ['bones', 'lava'] : ['bones', 'torch'];
+    l.theme === 'fields' || l.theme === 'forest' ? ['bones', 'grave']
+    : l.theme === 'hell' ? ['bones', 'lava']
+    : l.theme === 'desert' || l.theme === 'mesa' ? ['bones', 'scrub', 'scrub']
+    : l.theme === 'glass' ? ['shards', 'shards', 'bones']
+    : l.theme === 'ruins' ? ['bones', 'urn', 'torch']
+    : l.theme === 'vault' ? ['urn', 'shards', 'torch']
+    : ['bones', 'torch'];
   for (const p of rng.shuffle(floors.slice()).slice(0, Math.floor(floors.length / 45))) {
     if (nearExit(p, 3)) continue;
     l.props.push({ x: p.x, y: p.y, kind: rng.pick(decorKinds) });
   }
+  if (l.theme === 'desert' || l.theme === 'glass') addQuicksand(l, rng, floors, nearExit);
   const objCount = Math.floor(floors.length / 140);
   let shrines = 0;
   for (const p of rng.shuffle(floors.filter((f) => wallNeighbors(l, f.x, f.y) >= 2 && dist[idx(l, f.x, f.y)] > 6)).slice(0, objCount)) {
@@ -374,8 +386,25 @@ function finishLevel(l: Level, spec: LevelSpec, rng: Rng, entry: Point, exitPts:
   }
 }
 
+/** Scatters patches of quicksand, kept clear of exits and the waypoint so arrivals are never bogged down. */
+function addQuicksand(l: Level, rng: Rng, floors: Point[], nearExit: (p: Point, r: number) => boolean) {
+  const taken = new Set(l.props.map((p) => idx(l, p.x, p.y)));
+  for (const c of rng.shuffle(floors.slice()).slice(0, Math.floor(floors.length / 220))) {
+    if (nearExit(c, 6) || (l.waypoint && Math.abs(l.waypoint.x - c.x) + Math.abs(l.waypoint.y - c.y) < 5)) continue;
+    const r = rng.range(1.2, 2.3);
+    for (let y = Math.floor(c.y - r); y <= Math.ceil(c.y + r); y++)
+      for (let x = Math.floor(c.x - r); x <= Math.ceil(c.x + r); x++) {
+        const i = idx(l, x, y);
+        if ((x - c.x) ** 2 + (y - c.y) ** 2 > r * r || l.tiles[i] !== FLOOR || taken.has(i)) continue;
+        taken.add(i);
+        l.slow.add(i);
+        l.props.push({ x, y, kind: 'quicksand' });
+      }
+  }
+}
+
 function genTown(spec: LevelSpec): Level {
-  const l = newLevel(spec.w, spec.h, 'town', WALL);
+  const l = newLevel(spec.w, spec.h, spec.theme, WALL);
   setRect(l, { x: 3, y: 3, w: l.w - 6, h: l.h - 6 }, FLOOR);
   const cx = Math.floor(l.w / 2);
   const cy = Math.floor(l.h / 2);
@@ -385,7 +414,7 @@ function genTown(spec: LevelSpec): Level {
     l.tiles[idx(l, x, y)] = WALL;
     l.props.push({ x, y, kind });
   };
-  block(cx, cy, 'campfire');
+  block(cx, cy, spec.theme === 'oasis' ? 'well' : 'campfire');
   block(cx - 7, cy - 6, 'tent');
   block(cx + 6, cy - 7, 'tent');
   block(cx - 8, cy + 5, 'tent');
@@ -398,6 +427,7 @@ function genTown(spec: LevelSpec): Level {
     sage: { x: cx - 3, y: cy + 3 },
     fence: { x: cx + 5, y: cy + 5 },
     stash: { x: cx + 2, y: cy - 2 },
+    caravan: { x: cx + 10, y: cy + 2 },
   };
   l.waypoint = { x: cx - 2, y: cy - 2 };
   l.start = { x: cx + 2, y: cy + 3 };

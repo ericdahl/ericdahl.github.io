@@ -37,6 +37,9 @@ const PHRYGIAN = [0, 1, 3, 5, 7, 8, 10];
 const HARMONIC = [0, 2, 3, 5, 7, 8, 11];
 const LOCRIAN = [0, 1, 3, 5, 6, 8, 10];
 const HELLISH = [0, 1, 4, 5, 6, 8, 10];
+/** The augmented second gives Act 2 its sound. */
+const DESERT = [0, 1, 4, 5, 7, 8, 10];
+const DESERT_MINOR = [0, 2, 3, 6, 7, 8, 11];
 
 export const MOODS: Record<string, Mood> = {
   town: {
@@ -66,6 +69,34 @@ export const MOODS: Record<string, Mood> = {
   hell: {
     root: 33, scale: HELLISH, bpm: 72, melody: 0.2, voice: 'bow', octave: 2, pad: 0.6, padVoice: 'saw', bells: 0.04, drone: 1, drumFloor: 0.35,
     chords: [0, 1, 4, 1], ambient: [{ kind: 'rumble', every: 6 }, { kind: 'crackle', every: 1.2 }],
+  },
+  oasis: {
+    root: 52, scale: DESERT, bpm: 74, melody: 0.5, voice: 'pluck', octave: 1, pad: 0.45, padVoice: 'saw', bells: 0.03, drone: 0.45, drumFloor: 0.08,
+    chords: [0, 1, 0, 6], ambient: [{ kind: 'wind', every: 12 }],
+  },
+  desert: {
+    root: 40, scale: DESERT, bpm: 62, melody: 0.3, voice: 'pluck', octave: 2, pad: 0.55, padVoice: 'saw', bells: 0.02, drone: 0.9, drumFloor: 0.1,
+    chords: [0, 1, 5, 1], ambient: [{ kind: 'wind', every: 5 }],
+  },
+  glass: {
+    root: 42, scale: DESERT_MINOR, bpm: 48, melody: 0.16, voice: 'choir', octave: 2, pad: 0.75, padVoice: 'choir', bells: 0.2, drone: 0.75, drumFloor: 0,
+    chords: [0, 5, 1, 4], ambient: [{ kind: 'wind', every: 6 }, { kind: 'whisper', every: 20 }],
+  },
+  mesa: {
+    root: 38, scale: DESERT, bpm: 70, melody: 0.24, voice: 'bow', octave: 2, pad: 0.5, padVoice: 'saw', bells: 0.03, drone: 0.9, drumFloor: 0.18,
+    chords: [0, 1, 4, 1], ambient: [{ kind: 'wind', every: 7 }, { kind: 'rumble', every: 22 }],
+  },
+  cistern: {
+    root: 36, scale: DESERT_MINOR, bpm: 44, melody: 0.08, voice: 'bow', octave: 2, pad: 0.45, padVoice: 'saw', bells: 0.14, drone: 1, drumFloor: 0,
+    chords: [0, 1, 0, 5], ambient: [{ kind: 'drip', every: 1.8 }, { kind: 'whisper', every: 11 }],
+  },
+  ruins: {
+    root: 37, scale: DESERT, bpm: 54, melody: 0.14, voice: 'choir', octave: 1, pad: 0.7, padVoice: 'choir', bells: 0.1, drone: 0.85, drumFloor: 0.06,
+    chords: [0, 5, 1, 0], ambient: [{ kind: 'whisper', every: 10 }, { kind: 'bell_far', every: 26 }, { kind: 'rumble', every: 30 }],
+  },
+  vault: {
+    root: 34, scale: DESERT_MINOR, bpm: 78, melody: 0.22, voice: 'choir', octave: 2, pad: 0.8, padVoice: 'choir', bells: 0.12, drone: 1, drumFloor: 0.4,
+    chords: [0, 1, 4, 6], ambient: [{ kind: 'rumble', every: 5 }, { kind: 'whisper', every: 8 }],
   },
 };
 

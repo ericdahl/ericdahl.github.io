@@ -3,8 +3,10 @@ import type { Element } from './skills';
 
 export type MonsterShape =
   | 'imp' | 'hexer' | 'ghoul' | 'skeleton' | 'archer' | 'bat' | 'hound' | 'brute' | 'wraith' | 'cultist'
-  | 'glutton' | 'bishop' | 'warden' | 'mother';
-export type MonsterAI = 'melee' | 'ranged' | 'caster' | 'bat' | 'hexer' | 'boss';
+  | 'glutton' | 'bishop' | 'warden' | 'mother'
+  | 'scarab' | 'scorpion' | 'burrower' | 'kite' | 'mummy' | 'raider' | 'acolyte' | 'mirage' | 'colossus'
+  | 'corvin' | 'noon';
+export type MonsterAI = 'melee' | 'ranged' | 'caster' | 'bat' | 'hexer' | 'boss' | 'burrow';
 
 export interface Resists {
   phys: number;
@@ -14,7 +16,20 @@ export interface Resists {
   poison: number;
 }
 
-export type BossAbility = 'nova_fire' | 'nova_cold' | 'fire_spread' | 'summon_imps' | 'summon_skeletons' | 'charge' | 'meteor_rain';
+export type BossAbility =
+  | 'nova_fire' | 'nova_cold' | 'fire_spread' | 'summon_imps' | 'summon_skeletons' | 'charge' | 'meteor_rain'
+  | 'poison_spray' | 'summon_scarabs' | 'burrow_strike' | 'summon_kites' | 'corpse_feast' | 'sun_lance'
+  | 'summon_mummies' | 'raise_dead' | 'mirage_split' | 'summon_acolytes' | 'noon_burst';
+
+/** A boss stage, entered once life falls to `at` (0..1 of maximum). */
+export interface BossPhase {
+  at: number;
+  abilities: BossAbility[];
+  line: string;
+  name?: string;
+  shape?: MonsterShape;
+  color?: string;
+}
 
 export interface MonsterDef {
   id: string;
@@ -37,6 +52,21 @@ export interface MonsterDef {
   scale: number;
   color: string;
   abilities?: BossAbility[];
+  phases?: BossPhase[];
+  /** Bursts into this many shards when killed. */
+  burst?: number;
+  /** Gets back up once, unless burned to death or its corpse is used. */
+  rises?: boolean;
+  /** Wards nearby allies with an absorbing shield. */
+  support?: boolean;
+  /** Splits into harmless copies on first sight of the player. */
+  mirage?: boolean;
+  /** Dives on corpses to heal. */
+  feeds?: boolean;
+  /** Winds up a telegraphed ground slam. */
+  slam?: boolean;
+  /** Packs of this monster are led by one of it and followed by these. */
+  pack?: string;
 }
 
 const D = (d: Omit<MonsterDef, 'res' | 'scale'> & { res?: Partial<Resists>; scale?: number }): MonsterDef => ({ res: {}, scale: 1, ...d });
@@ -60,6 +90,35 @@ export const MONSTERS: Record<string, MonsterDef> = {
   raised_skeleton: D({ id: 'raised_skeleton', name: 'Skeleton', shape: 'skeleton', ai: 'melee', lifeMul: 0.9, dmgMul: 0.75, speed: 3.8, radius: 0.3, range: 0.55, attackRate: 1.2, xpMul: 0, undead: true, res: { poison: 50 }, color: '#ece6d2' }),
   grave_golem: D({ id: 'grave_golem', name: 'Grave Golem', shape: 'brute', ai: 'melee', lifeMul: 3.0, dmgMul: 1.0, speed: 3.6, radius: 0.5, range: 0.7, attackRate: 0.85, xpMul: 0, res: { poison: 100, phys: 10 }, scale: 1.2, color: '#6e5a44' }),
   mother: D({ id: 'mother', name: 'Vhorza, Mother of Cinders', shape: 'mother', ai: 'boss', lifeMul: 30, dmgMul: 2.6, speed: 2.3, radius: 0.9, range: 1.0, attackRate: 0.8, xpMul: 40, element: 'fire', missile: { element: 'fire', speed: 8, kind: 'm_fire' }, res: { fire: 75, poison: 30, light: 20, cold: 10 }, scale: 2.1, color: '#c23b1f', abilities: ['fire_spread', 'nova_fire', 'summon_imps', 'meteor_rain'] }),
+
+  // ------------------------------------------------------------ Act 2: The Glass Sea
+  jackal: D({ id: 'jackal', name: 'Dust Jackal', shape: 'hound', ai: 'melee', lifeMul: 0.8, dmgMul: 0.85, speed: 4.3, radius: 0.34, range: 0.45, attackRate: 1.6, xpMul: 0.95, res: { fire: 15 }, color: '#a8875a' }),
+  scarab: D({ id: 'scarab', name: 'Glass Scarab', shape: 'scarab', ai: 'melee', lifeMul: 0.42, dmgMul: 0.55, speed: 3.7, radius: 0.27, range: 0.4, attackRate: 1.4, xpMul: 0.65, burst: 5, res: { fire: 20, cold: -15 }, scale: 0.85, color: '#3fa6a0' }),
+  raider: D({ id: 'raider', name: 'Glassfoot Raider', shape: 'raider', ai: 'ranged', lifeMul: 0.85, dmgMul: 0.95, speed: 2.6, radius: 0.33, range: 8, attackRate: 0.75, xpMul: 1.2, missile: { element: 'phys', speed: 11.5, kind: 'm_arrow' }, color: '#8a6a44' }),
+  kite: D({ id: 'kite', name: 'Carrion Kite', shape: 'kite', ai: 'bat', lifeMul: 0.6, dmgMul: 0.75, speed: 4.2, radius: 0.3, range: 0.45, attackRate: 1.3, xpMul: 0.9, feeds: true, res: { poison: 30 }, color: '#4e4238' }),
+  scorpion: D({ id: 'scorpion', name: 'Cistern Scorpion', shape: 'scorpion', ai: 'melee', lifeMul: 1.15, dmgMul: 1.0, speed: 2.7, radius: 0.42, range: 0.6, attackRate: 1.0, xpMul: 1.2, element: 'poison', res: { poison: 75, phys: 10 }, color: '#5c4a2e' }),
+  burrower: D({ id: 'burrower', name: 'Dune Burrower', shape: 'burrower', ai: 'burrow', lifeMul: 1.6, dmgMul: 1.3, speed: 2.5, radius: 0.5, range: 0.7, attackRate: 0.85, xpMul: 1.7, res: { phys: 15, cold: -20 }, scale: 1.15, color: '#b08a58' }),
+  mirage: D({ id: 'mirage', name: 'Mirage Dancer', shape: 'mirage', ai: 'caster', lifeMul: 0.7, dmgMul: 1.05, speed: 2.8, radius: 0.33, range: 7, attackRate: 0.55, xpMul: 1.6, mirage: true, missile: { element: 'fire', speed: 9, kind: 'm_sun' }, res: { light: 30 }, color: '#d8a24a' }),
+  mummy: D({ id: 'mummy', name: 'Embalmed Dead', shape: 'mummy', ai: 'melee', lifeMul: 1.35, dmgMul: 1.05, speed: 1.8, radius: 0.36, range: 0.55, attackRate: 0.95, xpMul: 1.15, undead: true, rises: true, res: { poison: 100, fire: -30 }, color: '#c8b892' }),
+  acolyte: D({ id: 'acolyte', name: 'Noon Acolyte', shape: 'acolyte', ai: 'caster', lifeMul: 0.85, dmgMul: 0.9, speed: 2.3, radius: 0.33, range: 7, attackRate: 0.5, xpMul: 1.6, support: true, pack: 'mummy', missile: { element: 'fire', speed: 8, kind: 'm_sun' }, res: { fire: 40, light: 20 }, color: '#c08a2a' }),
+  colossus: D({ id: 'colossus', name: 'Salt Colossus', shape: 'colossus', ai: 'melee', lifeMul: 2.9, dmgMul: 1.9, speed: 1.55, radius: 0.58, range: 0.75, attackRate: 0.6, xpMul: 2.3, slam: true, res: { phys: 25, poison: 100, cold: 25 }, scale: 1.4, color: '#d8d4c8' }),
+  shade: D({ id: 'shade', name: 'Glassbound Shade', shape: 'wraith', ai: 'melee', lifeMul: 0.95, dmgMul: 1.0, speed: 2.9, radius: 0.34, range: 0.55, attackRate: 1.05, xpMul: 1.4, element: 'fire', undead: true, res: { phys: 40, fire: 40, poison: 100 }, color: '#e8b860' }),
+
+  skarn: D({ id: 'skarn', name: 'Skarn, Tyrant of the Cistern', shape: 'scorpion', ai: 'boss', lifeMul: 12, dmgMul: 1.7, speed: 2.5, radius: 0.85, range: 0.9, attackRate: 0.9, xpMul: 14, element: 'poison', res: { poison: 75, phys: 20 }, scale: 2.2, color: '#3e6a32',
+    abilities: ['poison_spray', 'summon_scarabs'],
+    phases: [{ at: 0.5, abilities: ['poison_spray', 'summon_scarabs', 'burrow_strike'], line: 'Skarn tears down into the stone!' }] }),
+  karrik: D({ id: 'karrik', name: 'Karrik, the Carrion King', shape: 'kite', ai: 'boss', lifeMul: 14, dmgMul: 1.9, speed: 3.2, radius: 0.75, range: 0.8, attackRate: 1.0, xpMul: 16, res: { poison: 40, light: -15 }, scale: 2.5, color: '#3a2f2a',
+    abilities: ['charge', 'summon_kites'],
+    phases: [{ at: 0.55, abilities: ['charge', 'summon_kites', 'corpse_feast'], line: 'Karrik shrieks for carrion!' }] }),
+  embalmer: D({ id: 'embalmer', name: 'Vizier Ohm-Tet, the Embalmer', shape: 'mummy', ai: 'boss', lifeMul: 16, dmgMul: 1.75, speed: 2.1, radius: 0.6, range: 6.5, attackRate: 0.75, xpMul: 20, undead: true, element: 'fire', missile: { element: 'fire', speed: 8, kind: 'm_sun' }, res: { poison: 100, fire: 20, phys: 15 }, scale: 1.75, color: '#d8c068',
+    abilities: ['summon_mummies', 'sun_lance'],
+    phases: [{ at: 0.5, abilities: ['summon_mummies', 'raise_dead', 'sun_lance', 'nova_fire'], line: '"Rise. Rise, all of you. The Queen has need of us."' }] }),
+  corvin: D({ id: 'corvin', name: 'Old Corvin', shape: 'corvin', ai: 'boss', lifeMul: 28, dmgMul: 1.9, speed: 2.5, radius: 0.5, range: 7, attackRate: 0.85, xpMul: 50, element: 'cold', missile: { element: 'cold', speed: 9, kind: 'm_cold' }, res: { fire: 30, cold: 30, light: 30, poison: 20 }, scale: 1.3, color: '#4a5068',
+    abilities: ['nova_cold', 'mirage_split', 'sun_lance'],
+    phases: [
+      { at: 0.62, name: 'Corvane, Noon-Risen', shape: 'noon', color: '#e8a838', abilities: ['sun_lance', 'nova_fire', 'meteor_rain', 'summon_acolytes'], line: '"Enough of the old man. Look upon a Dialist of Imhara."' },
+      { at: 0.28, name: 'Corvane, the Hollow Sun', shape: 'noon', color: '#fff0b0', abilities: ['noon_burst', 'sun_lance', 'meteor_rain', 'noon_burst'], line: '"It is noon. It is always noon. Find what shade you can."' },
+    ] }),
 };
 
 export type MonsterRarity = 'normal' | 'champion' | 'unique' | 'minion' | 'boss';

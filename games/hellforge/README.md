@@ -34,7 +34,8 @@ Panels pause the game.
 - **Loot.** Items drop as normal, socketed (grey), magic (blue), rare (yellow), set (green) or unique (gold). Magic and better items drop unidentified; the sage identifies them for free. Gems in seven types and five grades go into sockets, with different effects in weapons, armor and shields. Your inventory is a grid where items take up space by size. Magic find improves your odds.
 - **Monsters.** Imps that flee when a packmate dies and Hexers that raise them again, ghouls, skeletons, archers, bats, hounds, brutes, wraiths and cultists. Champion packs (blue) and uniques with modifiers like Fire Enchanted, Stone Skin and Extra Fast (gold). Bosses: Gorvath the Glutton, the Drowned Bishop, Ossuary Warden Krell, and Vhorza, Mother of Cinders.
 - **The world.** Emberwatch Camp (healer, blacksmith, sage, gambler, stash) and seven randomly generated areas: Cinder Fields, Hollow Cave, Gloomwood, Sunken Chapel, Catacombs 1-2 and the Hellforge. Activate waypoints to fast-travel, and cast Town Portal to restock and come back. Shrines, chests and (occasionally explosive) barrels are scattered around.
-- **Quests.** Cleanse the Hollow Cave (+1 skill point), slay the Drowned Bishop (+5 stat points), and destroy the Mother of Cinders to unlock **Nightmare**, then **Hell**: tougher monsters, immunities and resistance penalties.
+- **Act 2: The Glass Sea.** Killing Vhorza opens a caravan to Tel Maresh and seven more areas: the Ashfall Road, Cistern of Whispers, the Glass Sea, Carrion Mesa, Buried Imhara (the Bazaar and the Hall of Dials) and the Noon Vault. Sandstorms and quicksand change how the desert plays, the new monsters each have a rule to learn (Embalmed Dead rise unless burned, Mirage Dancers split into copies with no shadow, Noon Acolytes ward their allies, Dune Burrowers tunnel to you, Carrion Kites heal on corpses, Salt Colossi telegraph ground slams), and the four bosses change phase as they are wounded.
+- **Quests.** Cleanse the Hollow Cave (+1 skill point), slay the Drowned Bishop (+5 stat points), destroy the Mother of Cinders to open the road south, then finish Act 2's four quests to unlock **Nightmare**, then **Hell**: tougher monsters, immunities and resistance penalties.
 - **Hardcore** heroes die permanently. Softcore heroes respawn in town and lose some gold.
 
 Music, ambient sound and weather are all generated in code too; the menu has switches for each.
@@ -47,6 +48,7 @@ The version is shown at the bottom of the title screen; tap it for the player-fa
 
 | Version | Commit | Notes |
 |---|---|---|
+| 0.9.0 | | Act 2: The Glass Sea |
 | 0.8.2 | | Light beam and chime for rare drops |
 | 0.8.1 | | Loot with no room hops back up with a thud |
 | 0.8.0 | | Four class item sets; set pieces favour the hero's class |

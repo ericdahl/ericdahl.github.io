@@ -570,6 +570,7 @@ button {
 .assign { display: flex; gap: 4px; align-items: center; margin: 4px 0; flex-wrap: wrap; }
 
 .wplist, .menu-list { display: flex; flex-direction: column; gap: 6px; }
+.wp-act { color: var(--gold); font-size: 13px; }
 .btn.wp { text-align: left; }
 .btn.wp.here { border-color: var(--gold); }
 .quests { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
@@ -644,6 +645,7 @@ button {
 .ov-title { font-size: clamp(28px, 6vw, 46px); color: #c8281a; text-shadow: 0 0 20px #600, 0 2px 4px #000; letter-spacing: 0.05em; }
 .victory .ov-title { color: #f0c860; text-shadow: 0 0 20px #a60, 0 2px 4px #000; }
 .ov-sub { color: #d8c8a8; font-size: 15px; }
+.ov-box.story { max-height: 92vh; overflow-y: auto; padding: 0 16px; }
 
 /* ------------------------------------------------------------------ title menu */
 

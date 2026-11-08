@@ -8,7 +8,7 @@ import type { Camera } from './camera';
  * space around the player so they move with the ground, and fade outside the light radius.
  */
 
-type Kind = 'ash' | 'ember' | 'fog' | 'leaf' | 'drip' | 'dust' | 'splash';
+type Kind = 'ash' | 'ember' | 'fog' | 'leaf' | 'drip' | 'dust' | 'splash' | 'sand' | 'glint';
 
 interface Particle {
   kind: Kind;
@@ -34,6 +34,13 @@ const RATES: Record<string, Partial<Record<Kind, number>>> = {
   chapel: { drip: 1, fog: 0.5, dust: 3 },
   crypt: { dust: 6, fog: 0.3 },
   hell: { ember: 16, ash: 8 },
+  oasis: { ash: 2, sand: 2, dust: 2 },
+  desert: { sand: 11, ash: 4 },
+  glass: { glint: 9, sand: 5, ash: 3 },
+  mesa: { sand: 8, dust: 4 },
+  cistern: { drip: 2, fog: 0.6, dust: 2 },
+  ruins: { dust: 8, sand: 1.5 },
+  vault: { ember: 9, glint: 5, dust: 3 },
 };
 
 const MAX = 220;
@@ -98,7 +105,8 @@ export class Weather {
     const rates = RATES[this.theme];
     if (!rates) return;
     for (const [kind, rate] of Object.entries(rates) as [Kind, number][]) {
-      this.acc[kind] = (this.acc[kind] ?? 0) + rate * dt;
+      const stormy = kind === 'sand' ? 1 + w.storm * 9 : 1;
+      this.acc[kind] = (this.acc[kind] ?? 0) + rate * stormy * dt;
       while (this.acc[kind]! >= 1) {
         this.acc[kind]! -= 1;
         if (this.ps.length < MAX) this.spawn(w, kind, warm);
@@ -134,6 +142,14 @@ export class Weather {
       case 'drip':
         Object.assign(q, { z: r(140, 200), vz: -320, life: 2, size: 1 });
         break;
+      case 'sand': {
+        const gust = 1 + w.storm * 2.5;
+        Object.assign(q, { z: r(3, 60), vx: r(1.6, 3) * gust, vy: r(-0.7, 0) * gust, vz: r(-3, 3), life: r(2, 3.6), size: r(1, 2) });
+        break;
+      }
+      case 'glint':
+        Object.assign(q, { z: r(0, 16), life: r(0.5, 1.2), size: r(1.5, 3.5) });
+        break;
       case 'dust':
         Object.assign(q, { z: r(10, 70), vx: r(-0.08, 0.08), vy: r(-0.08, 0.08), vz: r(-2, 2), life: r(6, 10), size: r(0.8, 1.6) });
         break;
@@ -163,6 +179,28 @@ export class Weather {
           ctx.fillStyle = `rgba(190,180,170,${0.55 * a})`;
           ctx.fillRect(s.x, sy, q.size * z, q.size * z);
           break;
+        case 'sand':
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.strokeStyle = `rgba(226,196,146,${0.55 * a})`;
+          ctx.lineWidth = q.size * 0.7 * z;
+          ctx.beginPath();
+          ctx.moveTo(s.x, sy);
+          ctx.lineTo(s.x - q.vx * 3.2 * z, sy - q.vy * 1.6 * z);
+          ctx.stroke();
+          break;
+        case 'glint': {
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.strokeStyle = `rgba(220,255,255,${0.9 * Math.sin(k * Math.PI) * lit})`;
+          ctx.lineWidth = 1 * z;
+          const g = q.size * Math.sin(k * Math.PI) * 2.4 * z;
+          ctx.beginPath();
+          ctx.moveTo(s.x - g, sy);
+          ctx.lineTo(s.x + g, sy);
+          ctx.moveTo(s.x, sy - g);
+          ctx.lineTo(s.x, sy + g);
+          ctx.stroke();
+          break;
+        }
         case 'dust':
           ctx.globalCompositeOperation = 'lighter';
           ctx.fillStyle = `rgba(220,200,160,${0.35 * a * (0.6 + 0.4 * Math.sin(this.time * 2 + q.rot))})`;

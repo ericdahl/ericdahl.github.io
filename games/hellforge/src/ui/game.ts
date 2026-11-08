@@ -2,6 +2,7 @@ import { AREA_BY_ID } from '../game/areas';
 import { POTION_POOLS, potionCount, potionSummary, potionTiers, type Character } from '../game/character';
 import { MOD_LABEL } from '../game/monsters';
 import { SKILL_BY_ID } from '../game/skills';
+import { STORIES, type StoryBeat } from '../game/story';
 import { World, type Interactable } from '../game/world';
 import { baseIconUrl, skillIconUrl } from '../render/icons';
 import { Renderer } from '../render/renderer';
@@ -35,6 +36,7 @@ export class Game implements PanelHost {
   private drag: { id: number; x: number; y: number; t: number; moved: boolean } | null = null;
   private hudCache: Record<string, string> = {};
   private paused = false;
+  private storyOpen = false;
   private onExit: () => void;
 
   constructor(root: HTMLElement, char: Character, onExit: () => void, seed?: number) {
@@ -95,7 +97,7 @@ export class Game implements PanelHost {
     const dt = Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
     const w = this.world;
-    this.paused = !!this.panel;
+    this.paused = !!this.panel || this.storyOpen;
     // A freeze frame holds the action (not the screen) for a beat after a heavy hit.
     const frozen = this.freeze > 0;
     if (frozen) this.freeze -= dt;
@@ -174,6 +176,9 @@ export class Game implements PanelHost {
           break;
         case 'victory':
           this.showVictory();
+          break;
+        case 'story':
+          this.showStory(STORIES[e.id]);
           break;
         case 'area':
           this.banner(AREA_BY_ID[e.id].name);
@@ -399,6 +404,8 @@ export class Game implements PanelHost {
       H.tfill.style.width = `${Math.max(0, (m.life / m.maxLife) * 100)}%`;
       const mods = [...m.mods.map((x) => MOD_LABEL[x])];
       if (m.def.undead) mods.unshift('Undead');
+      if (m.def.rises && !m.rose) mods.push('Rises Again');
+      if (m.def.support) mods.push('Wards Allies');
       for (const [k, n] of [['fire', 'Fire'], ['cold', 'Cold'], ['light', 'Lightning'], ['poison', 'Poison'], ['phys', 'Physical']] as const) if (m.res[k] >= 100) mods.push(`Immune to ${n}`);
       this.setText('tm', H.tmods, mods.join(' · '));
     } else H.target.classList.add('hidden');
@@ -518,7 +525,7 @@ export class Game implements PanelHost {
         'div',
         { class: 'ov-box death' },
         h('div', { class: 'ov-title' }, 'You have died'),
-        h('div', { class: 'ov-sub' }, hc ? `${c.name} has fallen forever. Hardcore heroes do not return.` : 'You will awaken in Emberwatch Camp. Some of your gold has been lost.'),
+        h('div', { class: 'ov-sub' }, hc ? `${c.name} has fallen forever. Hardcore heroes do not return.` : `You will awaken in ${AREA_BY_ID[this.world.homeTown].name}. Some of your gold has been lost.`),
         h('button', {
           class: 'btn primary', onclick: () => {
             this.overlayEl.classList.add('hidden');
@@ -533,6 +540,23 @@ export class Game implements PanelHost {
     );
   }
 
+  /** A story beat. The game holds still until it is dismissed. */
+  private showStory(beat: StoryBeat) {
+    this.save();
+    this.storyOpen = true;
+    this.overlayEl.innerHTML = '';
+    this.overlayEl.classList.remove('hidden');
+    this.overlayEl.append(
+      h(
+        'div',
+        { class: 'ov-box victory story' },
+        h('div', { class: 'ov-title' }, beat.title),
+        ...beat.lines.map((line) => h('div', { class: 'ov-sub' }, line)),
+        h('button', { class: 'btn primary', onclick: () => { this.storyOpen = false; this.overlayEl.classList.add('hidden'); } }, 'Continue'),
+      ),
+    );
+  }
+
   private showVictory() {
     this.save();
     this.overlayEl.innerHTML = '';
@@ -541,9 +565,10 @@ export class Game implements PanelHost {
     this.overlayEl.append(
       h(
         'div',
-        { class: 'ov-box victory' },
-        h('div', { class: 'ov-title' }, 'The Hellforge Grows Cold'),
-        h('div', { class: 'ov-sub' }, `Vhorza, Mother of Cinders, is slain. ${next ? `${next} difficulty is now unlocked from the character screen.` : 'You have conquered every difficulty. Legends will be sung of you.'}`),
+        { class: 'ov-box victory story' },
+        h('div', { class: 'ov-title' }, STORIES.finale.title),
+        ...STORIES.finale.lines.map((line) => h('div', { class: 'ov-sub' }, line)),
+        h('div', { class: 'ov-sub' }, `${next ? `${next} difficulty is now unlocked from the character screen.` : 'You have conquered every difficulty. Legends will be sung of you.'}`),
         h('button', { class: 'btn primary', onclick: () => this.overlayEl.classList.add('hidden') }, 'Continue'),
       ),
     );

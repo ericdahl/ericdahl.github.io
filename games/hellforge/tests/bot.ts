@@ -5,6 +5,7 @@ import type { World } from '../src/game/world';
 import { makeWorld } from './helpers';
 
 export const ACT = ['cinder_fields', 'hollow_cave', 'gloomwood', 'sunken_chapel', 'catacombs1', 'catacombs2', 'hellforge'];
+export const ACT2 = ['ashfall_road', 'whisper_cistern', 'glass_sea', 'carrion_mesa', 'buried_bazaar', 'hall_of_dials', 'noon_vault'];
 
 const PLAN: Record<ClassId, string[]> = {
   reaver: ['bash', 'iron_skin', 'bash', 'bash', 'bash', 'weapon_mastery', 'war_cry', 'weapon_mastery', 'iron_skin', 'weapon_mastery', 'frenzy', 'frenzy', 'frenzy', 'frenzy', 'frenzy', 'weapon_mastery', 'frenzy', 'frenzy'],
@@ -65,12 +66,12 @@ export interface AreaReport {
 }
 
 /** Plays the act end to end without town trips; infinite potions are counted, not limited. */
-export function playAct(classId: ClassId, seed: number, maxPerArea = 900): AreaReport[] {
+export function playAct(classId: ClassId, seed: number, maxPerArea = 900, route = ACT): AreaReport[] {
   const w = makeWorld(classId, seed);
   const c = w.char;
   const reports: AreaReport[] = [];
   let planIdx = 0;
-  for (const area of ACT) {
+  for (const area of route) {
     w.enterArea(area, 'start');
     const rep: AreaReport = { area, enterLevel: c.level, time: 0, deaths: 0, potions: 0, killed: 0, total: w.area.monsters.length, bossDead: false, weapon: '' };
     let t = 0;
