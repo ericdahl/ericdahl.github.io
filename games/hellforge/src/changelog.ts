@@ -1,6 +1,11 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.8.1',
+    date: '2026-11-08',
+    notes: ['Loot you have no room for now hops back up with a dull thud when you try to pick it up.'],
+  },
+  {
     version: '0.8.0',
     date: '2026-11-08',
     notes: [

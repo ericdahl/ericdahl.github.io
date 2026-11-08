@@ -113,6 +113,7 @@ export class Audio {
       case 'chest': return this.tone('square', 200, 120, 0.12, 0.1);
       case 'boom': this.hiss(0.5, 0.6, 180, 0.6, 'lowpass'); return this.tone('sine', 90, 30, 0.45, 0.35);
       case 'nomana': return this.tone('sine', 200, 160, 0.15, 0.1);
+      case 'thud': this.hiss(0.1, 0.35, 180, 0.7, 'lowpass'); return this.tone('sine', 110, 55, 0.16, 0.3);
       case 'roar': this.tone('sawtooth', 110, 60, 0.6, 0.18); return this.hiss(0.6, 0.2, 300, 0.8, 'lowpass');
       case 'quest': return [523, 659, 784, 659, 1046].forEach((f, i) => this.tone('triangle', f, f, 0.35, 0.12, i * 0.13));
       case 'step': return this.hiss(0.04, 0.05, 300, 1);
