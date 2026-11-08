@@ -1,7 +1,8 @@
-import type { Character } from '../game/character';
+import { migrateCharacter, SAVE_VERSION, type Character } from '../game/character';
 import { bumpUid, type Item } from '../game/items';
 
 const KEY = 'hellforge.chars.v1';
+const BACKUP = `${KEY}.before-v${SAVE_VERSION}`;
 const SETTINGS = 'hellforge.settings.v1';
 
 export interface Settings {
@@ -41,6 +42,11 @@ function allItems(c: Character): Item[] {
 
 export function loadCharacters(): Character[] {
   const list = read<Character[]>(KEY, []);
+  if (list.some((c) => c.version < SAVE_VERSION)) {
+    if (!read<Character[] | null>(BACKUP, null)) write(BACKUP, list);
+    list.forEach(migrateCharacter);
+    write(KEY, list);
+  }
   for (const c of list) for (const it of allItems(c)) bumpUid(it.uid);
   return list.sort((a, b) => b.created - a.created);
 }
@@ -70,6 +76,7 @@ export function importCharacters(chars: Character[]): number {
   const list = read<Character[]>(KEY, []);
   let replaced = 0;
   for (const c of chars) {
+    migrateCharacter(c);
     const i = list.findIndex((x) => x.id === c.id);
     if (i >= 0) (list[i] = c), replaced++;
     else list.push(c);

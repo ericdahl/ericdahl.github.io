@@ -1,6 +1,6 @@
 import {
-  baseOf, itemDefense, itemMods, makeItem, SET_BY_ID,
-  type ClassId, type Item, type Mod, type Slot, type StatKey,
+  BASES, baseOf, itemDefense, itemMods, makeItem, SET_BY_ID,
+  type BaseItem, type ClassId, type Item, type Mod, type PotionInfo, type Slot, type StatKey,
 } from './items';
 import { classSkills, SKILL_BY_ID, type SkillDef } from './skills';
 
@@ -52,6 +52,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
   },
 };
 
+export const SAVE_VERSION = 2;
 export const INV_COLS = 10;
 export const INV_ROWS = 4;
 export const STASH_COLS = 10;
@@ -81,8 +82,8 @@ export interface Character {
   equipment: Partial<Record<Slot, Item>>;
   inventory: GridEntry[];
   stash: GridEntry[];
-  /** 4 columns of potion bases, bottom of the column first. */
-  belt: string[][];
+  /** How many of each potion base the hero carries. */
+  potions: Record<string, number>;
   gold: number;
   stashGold: number;
   tpCharges: number;
@@ -100,7 +101,7 @@ export interface Character {
 export function createCharacter(name: string, classId: ClassId, hardcore = false): Character {
   const cls = CLASSES[classId];
   const c: Character = {
-    version: 1,
+    version: SAVE_VERSION,
     id: `${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`,
     name,
     classId,
@@ -113,7 +114,7 @@ export function createCharacter(name: string, classId: ClassId, hardcore = false
     equipment: {},
     inventory: [],
     stash: [],
-    belt: [['hp1'], ['hp1'], ['mp1'], ['mp1']],
+    potions: { hp1: 2, mp1: 2 },
     gold: 100,
     stashGold: 0,
     tpCharges: 2,
@@ -259,7 +260,7 @@ export interface Stats {
   lifeOnKill: number;
   manaOnKill: number;
   skillBonus: number;
-  beltRows: number;
+  potionCap: number;
 }
 
 export function equippedItems(c: Character): Item[] {
@@ -344,8 +345,7 @@ export function computeStats(c: Character, buffs: Buffs = {}): Stats {
   const off = c.equipment.offhand;
   if (off) block = (baseOf(off).block ?? 0) + g('block') + (c.classId === 'reaver' ? 5 : 0);
 
-  let beltRows = 1;
-  if (c.equipment.belt) beltRows = baseOf(c.equipment.belt).beltRows ?? 1;
+  const potionCap = potionCapOf(c);
 
   return {
     str, dex, vit, ene, maxLife, maxMana,
@@ -374,7 +374,7 @@ export function computeStats(c: Character, buffs: Buffs = {}): Stats {
     lifeOnKill: g('lifeOnKill'),
     manaOnKill: g('manaOnKill'),
     skillBonus: bonus,
-    beltRows,
+    potionCap,
   };
 }
 
@@ -413,26 +413,71 @@ export function addToInventory(c: Character, item: Item): boolean {
   return addToGrid(c.inventory, INV_COLS, INV_ROWS, item);
 }
 
-// ---------------------------------------------------------------- belt
+// ---------------------------------------------------------------- potions
 
-export function beltRowsOf(c: Character): number {
-  return c.equipment.belt ? baseOf(c.equipment.belt).beltRows ?? 1 : 1;
+export type PotionPool = PotionInfo['type'];
+export const POTION_POOLS: PotionPool[] = ['hp', 'mp', 'rejuv'];
+const POOL_NAMES: Record<PotionPool, string> = { hp: 'Health', mp: 'Mana', rejuv: 'Rejuvenation' };
+
+/** A pool's potion bases, weakest first. */
+export function potionTiers(pool: PotionPool): BaseItem[] {
+  return BASES.filter((b) => b.potion?.type === pool).sort((a, b) => a.potion!.amount - b.potion!.amount);
 }
 
-export function addToBelt(c: Character, baseId: string): boolean {
-  if (baseOf(baseId).kind !== 'potion') return false;
-  const rows = beltRowsOf(c);
-  const same = c.belt.findIndex((col) => col.length > 0 && col.length < rows && col[0] === baseId);
-  const col = same >= 0 ? same : c.belt.findIndex((cl) => cl.length === 0);
-  if (col < 0) return false;
-  c.belt[col].push(baseId);
+export function potionCapOf(c: Character): number {
+  return (c.equipment.belt && baseOf(c.equipment.belt).potionCap) || 8;
+}
+
+export function potionCount(c: Character, pool: PotionPool): number {
+  return potionTiers(pool).reduce((n, b) => n + (c.potions[b.id] ?? 0), 0);
+}
+
+export function takePotion(c: Character, baseId: string) {
+  if (--c.potions[baseId] <= 0) delete c.potions[baseId];
+}
+
+export function addPotion(c: Character, baseId: string): boolean {
+  const pot = baseOf(baseId).potion;
+  if (!pot) return false;
+  if (potionCount(c, pot.type) >= potionCapOf(c)) {
+    // A full pool trades its weakest potion up, so outdated tiers drop out on their own.
+    const weakest = potionTiers(pot.type).find((b) => c.potions[b.id]);
+    if (!weakest || weakest.potion!.amount >= pot.amount) return false;
+    takePotion(c, weakest.id);
+  }
+  c.potions[baseId] = (c.potions[baseId] ?? 0) + 1;
   return true;
 }
 
-export function takeFromBelt(c: Character, col: number): string | null {
-  const column = c.belt[col];
-  if (!column || !column.length) return null;
-  return column.shift()!;
+/** The smallest owned potion that covers `missing`, else the strongest owned. */
+export function choosePotion(c: Character, pool: PotionPool, missing: number): string | null {
+  const owned = potionTiers(pool).filter((b) => c.potions[b.id]);
+  if (!owned.length) return null;
+  return (owned.find((b) => b.potion!.amount >= missing) ?? owned[owned.length - 1]).id;
+}
+
+export function potionSummary(c: Character, pool: PotionPool): string {
+  const held = potionTiers(pool).filter((b) => c.potions[b.id]).map((b) => `${c.potions[b.id]} ${b.name}`);
+  return `${POOL_NAMES[pool]} potions ${potionCount(c, pool)}/${potionCapOf(c)}${held.length ? `: ${held.join(', ')}` : ''}`;
+}
+
+// ---------------------------------------------------------------- saves
+
+/** Brings a saved hero up to SAVE_VERSION in place. Returns whether anything changed. */
+export function migrateCharacter(c: Character & { belt?: string[][] }): boolean {
+  if (c.version >= SAVE_VERSION) return false;
+  // v1 kept potions in belt columns and the backpack. Counts may exceed the cap: migrating never destroys potions.
+  c.potions = {};
+  const keep = (id: string) => (c.potions[id] = (c.potions[id] ?? 0) + 1);
+  for (const id of (c.belt ?? []).flat()) keep(id);
+  delete c.belt;
+  c.inventory = c.inventory.filter((e) => {
+    if (baseOf(e.item).kind !== 'potion') return true;
+    keep(e.item.base);
+    return false;
+  });
+  c.version = SAVE_VERSION;
+  return true;
 }
 
 // ---------------------------------------------------------------- equipment

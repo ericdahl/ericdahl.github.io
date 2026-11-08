@@ -519,7 +519,7 @@ function helpPanel(host: PanelHost) {
     ['Attack', 'Big ⚔ button (auto-targets), or tap a monster', 'Left click a monster'],
     ['Skills', 'Skill buttons around ⚔ (hold to repeat)', 'Right click, or Q W E R'],
     ['Pick up / talk', 'Tap the item label or the context button', 'Click it'],
-    ['Potions', 'Tap a belt slot', '1 2 3 4'],
+    ['Potions', 'Tap a potion slot (hold for details)', '1 health, 2 mana, 3 rejuvenation'],
     ['Town Portal', 'Portal button', 'T'],
     ['Panels', 'Bottom buttons', 'I inventory · C character · K skills · M/Tab map'],
     ['Items', 'Tap an item, then a button', 'Hover an item: E equip/unequip · U use · S sell · B buy · D drop · X stash/inventory · G socket. Right-click for the main action'],

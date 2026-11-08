@@ -47,7 +47,8 @@ export interface BaseItem {
   defMin?: number;
   defMax?: number;
   block?: number;
-  beltRows?: number;
+  /** Potions carried per pool while this belt is worn. */
+  potionCap?: number;
   reqStr?: number;
   reqDex?: number;
   maxSockets?: number;
@@ -136,11 +137,11 @@ export const BASES: BaseItem[] = [
   A('heavy_boots', 'Heavy Boots', 'boots', 7, 5, 6, 2, 2, { reqStr: 18 }),
   A('chain_boots', 'Chain Boots', 'boots', 12, 8, 9, 2, 2, { reqStr: 30 }),
   A('greaves', 'Greaves', 'boots', 23, 12, 15, 2, 2, { reqStr: 70 }),
-  A('sash', 'Sash', 'belt', 1, 2, 2, 2, 1, { beltRows: 2 }),
-  A('light_belt', 'Light Belt', 'belt', 7, 3, 3, 2, 1, { beltRows: 2 }),
-  A('belt', 'Belt', 'belt', 12, 5, 5, 2, 1, { beltRows: 3, reqStr: 25 }),
-  A('heavy_belt', 'Heavy Belt', 'belt', 15, 6, 6, 2, 1, { beltRows: 3, reqStr: 45 }),
-  A('plated_belt', 'Plated Belt', 'belt', 20, 8, 11, 2, 1, { beltRows: 4, reqStr: 60 }),
+  A('sash', 'Sash', 'belt', 1, 2, 2, 2, 1, { potionCap: 12 }),
+  A('light_belt', 'Light Belt', 'belt', 7, 3, 3, 2, 1, { potionCap: 12 }),
+  A('belt', 'Belt', 'belt', 12, 5, 5, 2, 1, { potionCap: 16, reqStr: 25 }),
+  A('heavy_belt', 'Heavy Belt', 'belt', 15, 6, 6, 2, 1, { potionCap: 16, reqStr: 45 }),
+  A('plated_belt', 'Plated Belt', 'belt', 20, 8, 11, 2, 1, { potionCap: 20, reqStr: 60 }),
   { id: 'ring', name: 'Ring', kind: 'ring', qlvl: 1, w: 1, h: 1, magicOnly: true },
   { id: 'amulet', name: 'Amulet', kind: 'amulet', qlvl: 1, w: 1, h: 1, magicOnly: true },
 

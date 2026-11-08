@@ -1,6 +1,16 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.7.0',
+    date: '2026-11-08',
+    notes: [
+      'Potions no longer take up your backpack. Key 1 drinks health, 2 drinks mana and 3 drinks rejuvenation, and each draws from its own supply.',
+      'Each key drinks the smallest potion that covers what you are missing, or the strongest if none does. Hover or long-press a slot to see what you are carrying.',
+      'Your belt now sets how many potions of each type you can carry: 8 without one, up to 20. When you are full, better potions replace your weakest.',
+      'Existing heroes are converted automatically and keep every potion they had in their belt and backpack. Potions in the stash stay there until you withdraw them.',
+    ],
+  },
+  {
     version: '0.6.1',
     date: '2026-11-08',
     notes: [

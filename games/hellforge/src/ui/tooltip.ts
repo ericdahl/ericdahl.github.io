@@ -24,7 +24,7 @@ export function itemTooltip(item: Item, c: Character, extra?: string): string {
     lines.push(`<div>Defense: <span class="${d !== item.def ? 'blue' : ''}">${d}</span></div>`);
   }
   if (b.block) lines.push(`<div>Chance to Block: ${b.block}%</div>`);
-  if (b.beltRows) lines.push(`<div class="dim">Belt rows: ${b.beltRows}</div>`);
+  if (b.potionCap) lines.push(`<div class="dim">Potions carried per type: ${b.potionCap}</div>`);
   if (b.potion) {
     const p = b.potion;
     lines.push(`<div>${p.type === 'rejuv' ? `Restores ${p.amount}% of Life and Mana` : `Restores ${p.amount} ${p.type === 'hp' ? 'Life' : 'Mana'}`}</div>`);
