@@ -21,6 +21,13 @@ MOVED = {
     "games/tingdu/claude": "apps/tingdu",
 }
 
+# Still published at their URLs, but only linked from the small list at the bottom
+# of the index. Add a whole app ("apps/foo") or one build ("games/foo/codex").
+ARCHIVED = {
+    "games/hellforge/codex",
+    "games/starforge/codex",
+}
+
 STUB = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>Moved</title><link rel="canonical" href="{to}">
 <meta http-equiv="refresh" content="0; url={to}">
@@ -47,6 +54,8 @@ a{{color:var(--link);text-decoration:none}}a:hover{{text-decoration:underline}}
 .desc{{margin:2px 0 0;color:var(--muted);font-size:15px}}
 .variants{{margin-left:8px;font-size:14px}}
 .variants a+a::before{{content:"·";color:var(--muted);margin:0 6px}}
+.archive p{{margin:6px 0 0;color:var(--muted);font-size:14px}}
+.archive a{{color:inherit;text-decoration:underline}}
 </style>
 </head><body><main>
 <header><h1>Scratch</h1><p>Small throwaway apps and games. Nothing here is maintained.</p></header>
@@ -69,7 +78,7 @@ def short(title: str) -> str:
 
 def main(site: Path, dirs: list[str]) -> None:
     groups: dict[str, dict[str, list[str]]] = {}
-    for d in sorted(set(dirs)):
+    for d in sorted(set(dirs) - ARCHIVED):
         section, app, *_ = d.split("/")
         groups.setdefault(section, {}).setdefault(app, []).append(d)
 
@@ -89,6 +98,16 @@ def main(site: Path, dirs: list[str]) -> None:
             items.append(f"<li>{head}" + (f'<p class="desc">{desc}</p>' if desc else "") + "</li>")
         label = SECTIONS.get(section, html.escape(section.capitalize()))
         out.append(f"<section><h2>{label}</h2><ul>{''.join(items)}</ul></section>")
+
+    archived = []
+    for d in sorted(ARCHIVED.intersection(dirs)):
+        _, app, *variant = d.split("/")
+        name = short(meta(site / d / "index.html")[0]) or html.escape(app)
+        suffix = f" ({html.escape(variant[0])})" if variant else ""
+        archived.append(f'<a href="{d}/">{name}{suffix}</a>')
+    if archived:
+        out.append(f'<section class="archive"><h2>Archive</h2><p>{" · ".join(archived)}</p></section>')
+
     (site / "index.html").write_text(PAGE.format(sections="\n".join(out)), encoding="utf-8")
 
     def stub(old: str, new: str) -> None:
