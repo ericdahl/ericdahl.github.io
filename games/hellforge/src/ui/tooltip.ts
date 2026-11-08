@@ -1,6 +1,6 @@
 import { computeStats, equippedItems, requirementError, type Character } from '../game/character';
 import {
-  baseOf, describeMods, displayName, gemMods, itemColor, itemDefense, modTotal, SET_BY_ID, type Item,
+  baseOf, describeMods, displayName, gemMods, itemColor, itemDefense, modTotal, SET_BY_ID, type Item, type Mod,
 } from '../game/items';
 import { esc } from './dom';
 
@@ -42,8 +42,7 @@ export function itemTooltip(item: Item, c: Character, extra?: string): string {
   if (item.reqLvl > 1) lines.push(req(c.level >= item.reqLvl, `Required Level: ${item.reqLvl}`));
   if (!item.identified) lines.push('<div class="red">Unidentified</div>');
   else {
-    const mods = describeMods(item.mods);
-    for (const m of mods) lines.push(`<div class="blue">${esc(m)}</div>`);
+    for (const m of modLines(item.mods, c)) lines.push(`<div class="${m.wasted ? 'dim' : 'blue'}">${esc(m.text)}</div>`);
     for (const g of item.gems) lines.push(`<div class="blue">${esc(describeMods(gemMods(g, b.kind)).join(', '))} <span class="dim">(${esc(baseOf(g).name)})</span></div>`);
   }
   if (item.sockets) lines.push(`<div class="gray">Socketed (${item.gems.length}/${item.sockets})</div>`);
@@ -53,12 +52,18 @@ export function itemTooltip(item: Item, c: Character, extra?: string): string {
     lines.push(`<div class="set-title">${esc(set.name)}</div>`);
     for (const p of set.pieces) lines.push(`<div class="${worn.has(p.id) ? 'green' : 'dim'}">${esc(p.name)}</div>`);
     for (const [n, mods] of Object.entries(set.bonuses))
-      lines.push(`<div class="${worn.size >= Number(n) ? 'green' : 'dim'}">(${n} items) ${esc(describeMods(mods).join(', '))}</div>`);
+      lines.push(`<div class="${worn.size >= Number(n) ? 'green' : 'dim'}">(${n} items) ${esc(modLines(mods, c).map((m) => m.text).join(', '))}</div>`);
   }
   const err = b.kind !== 'potion' && b.kind !== 'gem' && b.kind !== 'scroll' ? requirementError(c, item) : null;
   if (err) lines.push(`<div class="red small">${esc(err)}</div>`);
   if (extra) lines.push(extra);
   return lines.join('');
+}
+
+/** Mod text for this hero, flagging another class's skill bonus, which does nothing for them. */
+function modLines(mods: Mod[], c: Character): { text: string; wasted: boolean }[] {
+  const wasted = new Set(describeMods(mods.filter((md) => md.stat.startsWith('skills_') && md.stat !== `skills_${c.classId}`)));
+  return describeMods(mods).map((text) => (wasted.has(text) ? { text: `${text} (no effect)`, wasted: true } : { text, wasted: false }));
 }
 
 function speedName(s: number): string {
