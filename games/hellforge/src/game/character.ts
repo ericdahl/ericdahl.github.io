@@ -395,11 +395,46 @@ export function findSpace(entries: GridEntry[], cols: number, rows: number, w: n
   return null;
 }
 
+const PACK_ORDERS: ((a: BaseItem, b: BaseItem) => number)[] = [
+  (a, b) => b.h - a.h || b.w - a.w,
+  (a, b) => b.w * b.h - a.w * a.h || b.h - a.h,
+  (a, b) => b.w - a.w || b.h - a.h,
+];
+
+/** A tidy layout for these items, or null if none of the orders fits them all. */
+function packGrid(items: Item[], cols: number, rows: number): GridEntry[] | null {
+  for (const order of PACK_ORDERS) {
+    const sorted = items.slice().sort((a, b) => order(baseOf(a), baseOf(b)) || a.base.localeCompare(b.base) || a.uid - b.uid);
+    const packed: GridEntry[] = [];
+    for (const item of sorted) {
+      const b = baseOf(item);
+      const at = findSpace(packed, cols, rows, b.w, b.h);
+      if (!at) break;
+      packed.push({ item, ...at });
+    }
+    if (packed.length === items.length) return packed;
+  }
+  return null;
+}
+
 export function addToGrid(entries: GridEntry[], cols: number, rows: number, item: Item): boolean {
   const b = baseOf(item);
   const at = findSpace(entries, cols, rows, b.w, b.h);
-  if (!at) return false;
-  entries.push({ item, ...at });
+  if (at) {
+    entries.push({ item, ...at });
+    return true;
+  }
+  // Scattered gaps can add up to enough room. Packing makes new entries, so a caller's backup of the old ones stays valid.
+  const packed = packGrid([...entries.map((e) => e.item), item], cols, rows);
+  if (!packed) return false;
+  entries.splice(0, entries.length, ...packed);
+  return true;
+}
+
+export function sortGrid(entries: GridEntry[], cols: number, rows: number): boolean {
+  const packed = packGrid(entries.map((e) => e.item), cols, rows);
+  if (!packed) return false;
+  entries.splice(0, entries.length, ...packed);
   return true;
 }
 

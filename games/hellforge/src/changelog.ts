@@ -1,6 +1,14 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.7.1',
+    date: '2026-11-08',
+    notes: [
+      'If an item only fits after moving things around, your backpack or stash now rearranges itself to make room.',
+      'New Sort button on the backpack and stash packs everything neatly.',
+    ],
+  },
+  {
     version: '0.7.0',
     date: '2026-11-08',
     notes: [
