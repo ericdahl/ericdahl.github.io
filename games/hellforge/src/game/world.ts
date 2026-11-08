@@ -358,6 +358,13 @@ export class World {
     this.emit({ type: 'quest', id });
   }
 
+  /** Creatures still standing in the way of the Hollow Cave purge, while the player is in there. */
+  questStrays(): Monster[] {
+    const a = this.area;
+    if (a.def.quest !== 'hollow' || this.questState('hollow') !== 'active') return [];
+    return a.monsters.filter((m) => !m.dead);
+  }
+
   buffTotals(): Buffs {
     const b: Buffs = {};
     const p = this.player.buffs;

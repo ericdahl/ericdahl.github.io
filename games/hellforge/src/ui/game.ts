@@ -376,7 +376,8 @@ export class Game implements PanelHost {
       for (const [k, n] of [['fire', 'Fire'], ['cold', 'Cold'], ['light', 'Lightning'], ['poison', 'Poison'], ['phys', 'Physical']] as const) if (m.res[k] >= 100) mods.push(`Immune to ${n}`);
       this.setText('tm', H.tmods, mods.join(' · '));
     } else H.target.classList.add('hidden');
-    this.setText('area', H.area, `${AREA_BY_ID[w.area.def.id].name}`);
+    const strays = w.questStrays().length;
+    this.setText('area', H.area, `${AREA_BY_ID[w.area.def.id].name}${strays ? ` · ${strays} left` : ''}`);
     // Context button: nearest interactable.
     const near = w.interactablesNear(p.x, p.y, 2.6)[0];
     if (near && !p.dead) {

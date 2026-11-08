@@ -232,6 +232,19 @@ describe('quests', () => {
     expect(w.questState('hollow')).toBe('rewarded');
   });
 
+  it('counts the creatures left in the Hollow Cave purge', () => {
+    const w = makeWorld();
+    w.enterArea('cinder_fields', 'start');
+    expect(w.questStrays()).toEqual([]);
+    w.enterArea('hollow_cave', 'start');
+    const total = w.area.monsters.length;
+    expect(w.questStrays()).toHaveLength(total);
+    w.damageMonster(w.area.monsters[0], elemDamage('fire', 1e7));
+    expect(w.questStrays()).toHaveLength(total - 1);
+    for (const m of w.area.monsters) w.damageMonster(m, elemDamage('fire', 1e7));
+    expect(w.questStrays()).toEqual([]);
+  });
+
   it('killing the Mother of Cinders unlocks the next difficulty', () => {
     const w = makeWorld();
     w.enterArea('hellforge', 'start');
