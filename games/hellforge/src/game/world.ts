@@ -358,6 +358,17 @@ export class World {
     this.emit({ type: 'quest', id });
   }
 
+  /**
+   * The last few creatures standing in the way of the Hollow Cave purge, while the player is in there.
+   * Empty until five or fewer remain: only the stragglers are hard to find, and revealing every pack would spoil the map.
+   */
+  questStrays(): Monster[] {
+    const a = this.area;
+    if (a.def.quest !== 'hollow' || this.questState('hollow') !== 'active') return [];
+    const alive = a.monsters.filter((m) => !m.dead);
+    return alive.length <= 5 ? alive : [];
+  }
+
   buffTotals(): Buffs {
     const b: Buffs = {};
     const p = this.player.buffs;
