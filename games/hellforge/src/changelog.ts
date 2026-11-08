@@ -1,6 +1,14 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.6.1',
+    date: '2026-11-08',
+    notes: [
+      'Hollow Cave: once five or fewer creatures remain, the area name shows how many are left and the automap marks them in gold, wherever they are.',
+      'Necromancer: the Raise Skeleton button shows how many skeletons you have against your maximum, and turns green when you are at the cap.',
+    ],
+  },
+  {
     version: '0.6.0',
     date: '2026-11-07',
     notes: [
