@@ -402,6 +402,10 @@ button {
 .p-body { overflow: auto; padding: 10px; flex: 1; min-height: 0; -webkit-overflow-scrolling: touch; }
 .p-body.two { display: grid; grid-template-columns: auto minmax(220px, 1fr); gap: 12px; align-items: start; }
 .p-body.three { display: grid; grid-template-columns: minmax(170px, 1fr) auto minmax(190px, 1fr); gap: 10px; align-items: start; }
+/* Two 10-wide grids side by side: each column is as wide as its grid, and they wrap rather than overlap. */
+.p-body.stash-body { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; justify-content: center; }
+.stash-body > .col { flex: none; }
+.stash-body > .detail { flex: 1 1 190px; min-width: 190px; }
 .col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .sub { color: var(--gold); font-size: 13px; border-bottom: 1px solid #3a2e1e; padding-bottom: 2px; margin-top: 2px; }
 .npc-say { padding: 8px 14px 0; font-style: italic; color: #c8b890; font-size: 14px; }

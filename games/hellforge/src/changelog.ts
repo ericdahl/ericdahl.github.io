@@ -1,6 +1,11 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.9.1',
+    date: '2026-11-09',
+    notes: ['The stash no longer spills over your backpack. On narrow screens the backpack now sits below the stash instead.'],
+  },
+  {
     version: '0.9.0',
     date: '2026-11-08',
     notes: [
