@@ -3,7 +3,11 @@ export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
     version: '0.9.2',
     date: '2026-11-09',
-    notes: ['Dying now costs your gold (and experience on Nightmare and Hell) right away. Reloading the page at the death screen no longer skips the penalty.'],
+    notes: [
+      'Dying now costs your gold (and experience on Nightmare and Hell) right away. Reloading the page at the death screen no longer skips the penalty.',
+      'Big monsters and bosses no longer sometimes spawn wedged against a wall, frozen in place for the whole fight.',
+      'Big monsters and bosses can no longer walk through pillars and thin walls.',
+    ],
   },
   {
     version: '0.9.1',

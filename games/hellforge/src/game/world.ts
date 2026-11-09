@@ -513,6 +513,9 @@ export class World {
 
   spawnMonster(a: AreaState, defId: string, x: number, y: number, rarity: MonsterRarity, opts: { mods?: UniqueMod[]; name?: string; packId?: number; level?: number; superId?: string } = {}): Monster {
     const def = MONSTERS[defId];
+    // Spawn points are tile centres, which can leave a big monster overlapping a wall. It could
+    // then never move, since every step it tried would still overlap, so nudge it clear first.
+    ({ x, y } = this.roomFor(a.level, x, y, def.radius));
     const level = opts.level ?? this.mlvl(a.def);
     const st = monsterStats(def, level, rarity, opts.mods, this.char.difficulty);
     const m: Monster = {
@@ -3053,10 +3056,34 @@ export class World {
   // ---------------------------------------------------------------- movement
 
   /** Axis-separated movement against walls. Returns false if fully blocked. */
+  /** Whether a box of half-width r centred at (x, y) lies entirely on floor. */
+  private fits(l: Level, x: number, y: number, r: number): boolean {
+    // Test the corners, plus points along the edges for anything wider than a tile, so a big
+    // monster can't straddle a one-tile wall or pillar that falls between its corners.
+    const n = Math.max(1, Math.ceil((2 * r) / 0.9));
+    for (let i = 0; i <= n; i++) {
+      const sx = x - r + (2 * r * i) / n;
+      for (let j = 0; j <= n; j++) if (!isWalkable(l, sx, y - r + (2 * r * j) / n)) return false;
+    }
+    return true;
+  }
+
+  /** The nearest point to (x, y), within a couple of tiles, where a box of half-width r fits. */
+  private roomFor(l: Level, x: number, y: number, r: number): Point {
+    if (this.fits(l, x, y, r)) return { x, y };
+    let best: Point | null = null;
+    let bestD = Infinity;
+    for (let dy = -2; dy <= 2; dy += 0.25)
+      for (let dx = -2; dx <= 2; dx += 0.25) {
+        const d = dx * dx + dy * dy;
+        if (d < bestD && this.fits(l, x + dx, y + dy, r)) (best = { x: x + dx, y: y + dy }), (bestD = d);
+      }
+    return best ?? { x, y };
+  }
+
   moveEntity(e: { x: number; y: number }, dx: number, dy: number, r: number): boolean {
     const l = this.area.level;
-    const free = (x: number, y: number) =>
-      isWalkable(l, x - r, y - r) && isWalkable(l, x + r, y - r) && isWalkable(l, x - r, y + r) && isWalkable(l, x + r, y + r);
+    const free = (x: number, y: number) => this.fits(l, x, y, r);
     let moved = false;
     if (dx && free(e.x + dx, e.y)) (e.x += dx), (moved = true);
     if (dy && free(e.x, e.y + dy)) (e.y += dy), (moved = true);
