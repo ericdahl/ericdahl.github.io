@@ -323,7 +323,7 @@ function stashPanel(host: PanelHost) {
     header(host, 'Stash'),
     h(
       'div',
-      { class: 'p-body three' },
+      { class: 'p-body stash-body' },
       h('div', { class: 'col' }, gridHeading(host, `Stash · ${c.stashGold.toLocaleString()} gold`, c.stash, STASH_COLS, STASH_ROWS), grid(host, c.stash, STASH_COLS, STASH_ROWS, 'stash'),
         h('div', { class: 'acts' }, h('button', { class: 'btn', onclick: () => { w.depositGold(); host.refresh(); } }, 'Deposit gold'), h('button', { class: 'btn', onclick: () => { w.withdrawGold(); host.refresh(); } }, 'Withdraw gold'))),
       h('div', { class: 'col' }, gridHeading(host, 'Inventory', c.inventory, INV_COLS, INV_ROWS), grid(host, c.inventory, INV_COLS, INV_ROWS, 'inv'), goldRow(host)),
