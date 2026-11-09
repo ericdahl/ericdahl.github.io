@@ -16,7 +16,7 @@ test('a necromancer raises a skeleton army', async ({ page }, info) => {
   await page.evaluate(() => {
     const w = (window as any).game.world;
     Object.assign(w.char, { level: 12 });
-    w.char.skills = { bone_shards: 3, raise_skeleton: 5, frailty: 2, skeletal_mastery: 2, bone_ward: 1, grave_golem: 1 };
+    w.char.skills = { bone_shards: 3, raise_skeleton: 6, frailty: 2, skeletal_mastery: 2, bone_ward: 1, grave_golem: 1 };
     w.char.hotbar = ['bone_shards', 'raise_skeleton', 'grave_golem', 'bone_ward'];
     w.refreshStats();
     w.player.life = w.stats.maxLife;

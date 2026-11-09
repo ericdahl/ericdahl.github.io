@@ -62,9 +62,9 @@ export const SKILLS: SkillDef[] = [
   },
   {
     id: 'iron_skin', name: 'Iron Skin', classId: 'reaver', reqLevel: 1, kind: 'passive',
-    mana: () => 0, params: (l) => ({ pct: 25 + 12 * l, pct2: Math.min(40, 4 + 2 * l) }),
+    mana: () => 0, params: (l) => ({ pct: 25 + 12 * l, pct2: Math.min(40, 6 + 3 * l), min: 1 + l }),
     desc: 'Passive: hardened hide and thick blood.',
-    lines: (p) => [`+${p.pct}% Defense`, `+${p.pct2}% Max Life`], color: '#8a8f99', glyph: '⛨',
+    lines: (p) => [`+${p.pct}% Defense`, `+${p.pct2}% Max Life`, `Physical Damage Reduced by ${p.min}`], color: '#8a8f99', glyph: '⛨',
   },
   {
     id: 'weapon_mastery', name: 'Weapon Mastery', classId: 'reaver', reqLevel: 6, kind: 'passive',
@@ -87,7 +87,7 @@ export const SKILLS: SkillDef[] = [
   },
   {
     id: 'frenzy', name: 'Frenzy', classId: 'reaver', reqLevel: 12, prereq: ['bash'], kind: 'attack', weapon: 'melee',
-    mana: () => 3, params: (l) => ({ dmgPct: 40 + 12 * l, pct: 10 + 2 * l, duration: 4 }),
+    mana: () => 2, params: (l) => ({ dmgPct: 40 + 12 * l, pct: 10 + 2 * l, duration: 4 }),
     desc: 'Each hit grows your fury, increasing attack and run speed (stacks 4x).',
     lines: (p) => [`+${p.dmgPct}% Damage`, `+${p.pct}% attack speed per stack`, `+${Math.round(p.pct! / 2)}% run speed per stack`], color: '#d23a2a', glyph: '♨',
   },
@@ -159,7 +159,7 @@ export const SKILLS: SkillDef[] = [
   // ------------------------------------------------------------ Huntress
   {
     id: 'power_shot', name: 'Power Shot', classId: 'huntress', reqLevel: 1, kind: 'attack', weapon: 'bow',
-    mana: () => 1.5, params: (l) => ({ dmgPct: 50 + 20 * l, arPct: 25 + 10 * l }),
+    mana: () => 1, params: (l) => ({ dmgPct: 50 + 20 * l, arPct: 25 + 10 * l }),
     desc: 'A carefully aimed arrow that pierces.', lines: (p) => [`+${p.dmgPct}% Damage`, `+${p.arPct}% Attack Rating`, 'Pierces'],
     color: '#d6c06a', glyph: '➶',
   },
@@ -171,7 +171,7 @@ export const SKILLS: SkillDef[] = [
   },
   {
     id: 'multishot', name: 'Multishot', classId: 'huntress', reqLevel: 6, prereq: ['power_shot'], kind: 'multishot', weapon: 'bow',
-    mana: (l) => 4 + 0.5 * l, params: (l) => ({ count: Math.min(15, 2 + l), dmgPct: -25 + 8 * l }),
+    mana: (l) => 3 + 0.3 * l, params: (l) => ({ count: Math.min(15, 2 + l), dmgPct: -10 + 9 * l }),
     desc: 'Loose a fan of arrows.', lines: (p) => [`Arrows: ${p.count}`, `${p.dmgPct! >= 0 ? '+' : ''}${p.dmgPct}% Damage`],
     color: '#b9d06a', glyph: '⋔',
   },
@@ -182,7 +182,7 @@ export const SKILLS: SkillDef[] = [
     color: '#8fdcff', glyph: '❆',
   },
   {
-    id: 'evade', name: 'Evade', classId: 'huntress', reqLevel: 12, prereq: ['critical_eye'], kind: 'passive',
+    id: 'evade', name: 'Evade', classId: 'huntress', reqLevel: 6, prereq: ['critical_eye'], kind: 'passive',
     mana: () => 0, params: (l) => ({ pct: dim(8, 3, l, 55) }),
     desc: 'Passive: chance to dodge attacks and missiles.', lines: (p) => [`${p.pct}% chance to evade`],
     color: '#9bd39b', glyph: '↯',
@@ -208,7 +208,7 @@ export const SKILLS: SkillDef[] = [
   // ------------------------------------------------------------ Necromancer
   {
     id: 'raise_skeleton', name: 'Raise Skeleton', classId: 'necromancer', reqLevel: 1, kind: 'summon',
-    mana: (l) => 5 + l * 0.5, params: (l) => ({ count: l <= 3 ? l : Math.min(12, 3 + Math.floor((l - 3) / 2)), pct: 10 * (l - 1), pct2: 8 * (l - 1) }),
+    mana: (l) => 5 + l * 0.5, params: (l) => ({ count: l <= 3 ? l : Math.min(10, 3 + Math.floor((l - 3) / 3)), pct: 10 * (l - 1), pct2: 8 * (l - 1) }),
     desc: 'Raise a skeleton warrior from a corpse to fight at your side.',
     lines: (p) => [`Skeletons: ${p.count}`, `+${p.pct}% Skeleton Damage`, `+${p.pct2}% Skeleton Life`, 'Needs a corpse'], color: '#e6dcc0', glyph: '☠',
   },
@@ -227,7 +227,7 @@ export const SKILLS: SkillDef[] = [
   },
   {
     id: 'skeletal_mastery', name: 'Skeletal Mastery', classId: 'necromancer', reqLevel: 6, prereq: ['raise_skeleton'], kind: 'passive',
-    mana: () => 0, params: (l) => ({ pct: 12 * l, pct2: 15 * l }),
+    mana: () => 0, params: (l) => ({ pct: 12 * l, pct2: 10 * l }),
     desc: 'Passive: your skeletons and golem hit harder and endure more.',
     lines: (p) => [`+${p.pct}% Minion Damage`, `+${p.pct2}% Minion Life`], color: '#cfc6a6', glyph: '⚚',
   },

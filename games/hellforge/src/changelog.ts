@@ -1,6 +1,16 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.9.2',
+    date: '2026-11-09',
+    notes: [
+      'Class balance. The Huntress has more life and mana, Multishot costs less and hits harder, Power Shot is cheaper, Evade unlocks at level 6, and the Short Bow hits a little harder.',
+      'The Reaver is tougher: Iron Skin now also reduces physical damage taken and grants more life, and Frenzy costs less mana.',
+      'The Arcanist gains more life from Vitality.',
+      'The Necromancer\'s servants are less sturdy, you raise fewer skeletons at high skill levels, and monsters turn on you sooner when you stand close.',
+    ],
+  },
+  {
     version: '0.9.1',
     date: '2026-11-09',
     notes: ['The stash no longer spills over your backpack. On narrow screens the backpack now sits below the stash instead.'],

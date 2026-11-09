@@ -104,7 +104,7 @@ export const BASES: BaseItem[] = [
   W('short_staff', 'Short Staff', 'staff', 1, 2, 6, 1.3, 1, 3, { twoHanded: true, maxSockets: 2 }),
   W('gnarled_staff', 'Gnarled Staff', 'staff', 7, 4, 12, 1.3, 1, 4, { twoHanded: true, maxSockets: 3 }),
   W('battle_staff', 'Battle Staff', 'staff', 15, 6, 15, 1.3, 1, 4, { twoHanded: true, maxSockets: 4 }),
-  W('short_bow', 'Short Bow', 'bow', 1, 1, 4, 1.45, 2, 3, { twoHanded: true, reqDex: 15 }),
+  W('short_bow', 'Short Bow', 'bow', 1, 2, 5, 1.45, 2, 3, { twoHanded: true, reqDex: 15 }),
   W('hunters_bow', "Hunter's Bow", 'bow', 4, 2, 6, 1.4, 2, 3, { twoHanded: true, reqDex: 28 }),
   W('long_bow', 'Long Bow', 'bow', 9, 3, 10, 1.35, 2, 4, { twoHanded: true, reqDex: 35, maxSockets: 4 }),
   W('composite_bow', 'Composite Bow', 'bow', 12, 4, 12, 1.45, 2, 3, { twoHanded: true, reqDex: 48, reqStr: 25 }),

@@ -2313,7 +2313,7 @@ export class World {
   private monsterFoe(m: Monster, dp: number): Monster | undefined {
     if (!this.minions.length) return undefined;
     const cur = m.foe !== undefined ? this.minions.find((mi) => mi.id === m.foe && !mi.dead) : undefined;
-    if (cur && Math.hypot(cur.x - m.x, cur.y - m.y) < Math.min(8, dp + 3)) return cur;
+    if (cur && Math.hypot(cur.x - m.x, cur.y - m.y) < Math.min(8, dp + 1.5)) return cur;
     let best: Monster | undefined;
     let bd = Math.min(8, dp - 0.75);
     for (const mi of this.minions) {

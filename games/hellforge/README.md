@@ -48,6 +48,7 @@ The version is shown at the bottom of the title screen; tap it for the player-fa
 
 | Version | Commit | Notes |
 |---|---|---|
+| 0.9.2 | | Class balance pass across all four classes |
 | 0.9.0 | | Act 2: The Glass Sea |
 | 0.8.2 | | Light beam and chime for rare drops |
 | 0.8.1 | | Loot with no room hops back up with a thud |
