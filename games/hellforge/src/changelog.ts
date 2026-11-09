@@ -1,6 +1,11 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.9.2',
+    date: '2026-11-09',
+    notes: ['Dying now costs your gold (and experience on Nightmare and Hell) right away. Reloading the page at the death screen no longer skips the penalty.'],
+  },
+  {
     version: '0.9.1',
     date: '2026-11-09',
     notes: ['The stash no longer spills over your backpack. On narrow screens the backpack now sits below the stash instead.'],

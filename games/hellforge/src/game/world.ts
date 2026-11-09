@@ -318,6 +318,8 @@ export class World {
   player: PlayerState;
   events: GameEvent[] = [];
   portal: Portal | null = null;
+  /** Gold taken by the last softcore death, reported when the hero respawns. */
+  private goldLost = 0;
   vendors: VendorStock = { healer: [], smith: [] };
   time = 0;
   focusId = -1;
@@ -2095,21 +2097,31 @@ export class World {
     p.path = [];
     this.minions = [];
     this.sound('death');
-    this.emit({ type: 'death' });
     if (this.char.hardcore) this.char.dead = true;
+    else this.deathPenalty();
+    this.emit({ type: 'death' });
   }
 
-  /** Softcore respawn: lose some gold (and experience on higher difficulties), wake in town. */
-  respawn() {
+  /**
+   * Softcore death costs some gold (and experience on higher difficulties). It is taken the moment
+   * the hero dies, before the death screen saves, so reloading the page can't dodge it.
+   */
+  private deathPenalty() {
     const c = this.char;
-    const p = this.player;
-    const lost = Math.floor(c.gold * 0.2);
-    c.gold -= lost;
+    this.goldLost = Math.floor(c.gold * 0.2);
+    c.gold -= this.goldLost;
     if (c.difficulty > 0) {
       const floor = xpForLevel(c.level);
       const span = xpForLevel(c.level + 1) - floor;
       c.xp = Math.max(floor, c.xp - Math.floor(span * 0.05 * c.difficulty));
     }
+  }
+
+  /** Softcore respawn: wake in town. The death penalty was already paid in die(). */
+  respawn() {
+    const p = this.player;
+    const lost = this.goldLost;
+    this.goldLost = 0;
     p.dead = false;
     p.buffs = {};
     p.frenzy = { stacks: 0, t: 0 };

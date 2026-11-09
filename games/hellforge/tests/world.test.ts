@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addToInventory } from '../src/game/character';
+import { addToInventory, xpForLevel } from '../src/game/character';
 import { makeItem } from '../src/game/items';
 import { elemDamage, LOOT_BOUNCE, type World } from '../src/game/world';
 import { makeWorld, nextToMonster, run } from './helpers';
@@ -155,6 +155,26 @@ describe('combat', () => {
     expect(w.area.def.id).toBe('town');
     expect(w.player.life).toBe(w.stats.maxLife);
     expect(w.char.gold).toBe(800);
+  });
+
+  it('takes the death penalty at once, so reloading at the death screen cannot dodge it', () => {
+    const w = makeWorld();
+    w.char.difficulty = 1;
+    w.char.level = 10;
+    w.char.xp = xpForLevel(10) + Math.floor((xpForLevel(11) - xpForLevel(10)) / 2);
+    const xp = w.char.xp;
+    w.enterArea('cinder_fields', 'start');
+    w.player.invuln = 0;
+    w.char.gold = 1000;
+    w.damagePlayer(elemDamage('fire', 1e6), { level: 1 });
+    expect(w.player.dead).toBe(true);
+    // The death screen saves the character now; it must already carry the loss.
+    expect(w.char.gold).toBe(800);
+    expect(w.char.xp).toBeLessThan(xp);
+    const after = w.char.xp;
+    w.respawn();
+    expect(w.char.gold).toBe(800);
+    expect(w.char.xp).toBe(after);
   });
 
   it('hardcore death is permanent', () => {
