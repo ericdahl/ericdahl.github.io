@@ -48,6 +48,8 @@ The version is shown at the bottom of the title screen; tap it for the player-fa
 
 | Version | Commit | Notes |
 |---|---|---|
+| 0.10.0 | | Redrawn character art: hero gear shows on the model, new monster and NPC models, keyframed weapon swings |
+| 0.9.1 | | Stash no longer overlaps the backpack |
 | 0.9.0 | | Act 2: The Glass Sea |
 | 0.8.2 | | Light beam and chime for rare drops |
 | 0.8.1 | | Loot with no room hops back up with a thud |
@@ -78,6 +80,8 @@ npm run typecheck
 |---|---|
 | `src/game/` | Pure simulation with no DOM: map generation, pathfinding, items, skills, monsters, combat, `World` |
 | `src/render/` | Canvas renderer: isometric camera, procedural sprites, lighting, automap, item/skill icons |
+| `src/render/figures.ts`, `creatures.ts`, `looks.ts` | Character art: the shading kit and humanoids, monster bodies, and what the hero and townsfolk wear |
+| `gallery.html` | Dev-only page (`npm run dev`, then `/gallery.html`) showing every character model in several poses; `?zoom=4&m=imp,bat` narrows it |
 | `src/ui/` | DOM HUD, panels, title screen, input, audio, saves |
 | `tests/` | Vitest suites (`bot.ts` is the playthrough bot used by `act.test.ts`) |
 | `e2e/` | Playwright specs |

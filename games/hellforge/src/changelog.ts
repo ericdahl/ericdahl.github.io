@@ -1,6 +1,17 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.10.0',
+    date: '2026-11-09',
+    notes: [
+      'Every character has been redrawn: shaded, outlined and far more detailed, with faces, hands, boots and proper weapons.',
+      'Your hero now wears what you equip. Quilted, leather, studded, mail, scale and plate armour each look different, as do caps, helms, great helms, circlets and round, heater, kite and tower shields. Magic, rare, set and unique weapons glow.',
+      'Weapons swing properly: a wind-up over the shoulder, a strike, and a recovery. Bows are drawn with an arrow on the string.',
+      'All monsters and bosses have new bodies, from the imps\' horns and tails to the Salt Colossus\'s crystal facets. Monsters that shared a body now look like themselves: Dust Jackals, Grave Golems, Glassbound Shades, Skarn, Karrik and the Embalmer all have their own look.',
+      'Townsfolk got makeovers too, and hit flashes, chill, poison and charred corpses now tint the whole figure cleanly.',
+    ],
+  },
+  {
     version: '0.9.1',
     date: '2026-11-09',
     notes: ['The stash no longer spills over your backpack. On narrow screens the backpack now sits below the stash instead.'],
