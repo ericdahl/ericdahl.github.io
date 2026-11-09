@@ -333,15 +333,18 @@ describe('quests', () => {
     expect(w.questStrays()).toEqual([]);
   });
 
-  it('killing the Mother of Cinders unlocks the next difficulty', () => {
+  it('killing the Mother of Cinders opens the road south but not the next difficulty', () => {
     const w = makeWorld();
     w.enterArea('hellforge', 'start');
     const boss = w.area.monsters.find((m) => m.superId === 'mother')!;
     expect(boss).toBeTruthy();
+    expect(w.roadSouthOpen).toBe(false);
     w.damageMonster(boss, elemDamage('cold', 1e7));
     expect(w.questState('forge')).toBe('done');
-    expect(w.char.maxDifficulty).toBe(1);
-    expect(w.events.some((e) => e.type === 'victory')).toBe(true);
+    expect(w.roadSouthOpen).toBe(true);
+    expect(w.char.maxDifficulty).toBe(0);
+    expect(w.events.some((e) => e.type === 'story' && e.id === 'forge_end')).toBe(true);
+    expect(w.events.some((e) => e.type === 'victory')).toBe(false);
   });
 });
 

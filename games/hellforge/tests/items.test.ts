@@ -44,7 +44,7 @@ describe('item data', () => {
     let own = 0;
     const n = 2000;
     for (let i = 0; i < n; i++) if (generateItem(rng, 30, { rarity: 'set', classId: 'necromancer' }).setId === 'bonewright') own++;
-    // 12 of the 31 weighted shares, against 4 of 23 without the bias.
+    // 12 of the 35 weighted shares, against 4 of 27 without the bias.
     expect(own / n).toBeGreaterThan(0.3);
     expect(own / n).toBeLessThan(0.48);
   });

@@ -5,13 +5,13 @@ import {
 } from '../game/character';
 import { baseOf, buyPrice, displayName, gamblePrice, itemColor, sellPrice, type Item, type Slot } from '../game/items';
 import { classSkills, SKILL_BY_ID } from '../game/skills';
-import { GAMBLE_KINDS, NPC_INFO, type World } from '../game/world';
+import { GAMBLE_KINDS, type World } from '../game/world';
 import { itemIconUrl, skillIconUrl } from '../render/icons';
 import { h, isTouch } from './dom';
 import { compareEquip, defaultSlot } from './compare';
 import { itemTooltip } from './tooltip';
 
-export type PanelKind = 'inventory' | 'character' | 'skills' | 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'menu' | 'help';
+export type PanelKind = 'inventory' | 'character' | 'skills' | 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan' | 'menu' | 'help';
 
 export interface Selection {
   uid: number;
@@ -242,6 +242,8 @@ export function renderPanel(host: PanelHost, kind: PanelKind): HTMLElement {
       return stashPanel(host);
     case 'waypoint':
       return waypointPanel(host);
+    case 'caravan':
+      return caravanPanel(host);
     case 'sage':
       return sagePanel(host);
     case 'fence':
@@ -285,7 +287,7 @@ function inventoryPanel(host: PanelHost) {
 function vendorPanel(host: PanelHost, kind: 'healer' | 'smith') {
   const w = host.world;
   const c = w.char;
-  const info = NPC_INFO[kind];
+  const info = w.npcInfo(kind);
   const list = h('div', { class: 'vendor' });
   for (const it of w.vendors[kind]) {
     const b = baseOf(it);
@@ -300,7 +302,9 @@ function vendorPanel(host: PanelHost, kind: 'healer' | 'smith') {
       ),
     );
   }
-  const greet = kind === 'healer' ? 'Your wounds are mended. Rest a while, friend.' : 'Steel for the brave. Gold for the rest of us.';
+  const greet = w.act === 2
+    ? kind === 'healer' ? 'Drink. The well is clean again, or clean enough.' : 'Sand makes the keenest edge. Mind your fingers.'
+    : kind === 'healer' ? 'Your wounds are mended. Rest a while, friend.' : 'Steel for the brave. Gold for the rest of us.';
   return h(
     'div',
     { class: 'panel vend' },
@@ -436,8 +440,12 @@ function skillsPanel(host: PanelHost) {
 function waypointPanel(host: PanelHost) {
   const w = host.world;
   const list = h('div', { class: 'wplist' });
+  const acts = new Set(w.waypointList().map((wp) => wp.act)).size;
+  let shownAct = 0;
   for (const wp of w.waypointList()) {
     const here = wp.id === w.area.def.id;
+    if (acts > 1 && wp.act !== shownAct) list.append(h('div', { class: 'wp-act' }, `Act ${wp.act}`));
+    shownAct = wp.act;
     list.append(
       h(
         'button',
@@ -450,21 +458,36 @@ function waypointPanel(host: PanelHost) {
   return h('div', { class: 'panel wpp' }, header(host, 'Waypoints', DIFFICULTIES[w.char.difficulty]), h('div', { class: 'p-body' }, list));
 }
 
+function caravanPanel(host: PanelHost) {
+  const w = host.world;
+  const info = w.npcInfo('caravan');
+  const south = w.act === 1;
+  return h(
+    'div',
+    { class: 'panel caravan' },
+    header(host, info.name, info.title),
+    h('div', { class: 'npc-say' }, south ? 'South, then? The road is ash for a week, and after that it is glass. Bring water.' : 'Back to the cold country? We leave whenever you say.'),
+    h('div', { class: 'p-body' },
+      h('button', { class: 'btn primary', onclick: () => { host.close(); w.travelCaravan(); } }, south ? 'Travel to Tel Maresh' : 'Travel to Emberwatch Camp')),
+  );
+}
+
 function sagePanel(host: PanelHost) {
   const w = host.world;
   const unid = [...w.char.inventory, ...w.char.stash].filter((e) => !e.item.identified).length + Object.values(w.char.equipment).filter((i) => i && !i.identified).length;
   const quests = h('div', { class: 'quests' });
-  for (const q of QUESTS) {
+  const info = w.npcInfo('sage');
+  for (const q of QUESTS.filter((d) => (d.act ?? 1) === w.act)) {
     const st = w.questState(q.id);
-    const status = st === 'rewarded' ? 'Complete' : st === 'done' ? 'Return to Corvin' : st === 'active' ? 'In progress' : 'Not started';
+    const status = st === 'rewarded' ? 'Complete' : st === 'done' ? `Return to ${info.name}` : st === 'active' ? 'In progress' : 'Not started';
     const text = st === 'done' || st === 'rewarded' ? q.done : q.intro;
     quests.append(h('div', { class: `quest q-${st}` }, h('div', { class: 'q-name' }, q.name, h('span', { class: 'dim small' }, ` · ${status}`)), h('div', { class: 'small' }, text), h('div', { class: 'small gold' }, `Reward: ${q.reward}`)));
   }
   return h(
     'div',
     { class: 'panel sage' },
-    header(host, NPC_INFO.sage.name, NPC_INFO.sage.title),
-    h('div', { class: 'npc-say' }, 'Stay a moment, wanderer. Let an old man share what he knows.'),
+    header(host, info.name, info.title),
+    h('div', { class: 'npc-say' }, w.act === 2 ? 'The archive survived the glass. Most of what it says, you will not like.' : info.name === 'Wren' ? 'He left in the night. Took his staff and none of his books. He has never done that.' : 'Stay a moment, wanderer. Let an old man share what he knows.'),
     h('div', { class: 'p-body' },
       h('button', { class: 'btn primary', disabled: !unid, onclick: () => { const n = w.identifyAll(); host.toast(n ? `Identified ${n} item${n > 1 ? 's' : ''}` : 'Nothing to identify'); host.refresh(); } }, unid ? `Identify all items (${unid})` : 'Nothing to identify'),
       quests),
@@ -495,8 +518,8 @@ function fencePanel(host: PanelHost) {
   return h(
     'div',
     { class: 'panel vend' },
-    header(host, NPC_INFO.fence.name, NPC_INFO.fence.title),
-    h('div', { class: 'npc-say' }, 'Care to try your luck? Every one of these could be a treasure... or not.'),
+    header(host, w.npcInfo('fence').name, w.npcInfo('fence').title),
+    h('div', { class: 'npc-say' }, w.act === 2 ? 'The bones have opinions about you. Shall we find out what they are?' : 'Care to try your luck? Every one of these could be a treasure... or not.'),
     h('div', { class: 'p-body three' }, h('div', { class: 'col' }, h('div', { class: 'sub' }, 'Gamble'), list), h('div', { class: 'col' }, h('div', { class: 'sub' }, 'Your inventory'), grid(host, c.inventory, INV_COLS, INV_ROWS, 'inv'), goldRow(host)), detail(host, 'vendor')),
   );
 }

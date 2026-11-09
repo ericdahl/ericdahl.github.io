@@ -22,6 +22,13 @@ export const THEMES: Record<ThemeId, Palette> = {
   chapel: { floor: ['#3d3b40', '#39373c', '#423f45', '#363439'], speck: ['#4a474e', '#2b292e'], wallTop: '#5c5862', wallL: '#46434b', wallR: '#333037', grid: '#2a282d' },
   crypt: { floor: ['#33302c', '#2f2c29', '#37342f', '#2c2926'], speck: ['#3f3b35', '#24211e'], wallTop: '#524b42', wallL: '#3d3731', wallR: '#2c2824', grid: '#221f1c' },
   hell: { floor: ['#3b1e15', '#361b13', '#401f16', '#331811'], speck: ['#4c2618', '#24100a', '#5a2a14'], wallTop: '#4d2216', wallL: '#3a1910', wallR: '#29110a', cracks: '#ff6a1a' },
+  oasis: { floor: ['#a8946a', '#a08b60', '#b09c72', '#98855a'], speck: ['#c4b184', '#83724a', '#6b7f42'], wallTop: '#8a6f48', wallL: '#6a5436', wallR: '#524028' },
+  desert: { floor: ['#b89a6c', '#ae9062', '#c0a274', '#a68a5c'], speck: ['#d0b484', '#8c7048', '#a08458'], wallTop: '#8a6c48', wallL: '#6a5236', wallR: '#524028' },
+  glass: { floor: ['#2f4a4c', '#294244', '#355256', '#263c3e'], speck: ['#4a7a7c', '#1a2c2e', '#70b0b0'], wallTop: '#4a7878', wallL: '#2c4c4e', wallR: '#1e3638', cracks: '#a8ecec' },
+  mesa: { floor: ['#96603f', '#8c5839', '#a06846', '#845030'], speck: ['#b47a50', '#5e3a24', '#a4683e'], wallTop: '#8a5234', wallL: '#663a24', wallR: '#4c2a1a' },
+  cistern: { floor: ['#2e3a3c', '#2a3537', '#324042', '#263032'], speck: ['#3f5052', '#1c2628', '#3a5a50'], wallTop: '#4c5a58', wallL: '#38443f', wallR: '#2a3330', grid: '#1e2826' },
+  ruins: { floor: ['#6e5e42', '#66573d', '#766548', '#5e5038'], speck: ['#8a7858', '#463a28'], wallTop: '#a08a64', wallL: '#786648', wallR: '#584a34', grid: '#4a3e2c' },
+  vault: { floor: ['#3a2c14', '#342710', '#402f16', '#2f230e'], speck: ['#5a4420', '#1e160a', '#8a6a20'], wallTop: '#6a5220', wallL: '#4a3816', wallR: '#33270f', grid: '#261c0c', cracks: '#ffc840' },
 };
 
 function canvas(w: number, h: number): HTMLCanvasElement {
@@ -91,6 +98,18 @@ export function floorTile(theme: ThemeId, v: number): HTMLCanvasElement {
     }
     ctx.globalAlpha = 1;
   }
+  if (theme === 'desert' || theme === 'mesa' || theme === 'oasis') {
+    // Wind ripples in the sand.
+    ctx.strokeStyle = 'rgba(70,45,20,0.13)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 4; i++) {
+      const y = rng.range(6, TILE_H - 6);
+      ctx.beginPath();
+      ctx.moveTo(rng.range(4, 18), y);
+      ctx.quadraticCurveTo(TILE_W / 2, y - rng.range(2, 5), TILE_W - rng.range(4, 18), y + rng.range(-2, 2));
+      ctx.stroke();
+    }
+  }
   if (pal.cracks && v % 2 === 0) {
     ctx.strokeStyle = pal.cracks;
     ctx.globalAlpha = 0.55;
@@ -157,7 +176,7 @@ export function wallBlock(theme: ThemeId, v: number): HTMLCanvasElement {
       ctx.lineTo(x, yTop + H);
       ctx.stroke();
     }
-  } else if (theme === 'chapel' || theme === 'crypt' || theme === 'hell') {
+  } else if (theme === 'chapel' || theme === 'crypt' || theme === 'hell' || theme === 'cistern' || theme === 'ruins' || theme === 'vault') {
     for (let r = 1; r < 5; r++) {
       const dy = (r / 5) * H;
       ctx.beginPath();
@@ -200,8 +219,8 @@ export function wallBlock(theme: ThemeId, v: number): HTMLCanvasElement {
       ctx.fill();
     }
   }
-  if (theme === 'hell' && v % 3 === 0) {
-    ctx.strokeStyle = '#ff5a10';
+  if ((theme === 'hell' || theme === 'vault') && v % 3 === 0) {
+    ctx.strokeStyle = theme === 'vault' ? '#ffc840' : '#ff5a10';
     ctx.globalAlpha = 0.6;
     ctx.beginPath();
     ctx.moveTo(W * 0.7, T / 2 + 8);
@@ -229,6 +248,11 @@ export function treeSprite(theme: ThemeId, v: number): HTMLCanvasElement {
   const rng = new Rng(v * 977 + 3);
   const bx = 48;
   const by = 112;
+  if (theme === 'oasis' || theme === 'desert' || theme === 'glass' || theme === 'mesa') {
+    drawDesertObstacle(ctx, theme, v, rng, bx, by);
+    treeCache.set(key, c);
+    return c;
+  }
   const rock = (theme === 'fields' && v % 3 === 0) || theme === 'cave';
   if (rock) {
     ctx.fillStyle = '#2a2723';
@@ -303,6 +327,123 @@ export function treeSprite(theme: ThemeId, v: number): HTMLCanvasElement {
   }
   treeCache.set(key, c);
   return c;
+}
+
+function drawDesertObstacle(ctx: CanvasRenderingContext2D, theme: 'oasis' | 'desert' | 'glass' | 'mesa', v: number, rng: Rng, bx: number, by: number) {
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(bx, by, 25, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (theme === 'oasis') {
+    // Date palm: a leaning trunk and a crown of drooping fronds.
+    const lean = rng.range(-9, 9);
+    const topX = bx + lean;
+    const topY = by - 74;
+    ctx.strokeStyle = '#6a4e2e';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.quadraticCurveTo(bx - lean * 0.5, by - 40, topX, topY);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(40,26,12,0.5)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i < 8; i++) {
+      const k = i / 8;
+      const x = bx + (topX - bx) * k * k;
+      ctx.beginPath();
+      ctx.moveTo(x - 3, by - 74 * k);
+      ctx.lineTo(x + 3, by - 74 * k - 1);
+      ctx.stroke();
+    }
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2;
+      const len = rng.range(30, 42);
+      const ex = topX + Math.cos(a) * len;
+      const ey = topY + Math.sin(a) * len * 0.42 + 12;
+      ctx.strokeStyle = i % 2 ? '#3f6a2a' : '#54803a';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(topX, topY);
+      ctx.quadraticCurveTo(topX + Math.cos(a) * len * 0.6, topY - 12, ex, ey);
+      ctx.stroke();
+    }
+    return;
+  }
+  if (theme === 'glass') {
+    // Jagged spires of fused black-green glass.
+    const n = 3 + (v % 3);
+    for (let i = 0; i < n; i++) {
+      const x = bx + rng.range(-20, 20);
+      const h = rng.range(34, 86);
+      const w = rng.range(7, 14);
+      const tip = x + rng.range(-8, 8);
+      const g = ctx.createLinearGradient(x - w, by - h, x + w, by);
+      g.addColorStop(0, '#a8ecec');
+      g.addColorStop(0.4, '#3b7476');
+      g.addColorStop(1, '#14282a');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(x - w, by + rng.range(-2, 4));
+      ctx.lineTo(tip, by - h);
+      ctx.lineTo(x + w, by + rng.range(-2, 4));
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(200,250,250,0.55)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(tip, by - h);
+      ctx.lineTo(x - w * 0.2, by);
+      ctx.stroke();
+    }
+    return;
+  }
+  if (theme === 'desert' && v % 3 === 1) {
+    // Saguaro.
+    ctx.strokeStyle = '#4c6a38';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.lineTo(bx, by - 66);
+    ctx.stroke();
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(bx, by - 30);
+    ctx.lineTo(bx - 16, by - 34);
+    ctx.lineTo(bx - 16, by - 54);
+    ctx.moveTo(bx, by - 40);
+    ctx.lineTo(bx + 15, by - 44);
+    ctx.lineTo(bx + 15, by - 60);
+    ctx.stroke();
+    return;
+  }
+  // Wind-carved rock: squat boulders in the desert, tall red spires on the mesa.
+  const tall = theme === 'mesa' ? rng.range(58, 92) : rng.range(26, 44);
+  const hi = theme === 'mesa' ? '#b87850' : '#c4a472';
+  const lo = theme === 'mesa' ? '#5c3420' : '#6e5636';
+  const g = ctx.createLinearGradient(bx - 22, by - tall, bx + 22, by);
+  g.addColorStop(0, hi);
+  g.addColorStop(1, lo);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(bx - 25, by + 3);
+  ctx.lineTo(bx - 19 + rng.range(-3, 3), by - tall * 0.65);
+  ctx.lineTo(bx - 8, by - tall);
+  ctx.lineTo(bx + 11, by - tall * 0.92);
+  ctx.lineTo(bx + 21, by - tall * 0.45);
+  ctx.lineTo(bx + 25, by + 3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(40,20,10,0.35)';
+  ctx.lineWidth = 1.2;
+  for (let i = 1; i < 5; i++) {
+    const y = by - (tall * i) / 5;
+    ctx.beginPath();
+    ctx.moveTo(bx - 21, y + rng.range(-2, 2));
+    ctx.lineTo(bx + 20, y + rng.range(-3, 3));
+    ctx.stroke();
+  }
 }
 
 // ------------------------------------------------------------------ figures
@@ -821,6 +962,324 @@ export function drawMonsterShape(ctx: CanvasRenderingContext2D, shape: string, c
         trim: big ? '#c8b060' : undefined,
       };
       drawHumanoid(ctx, look, { ...pose, dir: 1 });
+      break;
+    }
+    case 'scarab': {
+      const bob = Math.abs(sw) * 1.5;
+      ctx.strokeStyle = shade(color, -0.45);
+      ctx.lineWidth = 1.5;
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * 5, -7);
+        ctx.lineTo(i * 8 + sw * 3, 0);
+        ctx.moveTo(i * 5, -7);
+        ctx.lineTo(i * 8 - sw * 3, -1);
+        ctx.stroke();
+      }
+      const g = ctx.createLinearGradient(-9, -18, 9, -4);
+      g.addColorStop(0, '#d4fbfb');
+      g.addColorStop(0.45, color);
+      g.addColorStop(1, shade(color, -0.55));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(0, -10 - bob, 10, 7.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(220,255,255,0.6)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, -17 - bob);
+      ctx.lineTo(0, -3 - bob);
+      ctx.stroke();
+      ctx.fillStyle = shade(color, -0.5);
+      ctx.beginPath();
+      ctx.arc(9, -11 - bob, 3.6, 0, Math.PI * 2);
+      ctx.fill();
+      eyes(ctx, 10.5, -12 - bob, 2.5, '#ffe860', 0.8);
+      break;
+    }
+    case 'scorpion': {
+      ctx.strokeStyle = shade(color, -0.4);
+      ctx.lineWidth = 2.4;
+      for (let i = 0; i < 4; i++) {
+        const x = -8 + i * 5;
+        const s = i % 2 ? sw : -sw;
+        ctx.beginPath();
+        ctx.moveTo(x, -7);
+        ctx.lineTo(x - 5, -11);
+        ctx.lineTo(x - 7 + s * 3, 0);
+        ctx.moveTo(x, -7);
+        ctx.lineTo(x + 5, -11);
+        ctx.lineTo(x + 7 - s * 3, 0);
+        ctx.stroke();
+      }
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.ellipse(1, -9, 13, 6.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Tail arcing over the back, striking forward on attack.
+      ctx.strokeStyle = shade(color, 0.08);
+      ctx.lineWidth = 4.2;
+      ctx.beginPath();
+      ctx.moveTo(-11, -9);
+      ctx.quadraticCurveTo(-26, -20, -17 + atk * 16, -36 + atk * 8);
+      ctx.quadraticCurveTo(-11 + atk * 18, -40 + atk * 8, -5 + atk * 22, -32 + atk * 10);
+      ctx.stroke();
+      ctx.fillStyle = '#d8e070';
+      ctx.beginPath();
+      ctx.arc(-5 + atk * 22, -31 + atk * 10, 2.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = shade(color, -0.1);
+      ctx.lineWidth = 3.4;
+      ctx.beginPath();
+      ctx.moveTo(11, -9);
+      ctx.lineTo(19 + atk * 5, -12);
+      ctx.moveTo(19 + atk * 5, -12);
+      ctx.lineTo(25 + atk * 5, -8 + atk * 3);
+      ctx.moveTo(19 + atk * 5, -12);
+      ctx.lineTo(25 + atk * 5, -16 - atk * 3);
+      ctx.stroke();
+      eyes(ctx, 12, -12, 3, '#ff6030', 0.9);
+      break;
+    }
+    case 'burrower': {
+      const up = 1 + atk * 0.25;
+      ctx.fillStyle = shade(color, -0.25);
+      ctx.beginPath();
+      ctx.ellipse(0, -2, 20, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(-12, 0);
+      ctx.quadraticCurveTo(-13 + sw * 2, -28 * up, 0 + sw * 2, -42 * up);
+      ctx.quadraticCurveTo(13 + sw * 2, -28 * up, 12, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = shade(color, -0.4);
+      ctx.lineWidth = 1.4;
+      for (let i = 1; i < 6; i++) {
+        const y = -7 * i * up;
+        ctx.beginPath();
+        ctx.moveTo(-12 + i * 1.5, y);
+        ctx.quadraticCurveTo(0, y + 3, 12 - i * 1.5, y);
+        ctx.stroke();
+      }
+      ctx.fillStyle = '#2a0a08';
+      ctx.beginPath();
+      ctx.ellipse(1 + sw * 2, -37 * up, 8, 6 + atk * 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#efe4c8';
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2;
+        const px = 1 + sw * 2 + Math.cos(a) * 7.5;
+        const py = -37 * up + Math.sin(a) * 5.5;
+        ctx.beginPath();
+        ctx.moveTo(px - 1.5, py);
+        ctx.lineTo(1 + sw * 2 + Math.cos(a) * 3.5, -37 * up + Math.sin(a) * 2.5);
+        ctx.lineTo(px + 1.5, py);
+        ctx.fill();
+      }
+      break;
+    }
+    case 'kite': {
+      const flap = Math.sin(t * 9);
+      ctx.translate(0, -28 + Math.sin(t * 3) * 3);
+      ctx.fillStyle = shade(color, -0.25);
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(0, -2);
+        ctx.lineTo(side * 11, -8 - flap * 9);
+        ctx.lineTo(side * 25, -4 - flap * 13);
+        ctx.lineTo(side * 18, 1 - flap * 7);
+        ctx.lineTo(side * 21, 6 - flap * 8);
+        ctx.lineTo(side * 11, 4 - flap * 4);
+        ctx.lineTo(side * 5, 5);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 6, 9, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#c48870';
+      ctx.beginPath();
+      ctx.arc(4, -10, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#d8c080';
+      ctx.beginPath();
+      ctx.moveTo(7, -11);
+      ctx.lineTo(13 + atk * 3, -8);
+      ctx.lineTo(7, -8);
+      ctx.fill();
+      eyes(ctx, 5, -11, 2.5, '#ff3020', 0.9);
+      break;
+    }
+    case 'mummy': {
+      const big = color === '#d8c068';
+      ctx.strokeStyle = shade(color, -0.2);
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(-3, -18);
+      ctx.lineTo(-4 + sw * 3, 0);
+      ctx.moveTo(3, -18);
+      ctx.lineTo(4 - sw * 3, 0);
+      ctx.stroke();
+      ctx.fillStyle = color;
+      roundRect(ctx, -8, -38, 16, 22, 5);
+      ctx.fill();
+      ctx.strokeStyle = shade(color, -0.4);
+      ctx.lineWidth = 1.1;
+      for (let i = 0; i < 6; i++) {
+        const y = -36 + i * 4;
+        ctx.beginPath();
+        ctx.moveTo(-8, y + (i % 2) * 2);
+        ctx.lineTo(8, y + ((i + 1) % 2) * 2);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = shade(color, -0.1);
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(7, -34);
+      ctx.lineTo(16 + atk * 6, -32 + atk * 7);
+      ctx.moveTo(-7, -34);
+      ctx.lineTo(-13 + sw * 2, -22);
+      ctx.stroke();
+      ctx.strokeStyle = shade(color, -0.25);
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(-12 + sw * 2, -24);
+      ctx.lineTo(-15 + Math.sin(t * 4) * 3, -11);
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(1, -44, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = shade(color, -0.4);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-5, -46);
+      ctx.lineTo(7, -44);
+      ctx.moveTo(-5, -42);
+      ctx.lineTo(7, -41);
+      ctx.stroke();
+      eyes(ctx, 2.5, -45, 3.8, big ? '#ffc840' : '#70e0ff', 1.2);
+      if (big) {
+        ctx.fillStyle = '#c89a28';
+        ctx.beginPath();
+        ctx.moveTo(-7, -49);
+        ctx.lineTo(-5, -60);
+        ctx.lineTo(-1, -53);
+        ctx.lineTo(2, -64);
+        ctx.lineTo(5, -53);
+        ctx.lineTo(9, -60);
+        ctx.lineTo(9, -49);
+        ctx.closePath();
+        ctx.fill();
+      }
+      break;
+    }
+    case 'raider':
+    case 'acolyte':
+    case 'mirage':
+    case 'corvin': {
+      const looks: Record<string, HumanoidLook> = {
+        raider: { body: color, trim: '#3a2a18', skin: '#a87850', legs: '#4a3a24', head: 'hood', headColor: '#c8b488', weapon: 'bow', weaponColor: '#5a4020' },
+        acolyte: { body: color, trim: '#fff0a8', skin: '#b08860', legs: '#222', head: 'mitre', headColor: '#f0c858', robe: true, weapon: 'staff', weaponColor: '#ffe080' },
+        mirage: { body: color, trim: '#ff8040', skin: '#d8b078', legs: '#222', head: 'hood', headColor: '#e8c070', robe: true, weapon: 'wand', weaponColor: '#ffe0a0' },
+        corvin: { body: '#4a5068', trim: '#c8b060', skin: '#d8b898', legs: '#222', head: 'hair', headColor: '#e8e8e8', robe: true, weapon: 'staff', weaponColor: '#a0d8ff' },
+      };
+      drawHumanoid(ctx, looks[shape], { ...pose, dir: 1 });
+      break;
+    }
+    case 'colossus': {
+      ctx.strokeStyle = shade(color, -0.35);
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.moveTo(-6, -16);
+      ctx.lineTo(-7 + sw * 3, 0);
+      ctx.moveTo(6, -16);
+      ctx.lineTo(7 - sw * 3, 0);
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(-15, -38);
+      ctx.lineTo(-11, -14);
+      ctx.lineTo(12, -13);
+      ctx.lineTo(16, -40);
+      ctx.lineTo(4, -47);
+      ctx.lineTo(-7, -46);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = shade(color, -0.18);
+      ctx.beginPath();
+      ctx.moveTo(1, -42);
+      ctx.lineTo(13, -38);
+      ctx.lineTo(10, -16);
+      ctx.lineTo(1, -18);
+      ctx.closePath();
+      ctx.fill();
+      // Salt crystals growing out of the shoulders.
+      ctx.fillStyle = '#f6f4ec';
+      for (const [x, h] of [[-13, 15], [-8, 22], [13, 18], [8, 13]] as const) {
+        ctx.beginPath();
+        ctx.moveTo(x - 4, -41);
+        ctx.lineTo(x, -41 - h);
+        ctx.lineTo(x + 4, -41);
+        ctx.fill();
+      }
+      eyes(ctx, 3, -40, 6, '#60d8ff', 1.5);
+      ctx.strokeStyle = shade(color, -0.1);
+      ctx.lineWidth = 9;
+      ctx.beginPath();
+      ctx.moveTo(14, -36);
+      ctx.lineTo(21 + atk * 2, -14 - atk * 26);
+      ctx.moveTo(-14, -36);
+      ctx.lineTo(-20, -14 - atk * 26);
+      ctx.stroke();
+      break;
+    }
+    case 'noon': {
+      // Corvane's true form: a robed figure hanging under a burning halo.
+      const lift = 8 + Math.sin(t * 2) * 2;
+      ctx.translate(0, -lift);
+      const glow = ctx.createRadialGradient(0, -44, 2, 0, -44, 38);
+      glow.addColorStop(0, 'rgba(255,240,180,0.85)');
+      glow.addColorStop(0.45, 'rgba(255,170,50,0.32)');
+      glow.addColorStop(1, 'rgba(255,120,0,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(-40, -84, 80, 80);
+      ctx.strokeStyle = '#ffe9a0';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2 + t * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * 13, -44 + Math.sin(a) * 13);
+        ctx.lineTo(Math.cos(a) * (i % 2 ? 19 : 25), -44 + Math.sin(a) * (i % 2 ? 19 : 25));
+        ctx.stroke();
+      }
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(-8, -36);
+      ctx.lineTo(8, -36);
+      ctx.lineTo(13, 2);
+      ctx.lineTo(5, -3);
+      ctx.lineTo(0, 4);
+      ctx.lineTo(-5, -3);
+      ctx.lineTo(-13, 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#1a1208';
+      ctx.beginPath();
+      ctx.arc(0, -44, 8, 0, Math.PI * 2);
+      ctx.fill();
+      eyes(ctx, 0, -44, 5, '#fff6c0', 1.6);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(7, -33);
+      ctx.lineTo(18 + atk * 8, -26 - atk * 18);
+      ctx.moveTo(-7, -33);
+      ctx.lineTo(-18 - atk * 8, -26 - atk * 18);
+      ctx.stroke();
       break;
     }
     case 'mother': {

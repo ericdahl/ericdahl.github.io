@@ -7,7 +7,7 @@ function grid(rows: string[]): Level {
   const w = rows[0].length;
   const tiles = new Uint8Array(w * h);
   rows.forEach((r, y) => [...r].forEach((c, x) => (tiles[y * w + x] = c === '#' ? WALL : FLOOR)));
-  return { w, h, tiles, theme: 'crypt', start: { x: 1, y: 1 }, exits: [], waypoint: null, spawns: [], props: [], objects: [], rooms: [], spots: {} };
+  return { w, h, tiles, slow: new Set(), theme: 'crypt', start: { x: 1, y: 1 }, exits: [], waypoint: null, spawns: [], props: [], objects: [], rooms: [], spots: {} };
 }
 
 const MAZE = grid([

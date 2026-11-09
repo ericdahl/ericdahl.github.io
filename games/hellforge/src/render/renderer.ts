@@ -27,8 +27,8 @@ export interface LabelRect {
   groundId: number;
 }
 
-const OUTDOOR = new Set(['fields', 'forest', 'town']);
-const BLOCK_PROPS = new Set(['pillar', 'tent', 'campfire']);
+const OUTDOOR = new Set(['fields', 'forest', 'town', 'oasis', 'desert', 'glass', 'mesa']);
+const BLOCK_PROPS = new Set(['pillar', 'tent', 'campfire', 'well']);
 
 export class Renderer {
   readonly cam = new Camera();
@@ -96,13 +96,14 @@ export class Renderer {
     ctx.fillRect(0, 0, cam.w, cam.h);
     const z = cam.zoom;
     const b = cam.bounds(3);
-    const lightR = a.def.light;
+    // A sandstorm closes the world in around the player.
+    const lightR = a.def.light * (1 - 0.42 * w.storm);
     const visR = lightR + 3;
     const props = this.props(l);
     const lights: Light[] = [{ x: p.x, y: p.y, r: lightR, a: 1 }];
     const theme = l.theme;
     const outdoor = OUTDOOR.has(theme);
-    const town = a.def.id === 'town';
+    const town = !!a.def.town;
 
     // Floor pass.
     for (let y = Math.max(0, b.y0); y <= Math.min(l.h - 1, b.y1); y++)
@@ -120,6 +121,15 @@ export class Renderer {
           diamondPath(ctx, s.x, s.y, TILE_W * z * 0.8, TILE_H * z * 0.8);
           ctx.fill();
           lights.push({ x: x + 0.5, y: y + 0.5, r: 2.2, a: 0.5 });
+        }
+        if (pr?.kind === 'quicksand') {
+          // A soft blob rather than the tile's diamond, so patches read as sand and not as floor tiles.
+          ctx.fillStyle = theme === 'glass' ? 'rgba(14,46,48,0.38)' : 'rgba(84,58,30,0.34)';
+          for (const k of [1, 0.72, 0.45]) {
+            ctx.beginPath();
+            ctx.ellipse(s.x, s.y + (TILE_H * z) / 2, TILE_W * z * 0.62 * k, TILE_H * z * 0.62 * k, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
       }
 
@@ -148,7 +158,7 @@ export class Renderer {
         if (outdoor || theme === 'cave') {
           add(depth, () => {
             const v = Math.floor(tileHash(x, y, 7) * 6);
-            const spr = treeSprite(town ? 'town' : theme, v);
+            const spr = treeSprite(theme, v);
             const c = cam.toScreen(x + 0.5, y + 0.5);
             const k = z * (0.75 + tileHash(x, y, 3) * 0.35);
             if (occl) ctx.globalAlpha = 0.35;
@@ -166,7 +176,7 @@ export class Renderer {
 
     // Floor props.
     for (const pr of l.props) {
-      if (BLOCK_PROPS.has(pr.kind) || pr.kind === 'lava') continue;
+      if (BLOCK_PROPS.has(pr.kind) || pr.kind === 'lava' || pr.kind === 'quicksand') continue;
       if (pr.x < b.x0 || pr.x > b.x1 || pr.y < b.y0 || pr.y > b.y1) continue;
       if (!town && !a.explored[pr.y * l.w + pr.x]) continue;
       add(pr.x + pr.y + 1, () => this.drawProp(pr, lights));
@@ -258,7 +268,7 @@ export class Renderer {
     // Additive effects.
     for (const f of a.fx) this.drawFx(f, lights);
 
-    this.drawLighting(lights, a.def.dark);
+    this.drawLighting(lights, Math.max(a.def.dark, 0.88 * w.storm), w.storm);
     if (this.showWeather) {
       this.weather.update(w, dt);
       this.weather.draw(ctx, cam, w);
@@ -290,7 +300,7 @@ export class Renderer {
 
   // ---------------------------------------------------------------- lighting
 
-  private drawLighting(lights: Light[], dark: number) {
+  private drawLighting(lights: Light[], dark: number, dust = 0) {
     const d = this.dctx;
     const cam = this.cam;
     const W = this.dark.width;
@@ -299,7 +309,8 @@ export class Renderer {
     d.globalCompositeOperation = 'source-over';
     d.setTransform(1, 0, 0, 1, 0, 0);
     d.clearRect(0, 0, W, H);
-    d.fillStyle = `rgba(0,0,0,${dark})`;
+    // A sandstorm closes in as brown murk rather than night.
+    d.fillStyle = `rgba(${Math.round(104 * dust)},${Math.round(72 * dust)},${Math.round(36 * dust)},${dark})`;
     d.fillRect(0, 0, W, H);
     d.globalCompositeOperation = 'destination-out';
     const unit = (TILE_W / 2) * cam.zoom * sx;
@@ -439,14 +450,20 @@ export class Renderer {
       smith: { body: '#5a3a22', trim: '#2a1a10', skin: '#c08868', legs: '#2a2018', head: 'hair', headColor: '#2a1a0a', weapon: 'mace', weaponColor: '#888' },
       sage: { body: '#4a5068', trim: '#c8b060', skin: '#d8b898', legs: '#222', head: 'hair', headColor: '#e8e8e8', robe: true, weapon: 'staff', weaponColor: '#a0d8ff' },
       fence: { body: '#5a2a5a', trim: '#d8b850', skin: '#d0a888', legs: '#222', head: 'cap', headColor: '#2a1a2a', cape: '#3a1a3a' },
+      caravan: { body: '#8a6a3a', trim: '#3a2a18', skin: '#b08860', legs: '#3a2c1a', head: 'hood', headColor: '#d8c8a0', weapon: 'staff', weaponColor: '#6a4a24' },
     };
+    if (w.act === 2) {
+      looks.healer = { body: '#3f7f8a', trim: '#e8d8a0', skin: '#a87850', legs: '#222', head: 'hood', headColor: '#d8e8e0', robe: true, weapon: 'staff', weaponColor: '#80e0ff' };
+      looks.smith = { body: '#6a4a2a', trim: '#70c8c8', skin: '#8a5a38', legs: '#2a2018', head: 'cap', headColor: '#d8c8a0', weapon: 'mace', weaponColor: '#70c8c8' };
+      looks.sage = { body: '#7a5a2a', trim: '#e8c860', skin: '#8a6040', legs: '#222', head: 'hood', headColor: '#e8d8b0', robe: true, weapon: 'staff', weaponColor: '#ffd080' };
+      looks.fence = { body: '#8a2a3a', trim: '#e8c860', skin: '#a87850', legs: '#222', head: 'hair', headColor: '#141014', cape: '#5a1a2a' };
+    }
     const pose = this.pose(n.facing, 0, false, 0, 0);
     ctx.save();
     ctx.translate(s.x, s.y + Math.sin(this.time * 1.5 + n.id) * 0.5);
     ctx.scale(z, z);
     drawHumanoid(ctx, looks[n.kind], pose);
     ctx.restore();
-    void w;
   }
 
   private drawMonster(m: Monster) {
@@ -458,6 +475,7 @@ export class Renderer {
       const fade = m.deadT > 30 ? Math.max(0, 1 - (m.deadT - 30) / 10) : 1;
       const fall = Math.min(1, m.deadT / 0.35);
       const how = m.rarity === 'boss' ? 'normal' : m.deathKind ?? 'normal';
+      const deadShape = m.shape ?? m.def.shape;
       ctx.save();
       ctx.globalAlpha = fade;
       if (how === 'shatter') {
@@ -489,13 +507,13 @@ export class Renderer {
         }
       }
       const scorched = how === 'burn' || how === 'shock';
-      if (m.deadT > 0.2 && (scorched || (!m.def.undead && m.def.shape !== 'wraith'))) {
+      if (m.deadT > 0.2 && (scorched || (!m.def.undead && deadShape !== 'wraith'))) {
         ctx.fillStyle = scorched ? 'rgba(8,6,4,0.6)' : 'rgba(90,0,0,0.55)';
         ctx.beginPath();
         ctx.ellipse(s.x, s.y, Math.min(1, m.deadT) * 18 * z * k, Math.min(1, m.deadT) * 8 * z * k, 0, 0, Math.PI * 2);
         ctx.fill();
       }
-      if (m.def.shape === 'wraith' || m.def.shape === 'bat') {
+      if (deadShape === 'wraith' || deadShape === 'bat') {
         ctx.restore();
         return;
       }
@@ -504,18 +522,27 @@ export class Renderer {
       ctx.scale(z * k, z * k * (1 - fall * 0.45) * sink);
       ctx.rotate(-fall * Math.PI * 0.42);
       const col = how === 'burn' ? '#140e0a' : how === 'melt' ? '#4a6a20' : shade(m.def.color, -0.35);
-      drawMonsterShape(ctx, m.def.shape, col, this.pose(m.facing, 0, false, 0, 0), 0);
+      drawMonsterShape(ctx, deadShape, col, this.pose(m.facing, 0, false, 0, 0), 0);
       if (how === 'shock' && m.deadT < 0.8 && Math.sin(this.time * 60) > 0) {
         ctx.globalCompositeOperation = 'lighter';
         ctx.globalAlpha = 0.6 * (1 - m.deadT / 0.8);
-        drawMonsterShape(ctx, m.def.shape, '#80b0ff', this.pose(m.facing, 0, false, 0, 0), 0);
+        drawMonsterShape(ctx, deadShape, '#80b0ff', this.pose(m.facing, 0, false, 0, 0), 0);
       }
       if (how === 'burn' && m.deadT < 1.5) {
         ctx.globalCompositeOperation = 'lighter';
         ctx.globalAlpha = 0.3 * (1 - m.deadT / 1.5);
-        drawMonsterShape(ctx, m.def.shape, '#ff5010', this.pose(m.facing, 0, false, 0, 0), 0);
+        drawMonsterShape(ctx, deadShape, '#ff5010', this.pose(m.facing, 0, false, 0, 0), 0);
       }
       ctx.restore();
+      return;
+    }
+    if (m.sub) {
+      // Nothing to see but the sand heaving as it moves.
+      const heave = 0.7 + 0.3 * Math.sin(this.time * 14 + m.id);
+      ctx.fillStyle = 'rgba(120,92,56,0.75)';
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y, 20 * z * k * heave, 9 * z * k * heave, 0, Math.PI, 0);
+      ctx.fill();
       return;
     }
     // Aura ring for special monsters; servants get a pale green one.
@@ -531,23 +558,36 @@ export class Renderer {
       ctx.stroke();
       ctx.restore();
     }
-    this.shadow(m.x, m.y, m.def.radius * 1.4);
+    if (m.shield) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = '#ffd060';
+      ctx.globalAlpha = 0.55 + 0.25 * Math.sin(this.time * 7);
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y - 26 * z * k, 20 * z * k, 34 * z * k, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // Illusions cast no shadow, which is how you tell them apart.
+    if (!m.illusion) this.shadow(m.x, m.y, m.def.radius * 1.4);
     const act = m.action;
     const attack = act ? Math.min(1, act.t / act.dur) : 0;
     const pose = this.pose(m.facing, m.walk, m.walk > 0 && !act, attack, act?.kind === 'cast' ? attack : 0);
     ctx.save();
     ctx.translate(s.x, s.y);
     ctx.scale(z * k, z * k);
-    let color = m.def.color;
+    let color = m.color ?? m.def.color;
+    const shape = m.shape ?? m.def.shape;
     if (m.rarity === 'champion') color = shade(color, 0.15);
     if (m.mods.includes('fireEnch')) color = '#d8602a';
     if (m.mods.includes('coldEnch')) color = '#7aa8d8';
-    drawMonsterShape(ctx, m.def.shape, color, pose, this.time + m.id);
+    drawMonsterShape(ctx, shape, color, pose, this.time + m.id);
     const poisoned = m.poison.t > 0;
     if (m.flash > 0 || m.chill > 0 || poisoned || this.hoverId === m.id) {
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = m.flash > 0 ? 0.55 : this.hoverId === m.id ? 0.25 : 0.35;
-      drawMonsterShape(ctx, m.def.shape, m.flash > 0 ? '#ffffff' : m.chill > 0 ? '#3080ff' : poisoned ? '#40a010' : '#806040', pose, this.time + m.id);
+      drawMonsterShape(ctx, shape, m.flash > 0 ? '#ffffff' : m.chill > 0 ? '#3080ff' : poisoned ? '#40a010' : '#806040', pose, this.time + m.id);
     }
     ctx.restore();
     if (m.stun > 0.3) this.text('✦', s.x, s.y - 54 * z * k, '#ffe080', 12);
@@ -630,6 +670,9 @@ export class Renderer {
       m_fireball: ['#ffe8a0', '#ff4a00', 13],
       m_cold: ['#ffffff', '#3a90ff', 8],
       m_light: ['#ffffff', '#e8e060', 7],
+      m_poison: ['#e0ffa0', '#60b010', 8],
+      m_glass: ['#ffffff', '#70e0e0', 5],
+      m_sun: ['#fff4c8', '#ffb020', 9],
     };
     const [c0, c1, r0] = col[pr.kind] ?? ['#fff', '#f80', 8];
     const r = r0 * z;
@@ -742,6 +785,58 @@ export class Renderer {
         ctx.fill();
         flame(s.x, s.y - 26 * z, 9 * z);
         lights.push({ x: pr.x + 0.5, y: pr.y + 0.5, r: 5, a: 0.85 });
+        break;
+      case 'well':
+        ctx.fillStyle = '#7a6444';
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y - 6 * z, 21 * z, 11 * z, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#5a4830';
+        ctx.fillRect(s.x - 21 * z, s.y - 6 * z, 42 * z, 8 * z);
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y + 2 * z, 21 * z, 11 * z, 0, 0, Math.PI);
+        ctx.fill();
+        ctx.fillStyle = '#2f6f86';
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y - 7 * z, 16 * z, 8 * z, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = `rgba(190,240,255,${0.3 + 0.2 * Math.sin(t * 2)})`;
+        ctx.beginPath();
+        ctx.ellipse(s.x - 4 * z, s.y - 9 * z, 6 * z, 2.5 * z, 0, 0, Math.PI * 2);
+        ctx.fill();
+        lights.push({ x: pr.x + 0.5, y: pr.y + 0.5, r: 6, a: 0.5 });
+        break;
+      case 'scrub':
+        ctx.strokeStyle = '#6a6a38';
+        ctx.lineWidth = 1.5 * z;
+        ctx.beginPath();
+        for (let i = -4; i <= 4; i++) {
+          ctx.moveTo(s.x + i * 1.5 * z, s.y);
+          ctx.lineTo(s.x + i * 3.2 * z, s.y - (9 + (i & 3) * 2) * z);
+        }
+        ctx.stroke();
+        break;
+      case 'shards':
+        ctx.fillStyle = 'rgba(160,235,235,0.75)';
+        for (let i = 0; i < 4; i++) {
+          const dx = ((pr.x * 7 + i * 13) % 20) - 10;
+          const dy = ((pr.y * 5 + i * 9) % 10) - 5;
+          ctx.beginPath();
+          ctx.moveTo(s.x + (dx - 3) * z, s.y + dy * z);
+          ctx.lineTo(s.x + dx * z, s.y + (dy - 9) * z);
+          ctx.lineTo(s.x + (dx + 3) * z, s.y + dy * z);
+          ctx.fill();
+        }
+        break;
+      case 'urn':
+        ctx.fillStyle = '#a06a3a';
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y - 9 * z, 8 * z, 11 * z, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#6a4424';
+        ctx.fillRect(s.x - 5 * z, s.y - 21 * z, 10 * z, 3 * z);
+        ctx.fillStyle = 'rgba(232,200,96,0.7)';
+        ctx.fillRect(s.x - 7 * z, s.y - 11 * z, 14 * z, 2 * z);
         break;
       case 'campfire':
         ctx.strokeStyle = '#4a3020';
@@ -1046,6 +1141,28 @@ export class Renderer {
         ctx.stroke();
         break;
       }
+      case 'shade_mark': {
+        const r = (f.r ?? 2) * unitX * 1.3;
+        ctx.fillStyle = `rgba(10,14,40,${0.35 + 0.3 * k})`;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, r, r * 0.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(150,190,255,${0.6 + 0.3 * Math.sin(this.time * 9)})`;
+        ctx.lineWidth = 2.5 * z;
+        ctx.stroke();
+        break;
+      }
+      case 'dust': {
+        ctx.fillStyle = `rgba(190,160,110,${0.5 * (1 - k)})`;
+        for (let i = 0; i < 5; i++) {
+          const a = i * 1.26 + f.x;
+          const d = k * 22 * z;
+          ctx.beginPath();
+          ctx.ellipse(s.x + Math.cos(a) * d, s.y + Math.sin(a) * d * 0.5 - k * 12 * z, (5 + k * 9) * z, (3 + k * 5) * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+      }
       case 'meteor_mark': {
         const r = (f.r ?? 2) * unitX * 1.3;
         ctx.strokeStyle = `rgba(255,80,30,${0.4 + 0.4 * Math.sin(this.time * 12)})`;
@@ -1231,7 +1348,7 @@ export class Renderer {
     const z = this.cam.zoom;
     const vis = a.def.light + 3;
     const list = a.ground
-      .filter((g) => Math.hypot(g.x - p.x, g.y - p.y) < vis || a.def.id === 'town')
+      .filter((g) => Math.hypot(g.x - p.x, g.y - p.y) < vis || a.def.town)
       .map((g) => ({ g, s: this.cam.toScreen(g.x, g.y), l: w.groundLabel(g) }))
       .sort((q, r) => r.s.y - q.s.y);
     ctx.font = '12px Georgia, serif';
@@ -1269,7 +1386,7 @@ export class Renderer {
     c.t = this.time;
     const ctx = c.canvas.getContext('2d')!;
     ctx.clearRect(0, 0, c.canvas.width, c.canvas.height);
-    const town = a.def.id === 'town';
+    const town = !!a.def.town;
     ctx.fillStyle = 'rgba(200,190,160,0.12)';
     for (let y = 0; y < l.h; y++)
       for (let x = 0; x < l.w; x++) {

@@ -41,7 +41,7 @@ test('music plays, follows the area and the settings; weather fills each area', 
   expect(await musicLevel(page, 800)).toBeLessThan(0.002);
   await page.evaluate(() => (window as any).game.toggleSetting('music'));
 
-  for (const id of ['town', 'cinder_fields', 'gloomwood', 'hollow_cave', 'sunken_chapel', 'catacombs1', 'hellforge']) {
+  for (const id of ['town', 'cinder_fields', 'gloomwood', 'hollow_cave', 'sunken_chapel', 'catacombs1', 'hellforge', 'tel_maresh', 'ashfall_road', 'glass_sea', 'carrion_mesa', 'whisper_cistern', 'buried_bazaar', 'noon_vault']) {
     await page.evaluate((id) => {
       const w = (window as any).game.world;
       w.enterArea(id, 'start');

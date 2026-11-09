@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const AREAS = ['hollow_cave', 'gloomwood', 'sunken_chapel', 'catacombs2', 'hellforge'];
+const AREAS = ['hollow_cave', 'gloomwood', 'sunken_chapel', 'catacombs2', 'hellforge', 'tel_maresh', 'ashfall_road', 'whisper_cistern', 'glass_sea', 'carrion_mesa', 'hall_of_dials', 'noon_vault'];
 
 // Visits every area (and the bosses) and measures frame time, saving screenshots for review.
 test('area tour renders every theme', async ({ page }, info) => {

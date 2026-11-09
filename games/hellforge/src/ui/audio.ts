@@ -138,10 +138,10 @@ export class Audio {
     s.loop = true;
     const f = c.createBiquadFilter();
     f.type = 'lowpass';
-    f.frequency.value = areaId === 'town' ? 500 : areaId === 'hellforge' ? 160 : 260;
+    f.frequency.value = AREA_BY_ID[areaId]?.town ? 500 : areaId === 'hellforge' || areaId === 'noon_vault' ? 160 : 260;
     const g = c.createGain();
     g.gain.value = 0;
-    g.gain.setTargetAtTime(areaId === 'town' ? 0.03 : 0.06, c.currentTime, 1);
+    g.gain.setTargetAtTime(AREA_BY_ID[areaId]?.town ? 0.03 : 0.06, c.currentTime, 1);
     s.connect(f).connect(g).connect(this.master!);
     s.start();
     this.ambient = { src: s, gain: g };

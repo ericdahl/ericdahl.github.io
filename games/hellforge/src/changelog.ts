@@ -1,6 +1,19 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.9.0',
+    date: '2026-11-08',
+    notes: [
+      'Act 2: The Glass Sea. Vhorza\'s fire did not die with her. Kill her and a caravan will carry you south to Tel Maresh, a new town at the edge of a desert melted to glass.',
+      'Seven new areas with their own art, music and weather, from the Ashfall Road to the buried city of Imhara, plus four new quests and a story that changes what you thought you knew.',
+      'Eleven new monsters with rules of their own. Burn the Embalmed Dead or they get back up. Look for the shadow to find the real Mirage Dancer. Kill the Noon Acolyte before she wards the rest.',
+      'Four new bosses that change as you wound them, with attacks marked on the ground before they land.',
+      'Sandstorms close in your vision, but monsters cannot see you as far either. Quicksand slows everything that walks through it.',
+      'New gear for Act 2: new weapons and armor, eight uniques and a new set.',
+      'Nightmare and Hell are harder, and the next difficulty now unlocks at the end of Act 2.',
+    ],
+  },
+  {
     version: '0.8.2',
     date: '2026-11-08',
     notes: ['Rare items now land with a golden beam of light and their own chime, so they stand out from the rest of the loot.'],
