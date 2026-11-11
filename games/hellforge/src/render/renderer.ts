@@ -5,7 +5,10 @@ import { LOOT_BOUNCE, type AreaState, type Fx, type Monster, type Npc, type Proj
 import { Camera, TILE_H, TILE_W } from './camera';
 import { baseIconCanvas } from './icons';
 import { Weather } from './weather';
-import { drawHumanoid, drawMonsterShape, floorTile, shade, treeSprite, wallBlock, WALL_H, TREE_W, TREE_H, type HumanoidLook, type Pose } from './sprites';
+import { floorTile, treeSprite, wallBlock, WALL_H, TREE_W, TREE_H } from './sprites';
+import { drawHumanoid, drawTinted, shade, type HumanoidLook, type Pose } from './figures';
+import { drawMonsterShape } from './creatures';
+import { heroLook, npcLook } from './looks';
 
 interface Drawable {
   depth: number;
@@ -353,30 +356,7 @@ export class Renderer {
   }
 
   private playerLook(w: World): HumanoidLook {
-    const c = w.char;
-    const eq = c.equipment;
-    const cls = w.classDef();
-    const wb = eq.weapon ? baseOf(eq.weapon) : null;
-    const ab = eq.body ? baseOf(eq.body) : null;
-    const hb = eq.head ? baseOf(eq.head) : null;
-    const armorCol = ab ? (ab.qlvl >= 11 ? '#8f939c' : ab.qlvl >= 3 ? '#6b4a2e' : '#a8936a') : null;
-    const necro = c.classId === 'necromancer';
-    const caster = c.classId === 'arcanist' || necro;
-    const look: HumanoidLook = {
-      body: armorCol ?? (c.classId === 'reaver' ? '#7a4a2a' : c.classId === 'arcanist' ? '#33508f' : necro ? '#26262c' : '#3d5a32'),
-      trim: c.classId === 'arcanist' ? '#c8a858' : necro ? '#9aa87a' : '#3a2a1a',
-      skin: c.classId === 'arcanist' ? '#e0c0a0' : necro ? '#d8d2c4' : '#c89878',
-      legs: c.classId === 'reaver' ? '#4a3020' : '#2e2a24',
-      head: hb ? (hb.id === 'cap' ? 'cap' : 'helm') : caster ? 'hood' : 'hair',
-      headColor: hb ? (hb.qlvl >= 11 ? '#9a9ea8' : '#7a5a3a') : c.classId === 'reaver' ? '#3a2410' : c.classId === 'arcanist' ? '#2a3f72' : necro ? '#1c1c22' : '#b0702a',
-      weapon: wb ? (wb.cat === 'mace' && wb.id === 'club' ? 'club' : wb.cat!) : null,
-      weaponColor: eq.weapon?.rarity === 'unique' ? '#e8c27a' : eq.weapon?.rarity === 'rare' ? '#f0e070' : undefined,
-      shield: eq.offhand ? (baseOf(eq.offhand).qlvl >= 11 ? '#8a8e98' : '#6b4a2e') : null,
-      robe: caster && !ab,
-      cape: c.classId === 'huntress' ? '#2e4a2a' : c.classId === 'reaver' ? undefined : necro ? '#141218' : '#22305a',
-    };
-    void cls;
-    return look;
+    return heroLook(w.char.classId, w.char.equipment);
   }
 
   private drawPlayer(w: World) {
@@ -413,7 +393,10 @@ export class Renderer {
       ctx.translate(0, 10);
     }
     if (act?.kind === 'whirl') ctx.scale(Math.cos(p.facing * 2) > 0 ? 1 : -1, 1);
-    drawHumanoid(ctx, this.playerLook(w), pose);
+    const look = this.playerLook(w);
+    drawHumanoid(ctx, look, pose, this.time);
+    const tint = p.hurt > 0 ? '#ff4020' : p.chill > 0 ? '#3080ff' : p.poison.t > 0 ? '#40a010' : null;
+    if (tint) drawTinted(ctx, (c) => drawHumanoid(c, look, pose, this.time), tint, p.hurt > 0 ? p.hurt * 1.2 : 0.3);
     ctx.restore();
     if (p.buffs.bone_ward) {
       ctx.save();
@@ -445,24 +428,11 @@ export class Renderer {
     const z = this.cam.zoom;
     const s = this.cam.toScreen(n.x, n.y);
     this.shadow(n.x, n.y, 0.5);
-    const looks: Record<string, HumanoidLook> = {
-      healer: { body: '#d8d0c0', trim: '#a02020', skin: '#e0c0a0', legs: '#333', head: 'hood', headColor: '#e8e0d0', robe: true, weapon: 'staff', weaponColor: '#ff8080' },
-      smith: { body: '#5a3a22', trim: '#2a1a10', skin: '#c08868', legs: '#2a2018', head: 'hair', headColor: '#2a1a0a', weapon: 'mace', weaponColor: '#888' },
-      sage: { body: '#4a5068', trim: '#c8b060', skin: '#d8b898', legs: '#222', head: 'hair', headColor: '#e8e8e8', robe: true, weapon: 'staff', weaponColor: '#a0d8ff' },
-      fence: { body: '#5a2a5a', trim: '#d8b850', skin: '#d0a888', legs: '#222', head: 'cap', headColor: '#2a1a2a', cape: '#3a1a3a' },
-      caravan: { body: '#8a6a3a', trim: '#3a2a18', skin: '#b08860', legs: '#3a2c1a', head: 'hood', headColor: '#d8c8a0', weapon: 'staff', weaponColor: '#6a4a24' },
-    };
-    if (w.act === 2) {
-      looks.healer = { body: '#3f7f8a', trim: '#e8d8a0', skin: '#a87850', legs: '#222', head: 'hood', headColor: '#d8e8e0', robe: true, weapon: 'staff', weaponColor: '#80e0ff' };
-      looks.smith = { body: '#6a4a2a', trim: '#70c8c8', skin: '#8a5a38', legs: '#2a2018', head: 'cap', headColor: '#d8c8a0', weapon: 'mace', weaponColor: '#70c8c8' };
-      looks.sage = { body: '#7a5a2a', trim: '#e8c860', skin: '#8a6040', legs: '#222', head: 'hood', headColor: '#e8d8b0', robe: true, weapon: 'staff', weaponColor: '#ffd080' };
-      looks.fence = { body: '#8a2a3a', trim: '#e8c860', skin: '#a87850', legs: '#222', head: 'hair', headColor: '#141014', cape: '#5a1a2a' };
-    }
     const pose = this.pose(n.facing, 0, false, 0, 0);
     ctx.save();
     ctx.translate(s.x, s.y + Math.sin(this.time * 1.5 + n.id) * 0.5);
     ctx.scale(z, z);
-    drawHumanoid(ctx, looks[n.kind], pose);
+    drawHumanoid(ctx, npcLook(n.kind, w.act), pose, this.time + n.id);
     ctx.restore();
   }
 
@@ -521,18 +491,15 @@ export class Renderer {
       const sink = how === 'melt' ? Math.max(0.15, 1 - m.deadT / 2.5) : 1;
       ctx.scale(z * k, z * k * (1 - fall * 0.45) * sink);
       ctx.rotate(-fall * Math.PI * 0.42);
-      const col = how === 'burn' ? '#140e0a' : how === 'melt' ? '#4a6a20' : shade(m.def.color, -0.35);
-      drawMonsterShape(ctx, deadShape, col, this.pose(m.facing, 0, false, 0, 0), 0);
-      if (how === 'shock' && m.deadT < 0.8 && Math.sin(this.time * 60) > 0) {
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = 0.6 * (1 - m.deadT / 0.8);
-        drawMonsterShape(ctx, deadShape, '#80b0ff', this.pose(m.facing, 0, false, 0, 0), 0);
-      }
-      if (how === 'burn' && m.deadT < 1.5) {
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = 0.3 * (1 - m.deadT / 1.5);
-        drawMonsterShape(ctx, deadShape, '#ff5010', this.pose(m.facing, 0, false, 0, 0), 0);
-      }
+      const col = shade(m.color ?? m.def.color, -0.3);
+      const id = m.def.id;
+      const still = this.pose(m.facing, 0, false, 0, 0);
+      const corpse = (c: CanvasRenderingContext2D) => drawMonsterShape(c, deadShape, col, still, 0, { dead: true, id });
+      corpse(ctx);
+      if (how === 'burn') drawTinted(ctx, corpse, '#140e0a', 0.85, 'source-over');
+      if (how === 'melt') drawTinted(ctx, corpse, '#4a6a20', 0.6, 'source-over');
+      if (how === 'shock' && m.deadT < 0.8 && Math.sin(this.time * 60) > 0) drawTinted(ctx, corpse, '#80b0ff', 0.6 * (1 - m.deadT / 0.8));
+      if (how === 'burn' && m.deadT < 1.5) drawTinted(ctx, corpse, '#ff5010', 0.3 * (1 - m.deadT / 1.5));
       ctx.restore();
       return;
     }
@@ -582,12 +549,14 @@ export class Renderer {
     if (m.rarity === 'champion') color = shade(color, 0.15);
     if (m.mods.includes('fireEnch')) color = '#d8602a';
     if (m.mods.includes('coldEnch')) color = '#7aa8d8';
-    drawMonsterShape(ctx, shape, color, pose, this.time + m.id);
+    const id = m.def.id;
+    const mt = this.time + m.id;
+    drawMonsterShape(ctx, shape, color, pose, mt, { id });
     const poisoned = m.poison.t > 0;
     if (m.flash > 0 || m.chill > 0 || poisoned || this.hoverId === m.id) {
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = m.flash > 0 ? 0.55 : this.hoverId === m.id ? 0.25 : 0.35;
-      drawMonsterShape(ctx, shape, m.flash > 0 ? '#ffffff' : m.chill > 0 ? '#3080ff' : poisoned ? '#40a010' : '#806040', pose, this.time + m.id);
+      const a = m.flash > 0 ? 0.55 : this.hoverId === m.id ? 0.25 : 0.35;
+      const tint = m.flash > 0 ? '#ffffff' : m.chill > 0 ? '#3080ff' : poisoned ? '#40a010' : '#806040';
+      drawTinted(ctx, (c) => drawMonsterShape(c, shape, color, pose, mt, { id }), tint, a);
     }
     ctx.restore();
     if (m.stun > 0.3) this.text('✦', s.x, s.y - 54 * z * k, '#ffe080', 12);
