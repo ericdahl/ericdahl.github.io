@@ -105,7 +105,7 @@ button {
   pointer-events: none;
 }
 .hud > * { pointer-events: auto; }
-.hud .msgs, .hud .area-name, .hud .target, .hud .joy { pointer-events: none; }
+.hud .msgs, .hud .area-name, .hud .target, .hud .joy, .hud .spree, .hud .buffs { pointer-events: none; }
 
 .target {
   position: absolute;
@@ -317,6 +317,94 @@ button {
 }
 .mouse .sbtn { position: relative; width: 50px; height: 50px; border-radius: 8px; }
 .mouse .sbtn .key { left: 4px; top: 2px; font-size: 11px; color: #fff; text-shadow: 0 1px 2px #000; }
+
+.dbtn {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 2px solid #6a7890;
+  background: #0c1018;
+  color: #cfe0ff;
+  padding: 0;
+  cursor: pointer;
+  touch-action: none;
+  overflow: hidden;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
+}
+.dbtn .dglyph { position: relative; z-index: 1; font-size: 26px; line-height: 40px; text-shadow: 0 1px 2px #000; }
+.mouse .dbtn .dglyph { line-height: 34px; }
+.dbtn .key { position: absolute; left: 0; right: 0; bottom: 1px; font-size: 8px; color: #8a98b0; z-index: 1; }
+.dbtn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(rgba(0, 0, 0, 0.72) var(--cd, 0%), transparent 0);
+}
+.dbtn.cooling { border-color: #3a4250; color: #7888a0; }
+.dbtn:not(.cooling) { box-shadow: 0 0 8px rgba(0, 0, 0, 0.8), 0 0 10px rgba(150, 190, 255, 0.35); }
+.touch .dbtn { right: calc(138px + var(--safe-r)); bottom: calc(var(--orb) + 84px + var(--safe-b)); }
+.touch .dbtn .key { display: none; }
+.mouse .dbtn { left: calc(50% + 126px); bottom: calc(70px + var(--safe-b)); border-radius: 8px; }
+
+.spree {
+  --spree: #c8b890;
+  position: absolute;
+  top: calc(64px + var(--safe-t));
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+  color: var(--spree);
+  text-shadow: 0 1px 3px #000, 0 0 8px #000;
+  opacity: 0.8;
+}
+.spree.ranked { opacity: 1; }
+.spree-n { font-size: 20px; font-weight: bold; line-height: 1; display: inline-block; }
+.spree.ranked .spree-n { font-size: 30px; text-shadow: 0 1px 3px #000, 0 0 14px var(--spree); }
+.spree-n.pop { animation: spree-pop 0.22s ease-out; }
+.spree-t { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 2px; }
+.spree-bar { width: 96px; height: 3px; margin: 3px auto 0; background: rgba(0, 0, 0, 0.6); }
+.spree-fill { height: 100%; background: var(--spree); }
+@keyframes spree-pop { from { transform: scale(1.7); } to { transform: scale(1); } }
+
+.buffs {
+  position: absolute;
+  bottom: calc(var(--orb) + 34px + var(--safe-b));
+  left: calc(10px + var(--safe-l));
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  gap: 3px;
+  pointer-events: none;
+  font-size: 11px;
+}
+.buff { padding: 1px 6px; border-radius: 9px; background: rgba(10, 10, 14, 0.7); border: 1px solid #9fd8ff; color: #cfeaff; white-space: nowrap; }
+.buff.b-storm { border-color: #aac8ff; }
+.buff.b-fortune { border-color: #ffbe28; color: #ffe090; }
+.buff.b-haste { border-color: #6effaa; color: #c8ffe0; }
+.buff.b-combat { border-color: #ff5a3c; color: #ffc8b8; }
+.buff.b-experience { border-color: #ffdc5a; color: #fff0b0; }
+
+.announce {
+  position: absolute;
+  left: 50%;
+  top: max(24%, 116px);
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+  white-space: nowrap;
+  text-shadow: 0 2px 6px #000, 0 0 22px currentColor;
+  animation: announce 2.4s ease-out forwards;
+}
+.an-t { font-size: clamp(22px, min(6vw, 9vh), 44px); font-weight: bold; letter-spacing: 0.1em; text-transform: uppercase; }
+.an-s { font-size: clamp(12px, 2.4vw, 16px); color: #e8e2d0; letter-spacing: 0.06em; text-shadow: 0 1px 3px #000; }
+@keyframes announce {
+  0% { opacity: 0; transform: translateX(-50%) scale(1.9); }
+  9% { opacity: 1; transform: translateX(-50%) scale(1); }
+  70% { opacity: 1; transform: translateX(-50%) scale(1.03); }
+  100% { opacity: 0; transform: translateX(-50%) scale(1.08) translateY(-14px); }
+}
 
 .ctxbtn {
   position: absolute;
@@ -616,6 +704,7 @@ button {
   .hbtn { width: 36px; height: 36px; font-size: 16px; }
   .touch .skillbar { bottom: calc(var(--orb) + 64px + var(--safe-b)); }
   .touch .ctxbtn { bottom: calc(var(--orb) + 80px + var(--safe-b)); }
+  .touch .dbtn { bottom: calc(var(--orb) + 134px + var(--safe-b)); }
 }
 
 .banner {

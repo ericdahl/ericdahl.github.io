@@ -1,7 +1,7 @@
 import { baseOf, type Item } from '../game/items';
 import { FLOOR, WALL, type Level, type Prop } from '../game/map';
 import { tileHash } from '../game/rng';
-import { LOOT_BOUNCE, type AreaState, type Fx, type Monster, type Npc, type Projectile, type World } from '../game/world';
+import { LOOT_BOUNCE, ORB_LIFE, type AreaState, type Fx, type Monster, type Npc, type Orb, type Projectile, type World } from '../game/world';
 import { Camera, TILE_H, TILE_W } from './camera';
 import { baseIconCanvas } from './icons';
 import { Weather } from './weather';
@@ -223,6 +223,12 @@ export class Renderer {
       add(g.x + g.y - 0.3, () => this.drawGround(g.x, g.y, g.item, g.gold, g.t));
     }
 
+    for (const o of a.orbs) {
+      if (!near(o.x, o.y)) continue;
+      add(o.x + o.y - 0.2, () => this.drawOrb(o));
+      lights.push({ x: o.x, y: o.y, r: 1.6, a: 0.45 });
+    }
+
     // Creatures.
     for (const m of a.monsters) {
       if (!near(m.x, m.y, lightR + 1.5) || (m.dead && m.used)) continue;
@@ -375,7 +381,38 @@ export class Renderer {
       if (act.kind === 'cast') cast = k;
       if (act.kind === 'leap') lift = Math.sin(k * Math.PI) * 60;
     }
-    const pose = this.pose(p.facing, p.walk, p.moving, attack, cast);
+    const dodging = act?.kind === 'dodge';
+    const pose = this.pose(p.facing, p.walk, p.moving || dodging, attack, cast);
+    const spree = w.spreeTier();
+    if (spree) {
+      // A spree burns around the hero's feet, hotter with each rank.
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const heat = 0.5 + 0.12 * w.streak.tier;
+      for (let i = 0; i < 9; i++) {
+        const k = (this.time * 1.5 + i / 9) % 1;
+        const a = i * 0.7 + this.time * 2;
+        ctx.globalAlpha = heat * (1 - k);
+        ctx.fillStyle = spree.color;
+        ctx.beginPath();
+        ctx.arc(s.x + Math.cos(a) * 17 * z, s.y + Math.sin(a) * 8 * z - k * 30 * z, (3.2 - k * 2.2) * z, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    for (const [id, rgb] of [['shrine_storm', '170,200,255'], ['shrine_fortune', '255,190,40'], ['shrine_haste', '110,255,170']] as const) {
+      if (!p.buffs[id]) continue;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = `rgba(${rgb},${0.35 + 0.15 * Math.sin(this.time * 5)})`;
+      ctx.lineWidth = 2 * z;
+      ctx.setLineDash([6 * z, 6 * z]);
+      ctx.lineDashOffset = this.time * 24 * z;
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y, 24 * z, 12 * z, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
     if (p.frenzy.stacks > 0 || p.buffs.battle_shout) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
@@ -393,6 +430,13 @@ export class Renderer {
       ctx.translate(0, 10);
     }
     if (act?.kind === 'whirl') ctx.scale(Math.cos(p.facing * 2) > 0 ? 1 : -1, 1);
+    if (dodging) {
+      // Tucked low and leaning into the roll.
+      const k = Math.min(1, act.t / act.dur);
+      const lean = Math.cos(p.facing - Math.PI / 4) >= 0 ? 1 : -1;
+      ctx.rotate(lean * Math.sin(k * Math.PI) * 0.5);
+      ctx.scale(1, 1 - 0.3 * Math.sin(k * Math.PI));
+    }
     const look = this.playerLook(w);
     drawHumanoid(ctx, look, pose, this.time);
     const tint = p.hurt > 0 ? '#ff4020' : p.chill > 0 ? '#3080ff' : p.poison.t > 0 ? '#40a010' : null;
@@ -513,7 +557,7 @@ export class Renderer {
       return;
     }
     // Aura ring for special monsters; servants get a pale green one.
-    const ring = m.ally ? '#7ad070' : m.rarity === 'champion' ? '#5c7cff' : m.rarity === 'unique' ? '#d8b050' : m.rarity === 'boss' ? '#ff4020' : null;
+    const ring = m.thief ? '#ffd040' : m.ally ? '#7ad070' : m.rarity === 'champion' ? '#5c7cff' : m.rarity === 'unique' ? '#d8b050' : m.rarity === 'boss' ? '#ff4020' : null;
     if (ring) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
@@ -549,6 +593,7 @@ export class Renderer {
     if (m.rarity === 'champion') color = shade(color, 0.15);
     if (m.mods.includes('fireEnch')) color = '#d8602a';
     if (m.mods.includes('coldEnch')) color = '#7aa8d8';
+    if (m.mods.includes('lightEnch')) color = '#b9a8f0';
     const id = m.def.id;
     const mt = this.time + m.id;
     drawMonsterShape(ctx, shape, color, pose, mt, { id });
@@ -559,6 +604,7 @@ export class Renderer {
       drawTinted(ctx, (c) => drawMonsterShape(c, shape, color, pose, mt, { id }), tint, a);
     }
     ctx.restore();
+    if (m.thief) this.drawThiefExtras(m, s.x, s.y, z * k);
     if (m.stun > 0.3) this.text('✦', s.x, s.y - 54 * z * k, '#ffe080', 12);
     if (m.curse && m.curse.t > 0) this.text('⛧', s.x, s.y - 58 * z * k, '#c070e0', 13);
     if (m.ally && m.life < m.maxLife) {
@@ -568,6 +614,49 @@ export class Renderer {
       ctx.fillRect(s.x - bw / 2, by, bw, 3 * z);
       ctx.fillStyle = '#6ad060';
       ctx.fillRect(s.x - bw / 2, by, (bw * m.life) / m.maxLife, 3 * z);
+    }
+  }
+
+  /** The Tithe Imp's bulging sack, the glitter coming off it, and how long is left to catch it. */
+  private drawThiefExtras(m: Monster, x: number, y: number, u: number) {
+    const ctx = this.ctx;
+    const th = m.thief!;
+    const back = -Math.cos(m.facing - Math.PI / 4) * 9 * u;
+    const bob = Math.sin(m.walk * 6) * 1.5 * u;
+    ctx.fillStyle = '#6a4a22';
+    ctx.strokeStyle = '#1c1208';
+    ctx.lineWidth = 1.2 * u;
+    ctx.beginPath();
+    ctx.ellipse(x + back, y - 24 * u + bob, 8 * u, 9.5 * u, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#8a6630';
+    ctx.beginPath();
+    ctx.ellipse(x + back - 2 * u, y - 27 * u + bob, 3.5 * u, 4 * u, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#e8c040';
+    ctx.fillRect(x + back - 3 * u, y - 35 * u + bob, 6 * u, 2.5 * u);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 5; i++) {
+      const k = (this.time * 1.3 + i * 0.2 + m.id * 0.37) % 1;
+      const a = i * 2.4 + m.id;
+      ctx.fillStyle = `rgba(255,220,90,${0.9 * (1 - k)})`;
+      const px = x + back + Math.cos(a) * 11 * u;
+      const py = y - 24 * u + Math.sin(a) * 9 * u - k * 14 * u;
+      const r = (2.2 - k * 1.4) * u;
+      ctx.fillRect(px - r, py - 0.5 * u, r * 2, u);
+      ctx.fillRect(px - 0.5 * u, py - r, u, r * 2);
+    }
+    ctx.restore();
+    if (th.started) {
+      const bw = 34 * u;
+      const by = y - 58 * u;
+      const frac = Math.max(0, th.t / 15);
+      ctx.fillStyle = 'rgba(0,0,0,0.65)';
+      ctx.fillRect(x - bw / 2 - 1, by - 1, bw + 2, 4 * u + 2);
+      ctx.fillStyle = frac < 0.25 ? '#ff5030' : '#ffd040';
+      ctx.fillRect(x - bw / 2, by, bw * frac, 4 * u);
     }
   }
 
@@ -715,6 +804,42 @@ export class Renderer {
     ctx.rotate(0.9);
     ctx.drawImage(icon, -iw / 2, -ih / 2, iw, ih);
     ctx.restore();
+  }
+
+  /** A soul orb: a glowing bead that bobs above the ground, and flickers when it is about to fade. */
+  private drawOrb(o: Orb) {
+    const ctx = this.ctx;
+    const z = this.cam.zoom;
+    const s = this.cam.toScreen(o.x, o.y);
+    const left = ORB_LIFE - o.t;
+    if (left < 4 && Math.sin(this.time * 18) > 0.2) return;
+    const grow = Math.min(1, o.t / 0.3);
+    const bob = Math.sin(this.time * 3.2 + o.id) * 3 * z;
+    const cy = s.y - 13 * z + bob - (1 - grow) * 14 * z;
+    const rgb = o.kind === 'life' ? '255,60,70' : '80,130,255';
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(s.x, s.y, 6 * z, 3 * z, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const halo = (14 + 2 * Math.sin(this.time * 5 + o.id)) * z * grow;
+    const g = ctx.createRadialGradient(s.x, cy, 0, s.x, cy, halo);
+    g.addColorStop(0, `rgba(${rgb},0.55)`);
+    g.addColorStop(1, `rgba(${rgb},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(s.x, cy, halo, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    const core = ctx.createRadialGradient(s.x - 2 * z, cy - 2 * z, 0, s.x, cy, 6 * z * grow);
+    core.addColorStop(0, '#ffffff');
+    core.addColorStop(0.35, o.kind === 'life' ? '#ff6a70' : '#7aa4ff');
+    core.addColorStop(1, o.kind === 'life' ? '#8a0c18' : '#18308a');
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.arc(s.x, cy, 6 * z * grow, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   private drawProp(pr: Prop, lights: Light[]) {
@@ -1025,13 +1150,26 @@ export class Renderer {
     ctx.fillRect(s.x - 7 * z, s.y - 34 * z, 14 * z, 34 * z);
     ctx.fillStyle = '#6e6a62';
     ctx.fillRect(s.x - 10 * z, s.y - 38 * z, 20 * z, 5 * z);
-    const col = { armor: '90,160,255', combat: '255,90,60', refill: '255,80,160', experience: '255,220,90' }[kind] ?? '200,200,200';
+    const col = {
+      armor: '90,160,255', combat: '255,90,60', refill: '255,80,160', experience: '255,220,90',
+      storm: '170,200,255', fortune: '255,190,40', haste: '110,255,170', cursed: '170,60,230',
+    }[kind] ?? '200,200,200';
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.fillStyle = used ? 'rgba(120,120,120,0.3)' : `rgba(${col},${0.6 + 0.3 * Math.sin(this.time * 3)})`;
     ctx.beginPath();
     ctx.arc(s.x, s.y - 46 * z, 7 * z, 0, Math.PI * 2);
     ctx.fill();
+    if (kind === 'cursed' && !used) {
+      // A cursed shrine smoulders: dark motes rise off it.
+      for (let i = 0; i < 4; i++) {
+        const k = (this.time * 0.6 + i * 0.25) % 1;
+        ctx.fillStyle = `rgba(190,90,255,${0.7 * (1 - k)})`;
+        ctx.beginPath();
+        ctx.arc(s.x + Math.sin(i * 2.1 + this.time * 2) * 7 * z, s.y - (46 + k * 26) * z, (2.4 - k) * z, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
     ctx.restore();
   }
 
@@ -1108,6 +1246,38 @@ export class Renderer {
           lights.push({ x: pt.x, y: pt.y, r: 2, a: 0.6 * (1 - k) });
         });
         ctx.stroke();
+        break;
+      }
+      case 'dash': {
+        // The afterimage a dodge leaves: a pale streak along the way the hero rolled.
+        const ang = f.r ?? 0;
+        const dx = (Math.cos(ang) - Math.sin(ang)) * 16 * z;
+        const dy = (Math.cos(ang) + Math.sin(ang)) * 8 * z;
+        ctx.strokeStyle = `rgba(210,225,255,${0.5 * (1 - k)})`;
+        ctx.lineCap = 'round';
+        for (const [h, wd] of [[30, 5], [18, 7], [8, 4]] as const) {
+          ctx.lineWidth = wd * z * (1 - k * 0.5);
+          ctx.beginPath();
+          ctx.moveTo(s.x - dx, s.y - h * z - dy);
+          ctx.lineTo(s.x + dx * 0.4, s.y - h * z + dy * 0.4);
+          ctx.stroke();
+        }
+        break;
+      }
+      case 'coins': {
+        // A fountain of coins: up, out and back down.
+        for (let i = 0; i < 26; i++) {
+          const a = i * 2.399 + f.x * 7;
+          const sp = (0.45 + ((i * 37) % 10) / 10) * (f.r ?? 2) * unitX * 0.9;
+          const up = (70 + ((i * 53) % 60)) * z;
+          const px = s.x + Math.cos(a) * sp * k;
+          const py = s.y + Math.sin(a) * sp * k * 0.5 - Math.sin(Math.min(1, k * 1.15) * Math.PI) * up;
+          ctx.fillStyle = `rgba(255,${200 + (i % 3) * 20},70,${Math.min(1, 2.4 * (1 - k))})`;
+          ctx.beginPath();
+          ctx.ellipse(px, py, 3 * z, (1 + Math.abs(Math.sin(k * 18 + i)) * 2) * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        lights.push({ x: f.x, y: f.y, r: (f.r ?? 2) + 2, a: 0.8 * (1 - k) });
         break;
       }
       case 'shade_mark': {
@@ -1420,7 +1590,8 @@ export class Renderer {
     const pp = w.portalPos();
     if (pp) mark(pp.x, pp.y, '#6aa8ff', 3);
     if (full) for (const m of w.area.monsters) if (!m.dead && Math.hypot(m.x - p.x, m.y - p.y) < w.area.def.light + 1) mark(m.x, m.y, '#ff4030', 2);
-    for (const m of w.questStrays()) mark(m.x, m.y, '#ffb030', 3);
+    for (const m of w.stragglers()) mark(m.x, m.y, '#ffb030', 3);
+    for (const m of w.area.monsters) if (m.thief?.started && !m.dead) mark(m.x, m.y, '#ffe040', 3.5);
     for (const m of w.minions) mark(m.x, m.y, '#7ad070', 2);
     mark(p.x, p.y, '#ffffff', 3);
     ctx.restore();

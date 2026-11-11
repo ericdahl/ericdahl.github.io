@@ -96,6 +96,10 @@ export interface Character {
   dead: boolean;
   created: number;
   playTime: number;
+  /** Feats, for the character sheet. Absent on heroes from before they were counted. */
+  bestSpree?: number;
+  tithes?: number;
+  purges?: number;
 }
 
 export function createCharacter(name: string, classId: ClassId, hardcore = false): Character {

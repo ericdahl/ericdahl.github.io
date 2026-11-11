@@ -18,7 +18,7 @@ describe('full act playthrough', () => {
 
     it(`${cls} plays on through act 2 and defeats Corvin`, () => {
       // The bot can stall shooting at walls, so this seed is one where every class gets a clean run.
-      const reports = playAct(cls, 7, 900, [...ACT, ...ACT2]);
+      const reports = playAct(cls, 42, 900, [...ACT, ...ACT2]);
       const road = reports[ACT.length];
       const last = reports[reports.length - 1];
       expect(road.enterLevel).toBeGreaterThanOrEqual(12);

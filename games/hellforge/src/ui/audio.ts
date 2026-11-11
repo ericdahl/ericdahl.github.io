@@ -118,6 +118,12 @@ export class Audio {
       case 'roar': this.tone('sawtooth', 110, 60, 0.6, 0.18); return this.hiss(0.6, 0.2, 300, 0.8, 'lowpass');
       case 'quest': return [523, 659, 784, 659, 1046].forEach((f, i) => this.tone('triangle', f, f, 0.35, 0.12, i * 0.13));
       case 'step': return this.hiss(0.04, 0.05, 300, 1);
+      case 'dodge': this.hiss(0.16, 0.22, 900, 0.7, 'highpass'); return this.tone('sine', 420, 180, 0.14, 0.05);
+      case 'orb': this.tone('sine', 620, 1240, 0.22, 0.12); return this.tone('triangle', 930, 1860, 0.2, 0.05, 0.05);
+      case 'spree': this.hiss(0.3, 0.2, 240, 0.7, 'lowpass'); [196, 294, 392].forEach((f, i) => this.tone('sawtooth', f, f * 1.01, 0.42, 0.09, i * 0.07)); return;
+      case 'cackle': [900, 1150, 820, 1250, 760].forEach((f, i) => this.tone('square', f, f * 0.8, 0.09, 0.06, i * 0.085)); return;
+      case 'jackpot': [1047, 1319, 1568, 2093, 1568, 2093, 2637].forEach((f, i) => this.tone('triangle', f, f, 0.22, 0.1, i * 0.07)); this.hiss(0.6, 0.1, 7000, 2); return;
+      case 'curse': this.tone('sawtooth', 220, 55, 0.9, 0.16); this.tone('sawtooth', 233, 58, 0.9, 0.12); return this.hiss(0.8, 0.25, 220, 0.6, 'lowpass');
     }
   }
 

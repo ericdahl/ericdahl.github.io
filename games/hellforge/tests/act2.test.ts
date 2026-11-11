@@ -16,6 +16,8 @@ function atFirst(area: string) {
   w.player.invuln = 999;
   w.enterArea(area, 'start');
   w.area.monsters.length = 0;
+  // These tests kill the only monster in the area; the purge reward would muddy their experience counts.
+  w.area.purged = true;
   return w;
 }
 

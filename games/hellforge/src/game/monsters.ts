@@ -67,6 +67,8 @@ export interface MonsterDef {
   slam?: boolean;
   /** Packs of this monster are led by one of it and followed by these. */
   pack?: string;
+  /** Carries a hoard, never fights, and runs for a portal once it is seen. */
+  thief?: boolean;
 }
 
 const D = (d: Omit<MonsterDef, 'res' | 'scale'> & { res?: Partial<Resists>; scale?: number }): MonsterDef => ({ res: {}, scale: 1, ...d });
@@ -86,6 +88,8 @@ export const MONSTERS: Record<string, MonsterDef> = {
   glutton: D({ id: 'glutton', name: 'Gorvath the Glutton', shape: 'glutton', ai: 'boss', lifeMul: 8, dmgMul: 1.5, speed: 1.9, radius: 0.7, range: 0.8, attackRate: 0.8, xpMul: 8, res: { phys: 20, poison: 60 }, scale: 1.6, color: '#7c6a3e', abilities: ['charge'] }),
   bishop: D({ id: 'bishop', name: 'The Drowned Bishop', shape: 'bishop', ai: 'boss', lifeMul: 11, dmgMul: 1.6, speed: 2.2, radius: 0.5, range: 6, attackRate: 0.7, xpMul: 12, undead: true, element: 'cold', missile: { element: 'cold', speed: 8, kind: 'm_cold' }, res: { cold: 75, poison: 100, fire: -20 }, scale: 1.35, color: '#4c7a8a', abilities: ['nova_cold', 'summon_skeletons'] }),
   warden: D({ id: 'warden', name: 'Ossuary Warden Krell', shape: 'warden', ai: 'boss', lifeMul: 13, dmgMul: 2.4, speed: 2.4, radius: 0.6, range: 0.8, attackRate: 0.9, xpMul: 14, undead: true, element: 'cold', res: { phys: 30, cold: 60, poison: 100 }, scale: 1.55, color: '#d8d3c2', abilities: ['charge', 'summon_skeletons'] }),
+  // One may be hiding in any area. It runs rather than fights, and escapes if it is not caught in time.
+  tithe: D({ id: 'tithe', name: 'Tithe Imp', shape: 'imp', ai: 'melee', lifeMul: 4.2, dmgMul: 0, speed: 4.1, radius: 0.34, range: 0.45, attackRate: 1, xpMul: 5, thief: true, res: { fire: 25 }, scale: 1.05, color: '#e0b830' }),
   // Necromancer servants (never spawned as enemies).
   raised_skeleton: D({ id: 'raised_skeleton', name: 'Skeleton', shape: 'skeleton', ai: 'melee', lifeMul: 0.9, dmgMul: 0.75, speed: 3.8, radius: 0.3, range: 0.55, attackRate: 1.2, xpMul: 0, undead: true, res: { poison: 50 }, color: '#ece6d2' }),
   grave_golem: D({ id: 'grave_golem', name: 'Grave Golem', shape: 'brute', ai: 'melee', lifeMul: 3.0, dmgMul: 1.0, speed: 3.6, radius: 0.5, range: 0.7, attackRate: 0.85, xpMul: 0, res: { poison: 100, phys: 10 }, scale: 1.2, color: '#6e5a44' }),
@@ -122,11 +126,12 @@ export const MONSTERS: Record<string, MonsterDef> = {
 };
 
 export type MonsterRarity = 'normal' | 'champion' | 'unique' | 'minion' | 'boss';
-export type UniqueMod = 'fast' | 'strong' | 'stoneskin' | 'fireEnch' | 'coldEnch' | 'vampiric' | 'extraLife';
-export const UNIQUE_MODS: UniqueMod[] = ['fast', 'strong', 'stoneskin', 'fireEnch', 'coldEnch', 'vampiric', 'extraLife'];
+export type UniqueMod = 'fast' | 'strong' | 'stoneskin' | 'fireEnch' | 'coldEnch' | 'vampiric' | 'extraLife' | 'lightEnch' | 'teleport' | 'mortar';
+export const UNIQUE_MODS: UniqueMod[] = ['fast', 'strong', 'stoneskin', 'fireEnch', 'coldEnch', 'vampiric', 'extraLife', 'lightEnch', 'teleport', 'mortar'];
 export const MOD_LABEL: Record<UniqueMod, string> = {
   fast: 'Extra Fast', strong: 'Extra Strong', stoneskin: 'Stone Skin', fireEnch: 'Fire Enchanted',
   coldEnch: 'Cold Enchanted', vampiric: 'Vampiric', extraLife: 'Extra Health',
+  lightEnch: 'Lightning Enchanted', teleport: 'Teleporter', mortar: 'Bombardier',
 };
 
 export interface MonsterStats {
@@ -164,6 +169,7 @@ export function monsterStats(def: MonsterDef, mlvl: number, rarity: MonsterRarit
     if (md === 'extraLife') life *= 1.6;
     if (md === 'fireEnch') res.fire = Math.min(100, res.fire + 50);
     if (md === 'coldEnch') res.cold = Math.min(100, res.cold + 50);
+    if (md === 'lightEnch') res.light = Math.min(100, res.light + 50);
   }
   // Higher difficulties grant immunities on some already-resistant monsters.
   if (difficulty > 0) for (const k of ['fire', 'cold', 'light', 'poison'] as const) if (res[k] >= 50) res[k] = Math.min(110, res[k] + 25 * difficulty);

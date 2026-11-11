@@ -1,6 +1,20 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.11.0',
+    date: '2026-11-11',
+    notes: [
+      'Dodge roll. Press Space (or the new ➠ button) to roll out of danger. Nothing can hit you mid-roll, and it cuts short a swing or a cast.',
+      'Killing sprees. Kill quickly and a counter starts to climb: Killing Spree, Rampage, Massacre and beyond. Each rank makes you run faster, makes kills worth more experience, and gives you back some life and mana.',
+      'Soul orbs. The dead sometimes leave a red or blue orb behind. Walk over it to restore life or mana (and mend your servants). Elites and bosses always drop them.',
+      'The Tithe Imp. A golden imp with a sack of loot may be hiding in any area. It never fights. It runs, shedding gold with every blow, and opens a portal after fifteen seconds. Kill it first for the jackpot.',
+      'Four new shrines. Storm strikes nearby monsters with lightning, Fortune makes the dead give up more gold and better items, Fleet speeds you up, and the purple Cursed Shrine calls three waves of ambushers and pays out a hoard if you survive.',
+      'Three new elite modifiers. Lightning Enchanted monsters throw sparks when struck, Teleporters blink to your side, and Bombardiers mark the ground before fire rains on it.',
+      'Purge an area. Kill everything in an area for bonus experience and a pile of loot. The last five monsters show on the automap so you can find them.',
+      'Shrine blessings now show their time left above your life orb, and the character sheet records your longest spree, imps caught and areas purged.',
+    ],
+  },
+  {
     version: '0.10.0',
     date: '2026-11-09',
     notes: [
