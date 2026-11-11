@@ -20,6 +20,7 @@ URL options: `?seed=123` fixes the world layout, `?autostart&class=huntress` ski
 | Move | Joystick (touch the left side of the screen), or tap the ground | Left click / hold |
 | Attack | Big ⚔ button (auto-targets the nearest enemy, hold to keep attacking), or tap a monster | Left click a monster (Shift: attack in place) |
 | Skills | The three buttons around ⚔ | Right click (slot 2), or `Q` `W` `E` `R` for slots 1-4 |
+| Dodge | ➠ button (rolls the way you are steering) | `Space` (rolls toward the cursor) |
 | Pick up, talk, take stairs | Tap the label / NPC / stairs, or the context button that appears nearby | Click it, or `F` for the nearest thing |
 | Potions | Tap a potion slot (long-press for details) | `1` health, `2` mana, `3` rejuvenation |
 | Town Portal | ◎ button | `T` |
@@ -32,9 +33,11 @@ Panels pause the game.
 
 - **Four classes.** The **Reaver** (melee: Bash, Frenzy, Leap Attack, Whirlwind, War Cry), the **Arcanist** (Fire Bolt, Ice Bolt, Charged Bolt, Frost Nova, Teleport, Fireball, Meteor), the **Huntress** (bows: Power Shot, Multishot, Exploding and Storm Arrows, Strafe, plus Critical Eye and Evade) and the **Necromancer** (summons: Raise Skeleton from corpses, Grave Golem, Skeletal Mastery; curses and corpses: Mark of Frailty, Corpse Burst; bone and poison: Bone Shards, Bone Ward, Bone Lance, Bone Storm, Blight Nova). Servants follow you between areas, and monsters fight them as well as you. Each level gives 5 stat points and a skill point. Skill trees have level requirements, prerequisites and synergies.
 - **Loot.** Items drop as normal, socketed (grey), magic (blue), rare (yellow), set (green) or unique (gold). Magic and better items drop unidentified; the sage identifies them for free. Gems in seven types and five grades go into sockets, with different effects in weapons, armor and shields. Your inventory is a grid where items take up space by size. Magic find improves your odds.
-- **Monsters.** Imps that flee when a packmate dies and Hexers that raise them again, ghouls, skeletons, archers, bats, hounds, brutes, wraiths and cultists. Champion packs (blue) and uniques with modifiers like Fire Enchanted, Stone Skin and Extra Fast (gold). Bosses: Gorvath the Glutton, the Drowned Bishop, Ossuary Warden Krell, and Vhorza, Mother of Cinders.
+- **Monsters.** Imps that flee when a packmate dies and Hexers that raise them again, ghouls, skeletons, archers, bats, hounds, brutes, wraiths and cultists. Champion packs (blue) and uniques with modifiers like Fire Enchanted, Stone Skin, Extra Fast, Lightning Enchanted, Teleporter and Bombardier (gold). Bosses: Gorvath the Glutton, the Drowned Bishop, Ossuary Warden Krell, and Vhorza, Mother of Cinders.
 - **The world.** Emberwatch Camp (healer, blacksmith, sage, gambler, stash) and seven randomly generated areas: Cinder Fields, Hollow Cave, Gloomwood, Sunken Chapel, Catacombs 1-2 and the Hellforge. Activate waypoints to fast-travel, and cast Town Portal to restock and come back. Shrines, chests and (occasionally explosive) barrels are scattered around.
 - **Act 2: The Glass Sea.** Killing Vhorza opens a caravan to Tel Maresh and seven more areas: the Ashfall Road, Cistern of Whispers, the Glass Sea, Carrion Mesa, Buried Imhara (the Bazaar and the Hall of Dials) and the Noon Vault. Sandstorms and quicksand change how the desert plays, the new monsters each have a rule to learn (Embalmed Dead rise unless burned, Mirage Dancers split into copies with no shadow, Noon Acolytes ward their allies, Dune Burrowers tunnel to you, Carrion Kites heal on corpses, Salt Colossi telegraph ground slams), and the four bosses change phase as they are wounded.
+- **Dodging and sprees.** A dodge roll (1.5 second cooldown) makes the hero untouchable for a moment and cancels a swing or cast. Kills made within four seconds of each other build a spree (Killing Spree at 5, then Rampage, Massacre, Slaughter, Annihilation, Hell Unleashed); each rank adds run speed and experience per kill, and restores some life and mana.
+- **Things to find.** Soul orbs restore life or mana when walked over. A Tithe Imp may hide in any area but the Hollow Cave: it flees, drops gold when struck, and escapes through a portal unless killed. Shrines grant Armor, Combat, Experience, Storm, Fortune or Fleet blessings, refill life and mana, or (Cursed) call a three-wave ambush with a hoard at the end. Killing everything in an area purges it for experience and loot.
 - **Quests.** Cleanse the Hollow Cave (+1 skill point), slay the Drowned Bishop (+5 stat points), destroy the Mother of Cinders to open the road south, then finish Act 2's four quests to unlock **Nightmare**, then **Hell**: tougher monsters, immunities and resistance penalties.
 - **Hardcore** heroes die permanently. Softcore heroes respawn in town and lose some gold.
 
@@ -48,6 +51,7 @@ The version is shown at the bottom of the title screen; tap it for the player-fa
 
 | Version | Commit | Notes |
 |---|---|---|
+| 0.11.0 | | Dodge roll, killing sprees, soul orbs, the Tithe Imp, four new shrines, three new elite modifiers, area purges |
 | 0.10.0 | | Redrawn character art: hero gear shows on the model, new monster and NPC models, keyframed weapon swings |
 | 0.9.1 | | Stash no longer overlaps the backpack |
 | 0.9.0 | | Act 2: The Glass Sea |

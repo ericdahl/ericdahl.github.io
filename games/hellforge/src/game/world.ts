@@ -21,7 +21,8 @@ import type { StoryId } from './story';
 
 export type SoundId =
   | 'swing' | 'hit' | 'miss' | 'death' | 'hurt' | 'gold' | 'item' | 'unique' | 'potion' | 'levelup' | 'fire' | 'cold'
-  | 'light' | 'bow' | 'portal' | 'nova' | 'block' | 'shrine' | 'chest' | 'boom' | 'nomana' | 'roar' | 'quest' | 'step' | 'thud' | 'rare';
+  | 'light' | 'bow' | 'portal' | 'nova' | 'block' | 'shrine' | 'chest' | 'boom' | 'nomana' | 'roar' | 'quest' | 'step' | 'thud' | 'rare'
+  | 'spree' | 'orb' | 'dodge' | 'jackpot' | 'cackle' | 'curse';
 
 /** Seconds a ground item takes to bounce when it lands or refuses to be picked up. */
 export const LOOT_BOUNCE = 0.4;
@@ -42,12 +43,14 @@ export type GameEvent =
   /** Freeze the action for a moment to sell a heavy hit. */
   | { type: 'hitstop'; t: number }
   /** A full-screen colour flash (boss abilities, boss deaths). */
-  | { type: 'flash'; color: string; a: number };
+  | { type: 'flash'; color: string; a: number }
+  /** A big line across the middle of the screen: sprees, purges, ambushes. */
+  | { type: 'announce'; text: string; sub?: string; color: string };
 
 export type FxKind =
   | 'blood' | 'spark' | 'nova' | 'explosion' | 'chain' | 'meteor_mark' | 'burn' | 'teleport' | 'levelup' | 'heal'
   | 'shrine' | 'text' | 'shout' | 'revive' | 'whirl' | 'slam' | 'portal_open' | 'raise' | 'curse'
-  | 'shatter' | 'cinders' | 'zap' | 'gore' | 'shade_mark' | 'dust';
+  | 'shatter' | 'cinders' | 'zap' | 'gore' | 'shade_mark' | 'dust' | 'dash' | 'coins';
 
 export interface Fx {
   kind: FxKind;
@@ -130,6 +133,14 @@ export interface Monster {
   rose?: boolean;
   /** Current boss phase, and what it changed. */
   phase?: number;
+  /** A Tithe Imp's getaway: time left before it escapes, and where it is running. */
+  thief?: { t: number; started: boolean; path: Point[]; repath: number; dropCd: number; stagger: number };
+  /** Called up by a cursed shrine (the shrine's object id). */
+  ambush?: number;
+  /** World time before an elite's modifier ability is ready again. */
+  sparkAt?: number;
+  blinkAt?: number;
+  mortarAt?: number;
   abilities?: BossAbility[];
   shape?: MonsterShape;
   color?: string;
@@ -167,6 +178,36 @@ export interface GroundItem {
   t: number;
 }
 
+/** A soul orb left by the dead. Walking over it restores life or mana. */
+export interface Orb {
+  id: number;
+  x: number;
+  y: number;
+  kind: 'life' | 'mana';
+  t: number;
+}
+
+/** Seconds a soul orb lasts on the ground. */
+export const ORB_LIFE = 30;
+
+/** Kills needed for each spree rank, and what the rank is called. */
+export const SPREE_TIERS: { n: number; title: string; color: string }[] = [
+  { n: 5, title: 'Killing Spree', color: '#e8c860' },
+  { n: 10, title: 'Rampage', color: '#ffb040' },
+  { n: 16, title: 'Massacre', color: '#ff8030' },
+  { n: 24, title: 'Slaughter', color: '#ff5a28' },
+  { n: 35, title: 'Annihilation', color: '#ff3a3a' },
+  { n: 50, title: 'Hell Unleashed', color: '#ff40c0' },
+];
+/** Seconds after a kill before a spree lapses. */
+export const SPREE_WINDOW = 4;
+export const DODGE_COOLDOWN = 1.5;
+const DODGE_TIME = 0.22;
+const DODGE_DIST = 3.1;
+/** Seconds a Tithe Imp runs before its portal opens, and how long the portal takes. */
+const THIEF_RUN = 15;
+const THIEF_CHANNEL = 1.6;
+
 export interface WorldObject {
   id: number;
   x: number;
@@ -176,10 +217,13 @@ export interface WorldObject {
   shrine?: ShrineKind;
 }
 
-export type ShrineKind = 'armor' | 'combat' | 'refill' | 'experience';
+export type ShrineKind = 'armor' | 'combat' | 'refill' | 'experience' | 'storm' | 'fortune' | 'haste' | 'cursed';
+export const SHRINE_KINDS: ShrineKind[] = ['armor', 'combat', 'refill', 'experience', 'storm', 'fortune', 'haste', 'cursed'];
 const SHRINE_NAMES: Record<ShrineKind, string> = {
   armor: 'Armor Shrine', combat: 'Combat Shrine', refill: 'Refilling Shrine', experience: 'Experience Shrine',
+  storm: 'Storm Shrine', fortune: 'Fortune Shrine', haste: 'Fleet Shrine', cursed: 'Cursed Shrine',
 };
+const SHRINE_TIME: Partial<Record<ShrineKind, number>> = { storm: 45, fortune: 120, haste: 60 };
 
 export type NpcKind = 'healer' | 'smith' | 'sage' | 'fence' | 'caravan';
 export interface Npc {
@@ -229,6 +273,7 @@ export interface AreaState {
   level: Level;
   monsters: Monster[];
   ground: GroundItem[];
+  orbs: Orb[];
   projectiles: Projectile[];
   objects: WorldObject[];
   npcs: Npc[];
@@ -236,6 +281,8 @@ export interface AreaState {
   fx: Fx[];
   explored: Uint8Array;
   flow: FlowField;
+  /** Every monster here has been killed and the reward paid. */
+  purged?: boolean;
 }
 
 type Intent =
@@ -253,7 +300,7 @@ export type Interactable =
   | { kind: 'exit'; index: number };
 
 interface PlayerAction {
-  kind: 'melee' | 'shoot' | 'cast' | 'leap' | 'whirl';
+  kind: 'melee' | 'shoot' | 'cast' | 'leap' | 'whirl' | 'dodge';
   skill: string;
   t: number;
   dur: number;
@@ -306,6 +353,12 @@ export const GAMBLE_KINDS: ItemKind[] = ['ring', 'amulet', 'weapon', 'armor', 'h
 
 const TAU = Math.PI * 2;
 
+const SHRINE_TEXT: Record<ShrineKind, string> = {
+  armor: 'your armor hardens', combat: 'your blows land harder', refill: 'life and mana restored', experience: 'you learn faster',
+  storm: 'lightning hunts your foes', fortune: 'the dead give up more treasure', haste: 'you move and strike faster',
+  cursed: 'they are coming for you!',
+};
+
 export class World {
   char: Character;
   stats!: Stats;
@@ -330,11 +383,21 @@ export class World {
   storm = 0;
   private stormIn = 25;
   private stormLeft = 0;
+  /** The current run of quick kills. `tier` indexes SPREE_TIERS, or -1 below the first rank. */
+  streak = { n: 0, t: 0, tier: -1 };
+  /** Seconds until the dodge roll is ready again. */
+  dodgeCd = 0;
+  /** Cursed shrines whose ambush is still being fought, by the shrine's object id. */
+  private ambushes = new Map<number, { area: AreaState; x: number; y: number; wave: number }>();
+  private stormShrineT = 0;
+  /** Rolls for the extras (orbs, elite tricks), kept apart so they never shift loot or level generation. */
+  private luck: Rng;
 
   constructor(char: Character, seed = Date.now() >>> 0) {
     this.char = char;
     this.seed = seed;
     this.rng = new Rng(hashSeed(seed, 'world'));
+    this.luck = new Rng(hashSeed(seed, 'luck'));
     this.player = {
       x: 0, y: 0, life: 1, mana: 1, facing: Math.PI / 4, moving: false, walk: 0, path: [], pathT: 0, moveDir: null,
       intent: null, action: null, heal: [], buffs: {}, frenzy: { stacks: 0, t: 0 }, invuln: 0, dead: false, chill: 0,
@@ -438,6 +501,9 @@ export class World {
     if (p.frost_shell) add('defPct', p.frost_shell.p.pct!);
     if (p.shrine_armor) add('defPct', 100);
     if (p.shrine_combat) add('edPct', 80), add('ar', 150);
+    if (p.shrine_haste) add('ias', 30), add('frw', 30);
+    // A spree quickens the feet: each rank is worth a little more speed.
+    if (this.streak.tier >= 0) add('frw', 5 * (this.streak.tier + 1));
     const fr = this.player.frenzy;
     if (fr.stacks > 0) {
       const lvl = skillLevel(this.char, 'frenzy');
@@ -467,12 +533,12 @@ export class World {
     const rng = new Rng(hashSeed(this.seed, id, this.char.difficulty));
     const level = generateLevel(def.spec, rng);
     const a: AreaState = {
-      def, level, monsters: [], ground: [], projectiles: [], objects: [], npcs: [], hazards: [], fx: [],
+      def, level, monsters: [], ground: [], orbs: [], projectiles: [], objects: [], npcs: [], hazards: [], fx: [],
       explored: new Uint8Array(level.w * level.h), flow: new FlowField(level, 26),
     };
     for (const o of level.objects) {
       const obj: WorldObject = { id: this.id(), x: o.x + 0.5, y: o.y + 0.5, kind: o.kind, used: false };
-      if (o.kind === 'shrine') obj.shrine = rng.pick(['armor', 'combat', 'refill', 'experience'] as const);
+      if (o.kind === 'shrine') obj.shrine = rng.pick(SHRINE_KINDS);
       a.objects.push(obj);
     }
     if (def.town) {
@@ -521,6 +587,7 @@ export class World {
       dead: false, deadT: 0, packId: opts.packId ?? 0, facing: this.rng.range(0, TAU), walk: 0, flash: 0, revived: 0,
       superId: opts.superId,
     };
+    if (def.thief) m.thief = { t: THIEF_RUN, started: false, path: [], repath: 0, dropCd: 0, stagger: 0 };
     a.monsters.push(m);
     return m;
   }
@@ -598,6 +665,12 @@ export class World {
       }
       packId++;
     }
+    // Sometimes a Tithe Imp is hiding somewhere with its sack. Not in the Hollow Cave, where every last creature must die.
+    if (def.quest !== 'hollow' && spots.length && rng.chance(0.4)) {
+      const s = spots.pop()!;
+      const p = place(s.x, s.y);
+      this.spawnMonster(a, 'tithe', p.x, p.y, 'normal', { packId });
+    }
   }
 
   /** Moves the player to an area. `via` decides where they appear. */
@@ -629,6 +702,7 @@ export class World {
     p.intent = null;
     p.action = null;
     p.invuln = 1.2;
+    if (a.def.town) this.endSpree(true);
     this.minions = this.minions.filter((mi) => !mi.dead);
     for (const mi of this.minions) this.placeMinion(mi);
     a.flow.update(p.x, p.y);
@@ -1046,7 +1120,8 @@ export class World {
   }
 
   private spawnDrops(x: number, y: number, mlvl: number, tier: DropTier) {
-    const drops = rollDrops(this.rng, mlvl, tier, { mf: this.stats.mf, gf: this.stats.gf, classId: this.char.classId });
+    const lucky = this.player.buffs.shrine_fortune ? 1 : 0;
+    const drops = rollDrops(this.rng, mlvl, tier, { mf: this.stats.mf + 75 * lucky, gf: this.stats.gf + 150 * lucky, classId: this.char.classId });
     for (const d of drops) {
       if (d.kind === 'gold') {
         let gx = x;
@@ -1295,6 +1370,8 @@ export class World {
     for (const f of a.fx) f.t += dt;
     a.fx = a.fx.filter((f) => f.t < f.dur);
     for (const g of a.ground) g.t += dt;
+    for (const o of a.orbs) o.t += dt;
+    if (a.orbs.length) a.orbs = a.orbs.filter((o) => o.t < ORB_LIFE);
     this.focusT -= dt;
     this.runTimers(dt);
     this.updatePlayer(dt);
@@ -1331,7 +1408,10 @@ export class World {
     const st = this.stats;
     if (p.invuln > 0) p.invuln -= dt;
     if (p.hurt > 0) p.hurt -= dt;
+    if (this.dodgeCd > 0) this.dodgeCd -= dt;
     if (p.dead) return;
+    if (this.streak.n > 0 && (this.streak.t -= dt) <= 0) this.endSpree(false);
+    if (p.buffs.shrine_storm) this.stormShrine(dt);
 
     // Regeneration, potions, buffs, damage over time.
     p.mana = Math.min(st.maxMana, p.mana + st.manaRegen * dt);
@@ -1388,6 +1468,7 @@ export class World {
       this.processIntent(dt, speed);
     }
     if (p.moving) p.walk += dt * speed;
+    this.collectOrbs();
     this.autoPickup();
     this.checkExits();
   }
@@ -1574,6 +1655,22 @@ export class World {
     const p = this.player;
     const act = p.action!;
     act.t += dt;
+    if (act.kind === 'dodge') {
+      const step = (DODGE_DIST / DODGE_TIME) * dt;
+      const moved = this.moveEntity(p, act.x * step, act.y * step, 0.3);
+      p.walk += step;
+      act.tick = (act.tick ?? 0) - dt;
+      if (act.tick <= 0) {
+        act.tick = 0.045;
+        this.fx({ kind: 'dash', x: p.x, y: p.y, dur: 0.28, r: p.facing });
+      }
+      if (act.t >= act.dur || !moved) {
+        p.action = null;
+        this.collectOrbs();
+        this.autoPickup();
+      }
+      return;
+    }
     const def = SKILL_BY_ID[act.skill];
     const lvl = Math.max(1, skillLevel(this.char, act.skill));
     if (act.kind === 'leap') {
@@ -1927,6 +2024,19 @@ export class World {
       p.life = Math.min(this.stats.maxLife, p.life + (total * this.stats.lifeSteal) / 100);
       p.mana = Math.min(this.stats.maxMana, p.mana + (total * this.stats.manaSteal) / 100);
     }
+    if (m.thief && dealt > 0) this.shakeThief(m);
+    if (m.mods.includes('lightEnch') && total > 0 && m.life > 0 && (m.sparkAt ?? 0) <= this.time) {
+      // Lightning Enchanted: every blow shakes loose a ring of sparks.
+      m.sparkAt = this.time + 1.1;
+      const off = this.luck.range(0, TAU);
+      for (let i = 0; i < 6; i++) {
+        this.spawnProjectile({
+          x: m.x, y: m.y, ang: off + (i / 6) * TAU, speed: 5.5, ttl: 0.9, owner: 'monster', dmg: elemDamage('light', (m.dmgMin + m.dmgMax) * 0.22),
+          kind: 'm_light', radius: 0.26, srcLevel: m.level, srcId: m.id, wobble: true,
+        });
+      }
+      this.sound('light');
+    }
     if (m.life <= 0) this.killMonster(m, deathKindOf(d, m.res, -m.life > m.maxLife * 0.5));
     return true;
   }
@@ -1948,7 +2058,10 @@ export class World {
     m.deathKind = m.def.shape === 'wraith' || m.def.shape === 'bat' ? 'normal' : how;
     this.sound('death');
     this.deathEffect(m);
-    const mult = xpMultiplier(m.level, this.char.level) * (1 + this.player.xpBonus / 100);
+    this.countKill(m);
+    // Kills made on a spree are worth more, rank by rank.
+    const spree = 1 + 0.06 * (this.streak.tier + 1);
+    const mult = xpMultiplier(m.level, this.char.level) * (1 + this.player.xpBonus / 100) * spree;
     const gained = addXp(this.char, m.xp * mult);
     if (gained) this.levelUp();
     const p = this.player;
@@ -1956,6 +2069,9 @@ export class World {
     p.mana = Math.min(this.stats.maxMana, p.mana + this.stats.manaOnKill);
     const tier: DropTier = m.rarity === 'boss' ? 'boss' : m.rarity === 'unique' ? 'unique' : m.rarity === 'champion' ? 'champion' : 'normal';
     if (!m.summoned) this.spawnDrops(m.x, m.y, m.level, tier);
+    if (!m.summoned) this.dropOrbs(m);
+    if (m.thief) this.jackpot(m);
+    if (m.ambush !== undefined) this.ambushKill(m.ambush);
     if (m.mods.includes('fireEnch')) {
       this.fx({ kind: 'explosion', x: m.x, y: m.y, dur: 0.5, r: 2 });
       this.sound('boom');
@@ -1999,6 +2115,7 @@ export class World {
       this.msg('The Hollow Cave has been cleansed! Return to Old Corvin.', '#e8c860');
       this.sound('quest');
     }
+    this.checkPurge();
   }
 
   /** The burst a monster dies in, by how it died, plus a jolt for elites and bosses. */
@@ -2094,6 +2211,7 @@ export class World {
     p.intent = null;
     p.path = [];
     this.minions = [];
+    this.endSpree(true);
     this.sound('death');
     this.emit({ type: 'death' });
     if (this.char.hardcore) this.char.dead = true;
@@ -2132,12 +2250,14 @@ export class World {
       const k = o.shrine!;
       this.sound('shrine');
       this.fx({ kind: 'shrine', x: o.x, y: o.y, dur: 1 });
-      this.msg(SHRINE_NAMES[k], '#9fd8ff');
-      if (k === 'refill') {
+      this.msg(`${SHRINE_NAMES[k]}: ${SHRINE_TEXT[k]}`, k === 'cursed' ? '#d080ff' : '#9fd8ff');
+      if (k === 'cursed') {
+        this.startAmbush(o);
+      } else if (k === 'refill') {
         p.life = this.stats.maxLife;
         p.mana = this.stats.maxMana;
       } else {
-        p.buffs[`shrine_${k}`] = { t: 90, p: {} };
+        p.buffs[`shrine_${k}`] = { t: SHRINE_TIME[k] ?? 90, p: {} };
         if (k === 'experience') p.xpBonus = 50;
         this.refreshStats();
       }
@@ -2212,6 +2332,11 @@ export class World {
       }
       if (m.superId === 'corvin' && m.alert) this.tellOnce('corvin');
       if (m.invulnT) continue;
+      if (m.thief) {
+        if (m.alert && !safe) this.updateThief(m, dt);
+        else this.wander(m, dt);
+        continue;
+      }
       if (m.def.phases && !m.illusion && this.advancePhase(m)) continue;
       if (m.sub) {
         this.updateBurrow(m, dt, tgt);
@@ -2239,6 +2364,7 @@ export class World {
         m.abilityCd = this.rng.range(5, 7);
         continue;
       }
+      if (m.mods.length && this.eliteTricks(m, tgt, d)) continue;
       if (m.def.support && m.abilityCd <= 0 && this.wardAlly(m)) continue;
       if (m.def.feeds && m.abilityCd <= 0 && this.feedOnCorpse(m, dt, speed)) continue;
       if (m.def.slam && m.abilityCd <= 0 && d < 4.5 && !m.illusion) {
@@ -3038,6 +3164,359 @@ export class World {
     a.hazards = a.hazards.filter((h) => h.t < h.delay + h.dur);
   }
 
+  // ---------------------------------------------------------------- dodge
+
+  /**
+   * A quick roll that nothing can hit. Goes the way the hero is steering (or `dir`, or the way they face),
+   * and cuts short a swing or a cast that has not landed yet.
+   */
+  cmdDodge(dir?: Point | null): boolean {
+    const p = this.player;
+    if (p.dead || this.dodgeCd > 0) return false;
+    if (p.action && (p.action.kind === 'leap' || p.action.kind === 'whirl' || p.action.kind === 'dodge')) return false;
+    const d = dir && Math.hypot(dir.x, dir.y) > 0.15 ? dir : p.moveDir ?? { x: Math.cos(p.facing), y: Math.sin(p.facing) };
+    const len = Math.hypot(d.x, d.y) || 1;
+    p.facing = Math.atan2(d.y, d.x);
+    p.action = { kind: 'dodge', skill: 'attack', t: 0, dur: DODGE_TIME, hitAt: 0, done: true, x: d.x / len, y: d.y / len };
+    p.intent = null;
+    p.path = [];
+    p.invuln = Math.max(p.invuln, DODGE_TIME + 0.1);
+    this.dodgeCd = DODGE_COOLDOWN;
+    this.fx({ kind: 'dust', x: p.x, y: p.y, dur: 0.5 });
+    this.sound('dodge');
+    return true;
+  }
+
+  // ---------------------------------------------------------------- sprees
+
+  private countKill(m: Monster) {
+    if (this.inTown) return;
+    const s = this.streak;
+    s.n++;
+    s.t = SPREE_WINDOW + (m.rarity === 'boss' ? 4 : 0);
+    let tier = s.tier;
+    while (tier + 1 < SPREE_TIERS.length && s.n >= SPREE_TIERS[tier + 1].n) tier++;
+    if (tier === s.tier) return;
+    s.tier = tier;
+    const t = SPREE_TIERS[tier];
+    this.emit({ type: 'announce', text: t.title, sub: `${s.n} kills`, color: t.color });
+    this.sound('spree');
+    // Each new rank is a second wind.
+    this.refreshStats();
+    const p = this.player;
+    p.life = Math.min(this.stats.maxLife, p.life + this.stats.maxLife * 0.15);
+    p.mana = Math.min(this.stats.maxMana, p.mana + this.stats.maxMana * 0.15);
+    this.fx({ kind: 'heal', x: p.x, y: p.y, dur: 0.6, color: '#ff4040' });
+  }
+
+  private endSpree(quiet: boolean) {
+    const s = this.streak;
+    const ranked = s.tier >= 0;
+    if (ranked) {
+      const best = this.char.bestSpree ?? 0;
+      if (s.n > best) this.char.bestSpree = s.n;
+      if (!quiet) this.msg(`${SPREE_TIERS[s.tier].title} over: ${s.n} kills${s.n > best && best > 0 ? ', a new best!' : ''}`, '#e8c860');
+    }
+    this.streak = { n: 0, t: 0, tier: -1 };
+    if (ranked) this.refreshStats();
+  }
+
+  // ---------------------------------------------------------------- soul orbs
+
+  private addOrb(x: number, y: number, kind: Orb['kind']) {
+    const tx = x + this.luck.range(-0.8, 0.8);
+    const ty = y + this.luck.range(-0.8, 0.8);
+    const ok = isWalkable(this.area.level, tx, ty);
+    this.area.orbs.push({ id: this.id(), x: ok ? tx : x, y: ok ? ty : y, kind, t: 0 });
+  }
+
+  private dropOrbs(m: Monster) {
+    if (m.thief) return;
+    const big = m.rarity === 'boss' || m.rarity === 'unique';
+    const chance = big ? 1 : m.rarity === 'champion' ? 0.4 : m.rarity === 'minion' ? 0.15 : 0.08;
+    if (!this.luck.chance(chance)) return;
+    const n = m.rarity === 'boss' ? 4 : m.rarity === 'unique' ? 2 : 1;
+    const first: Orb['kind'] = this.luck.chance(0.7) ? 'life' : 'mana';
+    for (let i = 0; i < n; i++) this.addOrb(m.x, m.y, i % 2 === 0 ? first : first === 'life' ? 'mana' : 'life');
+  }
+
+  /** Orbs are taken by walking over them, and left where they lie when there is nothing for them to mend. */
+  private collectOrbs() {
+    const a = this.area;
+    if (!a.orbs.length) return;
+    const p = this.player;
+    const st = this.stats;
+    for (const o of a.orbs.slice()) {
+      if (o.t < 0.3 || Math.hypot(o.x - p.x, o.y - p.y) > 1.05) continue;
+      if (o.kind === 'life') {
+        const hurt = this.minions.filter((mi) => !mi.dead && mi.life < mi.maxLife);
+        if (p.life >= st.maxLife && !hurt.length) continue;
+        p.life = Math.min(st.maxLife, p.life + st.maxLife * 0.25);
+        for (const mi of hurt) mi.life = Math.min(mi.maxLife, mi.life + mi.maxLife * 0.3);
+        this.fx({ kind: 'heal', x: p.x, y: p.y, dur: 0.6, color: '#ff4040' });
+        this.floatText(p.x, p.y, 'Life', '#ff8088');
+      } else {
+        if (p.mana >= st.maxMana) continue;
+        p.mana = Math.min(st.maxMana, p.mana + st.maxMana * 0.25);
+        this.fx({ kind: 'heal', x: p.x, y: p.y, dur: 0.6, color: '#4f7dff' });
+        this.floatText(p.x, p.y, 'Mana', '#80a8ff');
+      }
+      this.sound('orb');
+      a.orbs.splice(a.orbs.indexOf(o), 1);
+    }
+  }
+
+  // ---------------------------------------------------------------- the Tithe Imp
+
+  /** Every blow knocks coins out of the sack and slows the imp for a moment, so it can be run down. */
+  private shakeThief(m: Monster) {
+    const th = m.thief!;
+    th.stagger = 0.55;
+    if (th.dropCd > this.time) return;
+    th.dropCd = this.time + 0.4;
+    const amt = Math.max(2, Math.round((4 + m.level * 2.2) * (1 + this.stats.gf / 100)));
+    this.area.ground.push({ id: this.id(), x: m.x, y: m.y, gold: amt, t: 0 });
+    this.sound('gold');
+  }
+
+  private updateThief(m: Monster, dt: number) {
+    const th = m.thief!;
+    const p = this.player;
+    const l = this.area.level;
+    if (!th.started) {
+      th.started = true;
+      this.emit({ type: 'announce', text: 'A Tithe Imp!', sub: 'Catch it before it escapes', color: '#ffd860' });
+      this.sound('cackle');
+    }
+    const before = th.t;
+    th.t -= dt;
+    if (th.stagger > 0) th.stagger -= dt;
+    if (th.t <= 0) {
+      this.fx({ kind: 'teleport', x: m.x, y: m.y, dur: 0.5 });
+      this.sound('portal');
+      this.msg('The Tithe Imp escapes with its hoard.', '#c8b890');
+      // Gone without a corpse.
+      m.dead = true;
+      m.used = true;
+      m.life = 0;
+      m.deadT = 999;
+      return;
+    }
+    if (th.t <= THIEF_CHANNEL) {
+      // It stands still to open its portal: the last chance to bring it down.
+      if (before > THIEF_CHANNEL) {
+        this.fx({ kind: 'portal_open', x: m.x, y: m.y, dur: THIEF_CHANNEL, r: 1.2 });
+        this.sound('portal');
+        this.msg('The Tithe Imp is opening a portal!', '#ffd860');
+      }
+      m.facing += dt * 9;
+      return;
+    }
+    th.repath -= dt;
+    if (!th.path.length || th.repath <= 0) {
+      th.repath = 2.5;
+      // Run for somewhere far from the hunter that does not mean running past them.
+      const dpm = Math.hypot(m.x - p.x, m.y - p.y) || 1;
+      let best: Point | null = null;
+      let bs = -Infinity;
+      for (const s of l.spawns) {
+        const dm = Math.hypot(s.x - m.x, s.y - m.y);
+        if (dm < 4) continue;
+        const away = ((s.x - m.x) * (m.x - p.x) + (s.y - m.y) * (m.y - p.y)) / (dm * dpm);
+        const score = Math.min(Math.hypot(s.x - p.x, s.y - p.y), 26) - dm * 0.5 + away * 7 + this.luck.range(0, 3);
+        if (score > bs) (bs = score), (best = s);
+      }
+      th.path = best ? findPath(l, m, { x: best.x + 0.5, y: best.y + 0.5 }) : [];
+    }
+    const speed = m.speed * (m.chill > 0 ? 0.5 : 1) * (th.stagger > 0 ? 0.5 : 1) * (this.inQuicksand(m) ? 0.6 : 1);
+    const next = th.path[0];
+    let dx = m.x - p.x;
+    let dy = m.y - p.y;
+    if (next) {
+      dx = next.x - m.x;
+      dy = next.y - m.y;
+      if (Math.hypot(dx, dy) < 0.35) {
+        th.path.shift();
+        return;
+      }
+    }
+    const d = Math.hypot(dx, dy) || 1;
+    if (!this.moveEntity(m, (dx / d) * speed * dt, (dy / d) * speed * dt, m.def.radius)) th.path = [];
+    m.facing = Math.atan2(dy, dx);
+    m.walk += dt * speed;
+  }
+
+  private jackpot(m: Monster) {
+    const a = this.area;
+    this.emit({ type: 'announce', text: 'Jackpot!', sub: 'The Tithe Imp spills its hoard', color: '#ffd860' });
+    this.emit({ type: 'shake', amount: 6 });
+    this.sound('jackpot');
+    this.fx({ kind: 'coins', x: m.x, y: m.y, dur: 1.1, r: 2.2 });
+    const gf = 1 + this.stats.gf / 100;
+    const spin = this.luck.range(0, TAU);
+    for (let i = 0; i < 10; i++) {
+      const ang = spin + (i / 10) * TAU;
+      const r = this.luck.range(0.7, 2.2);
+      const x = m.x + Math.cos(ang) * r;
+      const y = m.y + Math.sin(ang) * r;
+      const ok = isWalkable(a.level, x, y);
+      const gold = Math.round((12 + m.level * 7) * gf * this.luck.range(0.7, 1.4));
+      a.ground.push({ id: this.id(), x: ok ? x : m.x, y: ok ? y : m.y, gold, t: 0 });
+    }
+    this.spawnDrops(m.x, m.y, m.level, 'unique');
+    this.spawnDrops(m.x, m.y, m.level, 'unique');
+    this.char.tithes = (this.char.tithes ?? 0) + 1;
+  }
+
+  // ---------------------------------------------------------------- cursed shrines
+
+  private startAmbush(o: WorldObject) {
+    this.ambushes.set(o.id, { area: this.area, x: o.x, y: o.y, wave: 0 });
+    this.emit({ type: 'announce', text: 'Ambush!', sub: 'Break the curse to claim its hoard', color: '#d080ff' });
+    this.emit({ type: 'flash', color: '#8030c0', a: 0.3 });
+    this.emit({ type: 'shake', amount: 6 });
+    this.sound('curse');
+    this.ambushWave(o.id);
+  }
+
+  /** Three waves rise around the hero; the last is led by an elite. */
+  private ambushWave(id: number) {
+    const am = this.ambushes.get(id);
+    if (!am) return;
+    if (am.area !== this.area || this.player.dead) return void this.ambushes.delete(id);
+    const a = am.area;
+    const p = this.player;
+    am.wave++;
+    const last = am.wave === 3;
+    const type = this.luck.pick(a.def.monsters);
+    const big = type === 'brute' || type === 'colossus';
+    const n = last ? 4 : big ? 2 + am.wave : 4 + am.wave;
+    const packId = 100000 + id * 4 + am.wave;
+    const spin = this.luck.range(0, TAU);
+    for (let i = 0; i < n; i++) {
+      const ang = spin + (i / n) * TAU;
+      const r = this.luck.range(3.2, 5);
+      const spot = nearestFloor(a.level, { x: p.x + Math.cos(ang) * r, y: p.y + Math.sin(ang) * r });
+      const leader = last && i === 0;
+      const m = this.spawnMonster(a, type, spot.x + 0.5, spot.y + 0.5, leader ? 'unique' : last ? 'minion' : 'normal', leader
+        ? { packId, mods: rollUniqueMods(this.luck, 2 + this.char.difficulty), name: uniqueName(this.luck) }
+        : { packId });
+      m.ambush = id;
+      m.alert = true;
+      this.fx({ kind: 'revive', x: m.x, y: m.y, dur: 0.7 });
+    }
+    this.sound('fire');
+  }
+
+  private ambushKill(id: number) {
+    const am = this.ambushes.get(id);
+    if (!am) return;
+    if (am.area.monsters.some((m) => m.ambush === id && !m.dead)) return;
+    if (am.wave < 3) {
+      // One timer per wave, even if something that died gets back up and dies again.
+      if (am.wave < 0) return;
+      const wave = am.wave;
+      am.wave = -1;
+      this.msg(wave === 2 ? 'Something worse is coming...' : 'More are coming...', '#d080ff');
+      this.addTimer(1.3, () => {
+        am.wave = wave;
+        this.ambushWave(id);
+      });
+      return;
+    }
+    this.ambushes.delete(id);
+    if (this.area !== am.area) return;
+    this.emit({ type: 'announce', text: 'Curse Broken', sub: 'The shrine gives up its hoard', color: '#9fd8ff' });
+    this.sound('quest');
+    this.fx({ kind: 'shrine', x: am.x, y: am.y, dur: 1.2 });
+    const mlvl = this.mlvl(am.area.def);
+    this.spawnDrops(am.x, am.y, mlvl, 'unique');
+    this.spawnDrops(am.x, am.y, mlvl, 'chest');
+    this.spawnDrops(am.x, am.y, mlvl, 'chest');
+    this.addOrb(am.x, am.y, 'life');
+    this.addOrb(am.x, am.y, 'mana');
+    this.checkPurge();
+  }
+
+  // ---------------------------------------------------------------- elites, shrines, purges
+
+  /** Extra tricks from an elite's modifiers. Returns true if one of them used up its turn. */
+  private eliteTricks(m: Monster, tgt: { x: number; y: number }, d: number): boolean {
+    const l = this.area.level;
+    if (m.mods.includes('teleport')) {
+      if (m.blinkAt === undefined) m.blinkAt = this.time + 1.5;
+      else if (m.blinkAt <= this.time && d > 3.5 && d < 13) {
+        m.blinkAt = this.time + this.luck.range(4.5, 7);
+        const ang = this.luck.range(0, TAU);
+        const to = { x: tgt.x + Math.cos(ang) * 1.4, y: tgt.y + Math.sin(ang) * 1.4 };
+        if (isWalkable(l, to.x, to.y) && lineOfSight(l, to, tgt)) {
+          this.fx({ kind: 'teleport', x: m.x, y: m.y, dur: 0.4 });
+          m.x = to.x;
+          m.y = to.y;
+          this.fx({ kind: 'teleport', x: m.x, y: m.y, dur: 0.4 });
+          this.sound('portal');
+          // A beat to react before it swings.
+          m.atkCd = Math.max(m.atkCd, 0.5);
+          return true;
+        }
+      }
+    }
+    if (m.mods.includes('mortar')) {
+      if (m.mortarAt === undefined) m.mortarAt = this.time + 1.2;
+      else if (m.mortarAt <= this.time && d < 10 && lineOfSight(l, m, tgt)) {
+        m.mortarAt = this.time + 3.6;
+        for (let i = 0; i < 2; i++) {
+          const x = tgt.x + (i ? this.luck.range(-2, 2) : 0);
+          const y = tgt.y + (i ? this.luck.range(-2, 2) : 0);
+          const delay = 1.15 + i * 0.3;
+          this.area.hazards.push({
+            x, y, t: 0, delay, dur: 0.9, radius: 1.5, dmg: elemDamage('fire', (m.dmgMin + m.dmgMax) * 0.6), owner: 'monster',
+            burnDps: m.dmgMax * 0.2, srcLevel: m.level, fired: false, quiet: true,
+          });
+          this.fx({ kind: 'meteor_mark', x, y, dur: delay, r: 1.5 });
+        }
+        this.sound('fire');
+      }
+    }
+    return false;
+  }
+
+  /** The Storm Shrine: lightning leaps from the hero to whatever is near, and on from there. */
+  private stormShrine(dt: number) {
+    this.stormShrineT -= dt;
+    if (this.stormShrineT > 0 || this.inTown) return;
+    this.stormShrineT = 0.8;
+    const p = this.player;
+    const m = this.monstersNear(p.x, p.y, 7).find((x) => lineOfSight(this.area.level, p, x));
+    if (!m) return;
+    this.fx({ kind: 'chain', x: p.x, y: p.y, dur: 0.25, pts: [{ x: p.x, y: p.y }, { x: m.x, y: m.y }] });
+    this.chainLightning(m, 2, elemDamage('light', (6 + this.char.level * 3.2) * this.luck.range(0.7, 1.3)));
+  }
+
+  /** Killing everything in an area pays out once: experience, and a pile of loot at the hero's feet. */
+  private checkPurge() {
+    const a = this.area;
+    if (a.def.town || a.purged) return;
+    if (a.monsters.some((m) => !m.dead && !m.thief)) return;
+    // Not while an ambush has waves to come, or while the Embalmed Dead are still due to get back up.
+    for (const am of this.ambushes.values()) if (am.area === a) return;
+    if (a.monsters.some((m) => m.def.rises && !m.rose && !m.summoned && !m.used && m.deathKind !== 'burn')) return;
+    a.purged = true;
+    const c = this.char;
+    c.purges = (c.purges ?? 0) + 1;
+    this.emit({ type: 'announce', text: 'Area Purged', sub: `${a.def.name} lies silent`, color: '#9fe08a' });
+    this.sound('quest');
+    const gained = addXp(c, (xpForLevel(c.level + 1) - xpForLevel(c.level)) * 0.08);
+    if (gained) this.levelUp();
+    this.addTimer(0.7, () => {
+      if (this.area !== a) return;
+      const p = this.player;
+      this.fx({ kind: 'coins', x: p.x, y: p.y, dur: 1.1, r: 2 });
+      this.spawnDrops(p.x, p.y, this.mlvl(a.def), 'unique');
+      this.spawnDrops(p.x, p.y, this.mlvl(a.def), 'chest');
+    });
+  }
+
   // ---------------------------------------------------------------- movement
 
   /** Axis-separated movement against walls. Returns false if fully blocked. */
@@ -3064,6 +3543,23 @@ export class World {
     if (this.focusT <= 0) return null;
     const m = this.area.monsters.find((x) => x.id === this.focusId);
     return m && !m.dead ? m : null;
+  }
+
+  /**
+   * The last few monsters in an area, once five or fewer are left, so that finishing it off is not a hunt in the dark.
+   * In the Hollow Cave this is the quest's own list.
+   */
+  stragglers(): Monster[] {
+    const a = this.area;
+    if (a.def.quest === 'hollow' && this.questState('hollow') === 'active') return this.questStrays();
+    if (a.def.town || a.purged) return [];
+    const alive = a.monsters.filter((m) => !m.dead && !m.thief);
+    return alive.length <= 5 ? alive : [];
+  }
+
+  /** The current spree rank, if the run of kills has reached one. */
+  spreeTier() {
+    return this.streak.tier >= 0 ? SPREE_TIERS[this.streak.tier] : null;
   }
 
   groundLabel(g: GroundItem): { text: string; color: string } {

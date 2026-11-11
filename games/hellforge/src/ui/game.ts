@@ -3,7 +3,7 @@ import { POTION_POOLS, potionCount, potionSummary, potionTiers, type Character }
 import { MOD_LABEL } from '../game/monsters';
 import { SKILL_BY_ID } from '../game/skills';
 import { STORIES, type StoryBeat } from '../game/story';
-import { World, type Interactable } from '../game/world';
+import { DODGE_COOLDOWN, SPREE_TIERS, SPREE_WINDOW, World, type Interactable } from '../game/world';
 import { baseIconUrl, skillIconUrl } from '../render/icons';
 import { Renderer } from '../render/renderer';
 import { Audio } from './audio';
@@ -203,6 +203,9 @@ export class Game implements PanelHost {
         case 'flash':
           this.renderer.flash(e.color, e.a);
           break;
+        case 'announce':
+          this.announce(e.text, e.sub, e.color);
+          break;
         case 'quest':
           this.save();
           break;
@@ -264,6 +267,16 @@ export class Game implements PanelHost {
       });
       skills.append(b);
     }
+    const dodge = h('button', { class: 'dbtn', title: 'Dodge (Space)', 'aria-label': 'Dodge' }, h('span', { class: 'dglyph' }, '➠'), h('span', { class: 'key' }, 'Space'));
+    dodge.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      this.audio.unlock();
+      this.dodge();
+    });
+    dodge.addEventListener('contextmenu', (e) => e.preventDefault());
+    const spree = h('div', { class: 'spree hidden' }, h('div', { class: 'spree-n' }), h('div', { class: 'spree-t' }), h('div', { class: 'spree-bar' }, h('div', { class: 'spree-fill' })));
+    const buffs = h('div', { class: 'buffs' });
     const ctxBtn = h('button', { class: 'ctxbtn hidden', onpointerdown: (e: Event) => e.stopPropagation(), onclick: (e: Event) => { e.stopPropagation(); this.useContext(); } });
     const target = h('div', { class: 'target hidden' }, h('div', { class: 'tname' }), h('div', { class: 'tbar' }, h('div', { class: 'tfill' })), h('div', { class: 'tmods' }));
     const msgs = h('div', { class: 'msgs' });
@@ -289,6 +302,9 @@ export class Game implements PanelHost {
         orb('mana'),
       ),
       skills,
+      dodge,
+      spree,
+      buffs,
       ctxBtn,
     );
     this.panelEl = h('div', {
@@ -311,6 +327,7 @@ export class Game implements PanelHost {
       root: hud, target, tname: q('.tname'), tfill: q('.tfill'), tmods: q('.tmods'), msgs, xp: q('.xpfill'),
       life: q('.orb.life'), mana: q('.orb.mana'), belt, skills, ctx: ctxBtn, area: q('.area-name'), joy: q('.joy'), knob: q('.joy-knob'),
       tp: q('.hb-tp'), skillsBtn: q('.hb-skills'), charBtn: q('.hb-char'),
+      dodge, spree, spreeN: q('.spree-n'), spreeT: q('.spree-t'), spreeFill: q('.spree-fill'), buffs,
     };
   }
 
@@ -409,7 +426,45 @@ export class Game implements PanelHost {
       for (const [k, n] of [['fire', 'Fire'], ['cold', 'Cold'], ['light', 'Lightning'], ['poison', 'Poison'], ['phys', 'Physical']] as const) if (m.res[k] >= 100) mods.push(`Immune to ${n}`);
       this.setText('tm', H.tmods, mods.join(' · '));
     } else H.target.classList.add('hidden');
-    const strays = w.questStrays().length;
+    // Dodge cooldown sweeps round the button.
+    const cd = Math.max(0, Math.ceil((w.dodgeCd / DODGE_COOLDOWN) * 20));
+    if (this.hudCache.cd !== String(cd)) {
+      this.hudCache.cd = String(cd);
+      H.dodge.style.setProperty('--cd', `${cd * 5}%`);
+      H.dodge.classList.toggle('cooling', cd > 0);
+    }
+    // Spree meter: appears a couple of kills in, so a run can be seen building.
+    const sk2 = w.streak;
+    const showSpree = sk2.n >= 3 && !w.inTown;
+    H.spree.classList.toggle('hidden', !showSpree);
+    if (showSpree) {
+      const tier = w.spreeTier();
+      const next = SPREE_TIERS[sk2.tier + 1];
+      this.setText('spn', H.spreeN, `×${sk2.n}`);
+      this.setText('spt', H.spreeT, tier ? tier.title : `${next.n - sk2.n} more for a spree`);
+      const col = tier?.color ?? '#c8b890';
+      if (this.hudCache.spc !== col) {
+        this.hudCache.spc = col;
+        H.spree.style.setProperty('--spree', col);
+        H.spree.classList.toggle('ranked', !!tier);
+      }
+      H.spreeFill.style.width = `${Math.max(0, Math.min(1, sk2.t / SPREE_WINDOW)) * 100}%`;
+      if (this.hudCache.spk !== String(sk2.n)) {
+        this.hudCache.spk = String(sk2.n);
+        H.spreeN.classList.remove('pop');
+        void H.spreeN.offsetWidth;
+        H.spreeN.classList.add('pop');
+      }
+    }
+    // Shrine blessings and how long they have left.
+    const names: Record<string, string> = { shrine_armor: 'Armor', shrine_combat: 'Combat', shrine_experience: 'Experience', shrine_storm: 'Storm', shrine_fortune: 'Fortune', shrine_haste: 'Fleet' };
+    const chips = Object.entries(p.buffs).filter(([k]) => names[k]).map(([k, b]) => `${k}:${names[k]} ${Math.ceil(b.t)}s`);
+    const bk = chips.join('|');
+    if (this.hudCache.buffs !== bk) {
+      this.hudCache.buffs = bk;
+      H.buffs.replaceChildren(...chips.map((c) => h('span', { class: `buff b-${c.slice(7, c.indexOf(':'))}` }, c.slice(c.indexOf(':') + 1))));
+    }
+    const strays = w.stragglers().length;
     this.setText('area', H.area, `${AREA_BY_ID[w.area.def.id].name}${strays ? ` · ${strays} left` : ''}`);
     // Context button: nearest interactable.
     const near = w.interactablesNear(p.x, p.y, 2.6)[0];
@@ -432,6 +487,26 @@ export class Game implements PanelHost {
     while (this.hud.msgs.children.length > 5) this.hud.msgs.firstElementChild!.remove();
     setTimeout(() => el.classList.add('fade'), 3200);
     setTimeout(() => el.remove(), 4200);
+  }
+
+  /** A big line mid-screen for sprees, purges and ambushes. A new one replaces the last. */
+  private announce(text: string, sub: string | undefined, color: string) {
+    this.root.querySelectorAll('.announce, .banner').forEach((b) => b.remove());
+    const el = h('div', { class: 'announce', style: { color } }, h('div', { class: 'an-t' }, text), sub ? h('div', { class: 'an-s' }, sub) : null);
+    this.root.append(el);
+    setTimeout(() => el.remove(), 2400);
+  }
+
+  /** Roll toward the cursor with a mouse; with a joystick, the way it is pushed. */
+  private dodge(towardMouse = false) {
+    const w = this.world;
+    if (this.panel || this.storyOpen) return;
+    let dir: { x: number; y: number } | null = null;
+    if (towardMouse && !w.player.moveDir) {
+      const g = this.renderer.cam.toWorld(this.mouse.x, this.mouse.y);
+      dir = { x: g.x - w.player.x, y: g.y - w.player.y };
+    }
+    w.cmdDodge(dir);
   }
 
   private banner(text: string) {
@@ -789,7 +864,9 @@ export class Game implements PanelHost {
       case 'KeyM':
         return this.toggleMap();
       case 'Space':
+        e.preventDefault();
         if (this.panel) this.close();
+        else this.dodge(true);
         return;
       case 'KeyT':
         if (!this.panel) w.castTownPortal();
