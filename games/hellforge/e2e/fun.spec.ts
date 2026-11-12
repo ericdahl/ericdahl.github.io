@@ -84,3 +84,15 @@ test('soul orbs, a Tithe Imp and a cursed shrine draw without errors', async ({ 
   expect(await page.evaluate(() => (window as any).game.world.area.monsters.some((m: any) => m.ambush !== undefined))).toBe(true);
   expect(errors).toEqual([]);
 });
+
+test('holding a skill button keeps casting and never opens the skills panel', async ({ page }) => {
+  await fields(page);
+  const btn = page.locator('.sbtn.s0');
+  // A long press on a phone is delivered as a context menu event.
+  await btn.dispatchEvent('pointerdown');
+  await btn.dispatchEvent('contextmenu');
+  await page.waitForTimeout(300);
+  await expect(page.locator('.panel-wrap')).toBeHidden();
+  expect(await page.evaluate(() => (window as any).game.panel)).toBeNull();
+  await btn.dispatchEvent('pointerup');
+});

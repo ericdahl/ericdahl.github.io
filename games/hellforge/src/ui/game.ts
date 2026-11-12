@@ -274,10 +274,8 @@ export class Game implements PanelHost {
       b.addEventListener('pointerup', up);
       b.addEventListener('pointercancel', up);
       b.addEventListener('pointerleave', up);
-      b.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        this.open('skills');
-      });
+      // A long press on a phone arrives as a context menu. Holding a skill button means "keep casting", nothing else.
+      b.addEventListener('contextmenu', (e) => e.preventDefault());
       skills.append(b);
     }
     const dodge = h('button', { class: 'dbtn', title: 'Dodge (Space)', 'aria-label': 'Dodge' }, h('span', { class: 'dglyph' }, '➠'), h('span', { class: 'key' }, 'Space'));

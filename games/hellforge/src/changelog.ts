@@ -1,6 +1,11 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.11.2',
+    date: '2026-11-12',
+    notes: ['Holding a skill button on a phone no longer pops up the skills panel in the middle of a fight. Skills are assigned from the Skills panel.'],
+  },
+  {
     version: '0.11.1',
     date: '2026-11-12',
     notes: [
