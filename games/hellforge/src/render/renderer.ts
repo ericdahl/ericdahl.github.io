@@ -1,7 +1,7 @@
 import { baseOf, type Item } from '../game/items';
 import { FLOOR, WALL, type Level, type Prop } from '../game/map';
 import { tileHash } from '../game/rng';
-import { LOOT_BOUNCE, ORB_LIFE, type AreaState, type Fx, type Monster, type Npc, type Orb, type Projectile, type World } from '../game/world';
+import { BRAZIER_RADIUS, LOOT_BOUNCE, ORB_LIFE, SLAG_BRITTLE, SLAG_MOLTEN, type AreaState, type Fx, type Monster, type Npc, type Orb, type Projectile, type World } from '../game/world';
 import { Camera, TILE_H, TILE_W } from './camera';
 import { baseIconCanvas } from './icons';
 import { Weather } from './weather';
@@ -30,8 +30,8 @@ export interface LabelRect {
   groundId: number;
 }
 
-const OUTDOOR = new Set(['fields', 'forest', 'town', 'oasis', 'desert', 'glass', 'mesa']);
-const BLOCK_PROPS = new Set(['pillar', 'tent', 'campfire', 'well']);
+const OUTDOOR = new Set(['fields', 'forest', 'town', 'oasis', 'desert', 'glass', 'mesa', 'snow', 'snowtown']);
+const BLOCK_PROPS = new Set(['pillar', 'tent', 'campfire', 'well', 'hearth', 'ruin']);
 
 export class Renderer {
   readonly cam = new Camera();
@@ -102,7 +102,8 @@ export class Renderer {
     const z = cam.zoom;
     const b = cam.bounds(3);
     // A sandstorm closes the world in around the player.
-    const lightR = a.def.light * (1 - 0.42 * w.storm);
+    // ...and in the cold, so does a dying ember.
+    const lightR = w.sight;
     const visR = lightR + 3;
     const props = this.props(l);
     const lights: Light[] = [{ x: p.x, y: p.y, r: lightR, a: 1 }];
@@ -214,9 +215,11 @@ export class Renderer {
       add(o.x + o.y, () => {
         if (o.kind === 'chest') this.drawChest(o.x, o.y, o.used, false);
         else if (o.kind === 'barrel') this.drawBarrel(o.x, o.y, o.used);
+        else if (o.kind === 'brazier') this.drawBrazier(o.x, o.y, o.used);
         else this.drawShrine(o.x, o.y, o.used, o.shrine!);
       });
       if (o.kind === 'shrine' && !o.used) lights.push({ x: o.x, y: o.y, r: 2.5, a: 0.5 });
+      if (o.kind === 'brazier' && o.used) lights.push({ x: o.x, y: o.y, r: BRAZIER_RADIUS + 1.5, a: 0.9 });
     }
 
     // Ground items (below creatures).
@@ -250,7 +253,18 @@ export class Renderer {
     }
 
     items.sort((q, r) => q.depth - r.depth);
+    // The warm ground around each lit brazier, under everything that stands on it.
+    if (a.def.cold) for (const o of a.objects) if (o.kind === 'brazier' && o.used && near(o.x, o.y, visR + BRAZIER_RADIUS)) this.drawWarmth(o.x, o.y);
     for (const it of items) it.draw();
+    for (const g of a.rings) this.drawRing(g.x, g.y, g.r, g.max);
+    for (const m of a.monsters) {
+      if (m.dead) continue;
+      if (m.drainT) this.drawTether(m.x, m.y, p.x, p.y, '120,90,220', w.ember > 0 ? '255,150,60' : '150,210,255');
+      if (m.wardId !== undefined) {
+        const ward = a.monsters.find((o) => o.id === m.wardId && !o.dead);
+        if (ward) this.drawTether(ward.x, ward.y, m.x, m.y, '110,170,255', '200,230,255');
+      }
+    }
 
     // Meteors in flight.
     for (const h of a.hazards) {
@@ -266,9 +280,9 @@ export class Renderer {
       const gx = s.x - hy * 0.4;
       const gy = s.y - hy;
       const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, 18 * z);
-      g.addColorStop(0, 'rgba(255,240,180,1)');
-      g.addColorStop(0.4, 'rgba(255,120,30,0.8)');
-      g.addColorStop(1, 'rgba(255,60,0,0)');
+      g.addColorStop(0, h.cold ? 'rgba(240,250,255,1)' : 'rgba(255,240,180,1)');
+      g.addColorStop(0.4, h.cold ? 'rgba(110,190,255,0.8)' : 'rgba(255,120,30,0.8)');
+      g.addColorStop(1, h.cold ? 'rgba(40,90,255,0)' : 'rgba(255,60,0,0)');
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.arc(gx, gy, 18 * z, 0, Math.PI * 2);
@@ -279,7 +293,7 @@ export class Renderer {
     // Additive effects.
     for (const f of a.fx) this.drawFx(f, lights);
 
-    this.drawLighting(lights, Math.max(a.def.dark, 0.88 * w.storm), w.storm);
+    this.drawLighting(lights, Math.max(a.def.dark, 0.88 * w.storm), w.storm, a.def.blizzard ? [176, 196, 220] : [104, 72, 36]);
     if (this.showWeather) {
       this.weather.update(w, dt);
       this.weather.draw(ctx, cam, w);
@@ -311,7 +325,7 @@ export class Renderer {
 
   // ---------------------------------------------------------------- lighting
 
-  private drawLighting(lights: Light[], dark: number, dust = 0) {
+  private drawLighting(lights: Light[], dark: number, dust = 0, murk: [number, number, number] = [104, 72, 36]) {
     const d = this.dctx;
     const cam = this.cam;
     const W = this.dark.width;
@@ -320,8 +334,8 @@ export class Renderer {
     d.globalCompositeOperation = 'source-over';
     d.setTransform(1, 0, 0, 1, 0, 0);
     d.clearRect(0, 0, W, H);
-    // A sandstorm closes in as brown murk rather than night.
-    d.fillStyle = `rgba(${Math.round(104 * dust)},${Math.round(72 * dust)},${Math.round(36 * dust)},${dark})`;
+    // A sandstorm closes in as brown murk rather than night, and a whiteout as grey-white.
+    d.fillStyle = `rgba(${Math.round(murk[0] * dust)},${Math.round(murk[1] * dust)},${Math.round(murk[2] * dust)},${dark})`;
     d.fillRect(0, 0, W, H);
     d.globalCompositeOperation = 'destination-out';
     const unit = (TILE_W / 2) * cam.zoom * sx;
@@ -441,9 +455,39 @@ export class Renderer {
     }
     const look = this.playerLook(w);
     drawHumanoid(ctx, look, pose, this.time);
-    const tint = p.hurt > 0 ? '#ff4020' : p.chill > 0 ? '#3080ff' : p.poison.t > 0 ? '#40a010' : null;
-    if (tint) drawTinted(ctx, (c) => drawHumanoid(c, look, pose, this.time), tint, p.hurt > 0 ? p.hurt * 1.2 : 0.3);
+    const frozen = w.frost > 0.5;
+    const tint = p.hurt > 0 ? '#ff4020' : p.chill > 0 || frozen ? '#3080ff' : p.poison.t > 0 ? '#40a010' : null;
+    if (tint) drawTinted(ctx, (c) => drawHumanoid(c, look, pose, this.time), tint, p.hurt > 0 ? p.hurt * 1.2 : frozen ? 0.2 + 0.25 * w.frost : 0.3);
     ctx.restore();
+    if (w.cold && !p.dead) {
+      // Vhorza's ember, carried at the chest: bright while it has heat, a dull red seed when it is nearly out.
+      const e = w.ember;
+      const flick = 0.85 + 0.15 * Math.sin(this.time * 11);
+      const ey = s.y - 30 * z - lift * z;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const r = (7 + 20 * e) * z * flick;
+      const g = ctx.createRadialGradient(s.x, ey, 0, s.x, ey, r);
+      g.addColorStop(0, `rgba(255,${Math.round(150 + 90 * e)},${Math.round(60 + 90 * e)},${0.35 + 0.5 * e})`);
+      g.addColorStop(0.4, `rgba(255,110,30,${0.12 + 0.3 * e})`);
+      g.addColorStop(1, 'rgba(255,60,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(s.x, ey, r, 0, Math.PI * 2);
+      ctx.fill();
+      if (w.nearFire) {
+        // Motes drawn in from the fire the hero is standing by.
+        for (let i = 0; i < 5; i++) {
+          const k = (this.time * 0.9 + i / 5) % 1;
+          const a2 = i * 1.9 + this.time;
+          ctx.fillStyle = `rgba(255,190,90,${0.8 * k})`;
+          ctx.beginPath();
+          ctx.arc(s.x + Math.cos(a2) * 22 * z * (1 - k), ey + Math.sin(a2) * 12 * z * (1 - k), 1.6 * z, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
     if (p.buffs.bone_ward) {
       ctx.save();
       ctx.strokeStyle = 'rgba(232,222,196,0.75)';
@@ -605,6 +649,8 @@ export class Renderer {
     let color = m.color ?? m.def.color;
     const shape = m.shape ?? m.def.shape;
     if (m.rarity === 'champion') color = shade(color, 0.15);
+    const heat = m.heat ?? 0;
+    if (m.def.slag) color = heat >= SLAG_MOLTEN ? '#c8501c' : heat <= SLAG_BRITTLE ? '#9ab8cc' : color;
     if (m.mods.includes('fireEnch')) color = '#d8602a';
     if (m.mods.includes('coldEnch')) color = '#7aa8d8';
     if (m.mods.includes('lightEnch')) color = '#b9a8f0';
@@ -618,6 +664,36 @@ export class Renderer {
       drawTinted(ctx, (c) => drawMonsterShape(c, shape, color, pose, mt, { id }), tint, a);
     }
     ctx.restore();
+    if ((m.burnT ?? 0) > 0 || (m.def.slag && heat >= SLAG_MOLTEN)) {
+      // Ablaze: warm to stand beside.
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 4; i++) {
+        const f = (this.time * 1.6 + i * 0.25 + m.id * 0.13) % 1;
+        const fx = s.x + Math.sin(i * 2.3 + m.id) * 9 * z * k;
+        const fy = s.y - (10 + i * 9) * z * k - f * 16 * z;
+        const fr = (6 - f * 4) * z * k;
+        const g = ctx.createRadialGradient(fx, fy, 0, fx, fy, fr);
+        g.addColorStop(0, `rgba(255,230,150,${0.8 * (1 - f)})`);
+        g.addColorStop(1, 'rgba(255,80,10,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(fx, fy, fr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    if (m.wardId !== undefined) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = '#8ac8ff';
+      ctx.globalAlpha = 0.55 + 0.25 * Math.sin(this.time * 7);
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y - 26 * z * k, 20 * z * k, 34 * z * k, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
     if (m.thief) this.drawThiefExtras(m, s.x, s.y, z * k);
     if (m.stun > 0.3) this.text('✦', s.x, s.y - 54 * z * k, '#ffe080', 12);
     if (m.curse && m.curse.t > 0) this.text('⛧', s.x, s.y - 58 * z * k, '#c070e0', 13);
@@ -745,6 +821,7 @@ export class Renderer {
       m_poison: ['#e0ffa0', '#60b010', 8],
       m_glass: ['#ffffff', '#70e0e0', 5],
       m_sun: ['#fff4c8', '#ffb020', 9],
+      m_ice: ['#ffffff', '#8ad0ff', 6],
     };
     const [c0, c1, r0] = col[pr.kind] ?? ['#fff', '#f80', 8];
     const r = r0 * z;
@@ -914,6 +991,151 @@ export class Renderer {
         ctx.fill();
         lights.push({ x: pr.x + 0.5, y: pr.y + 0.5, r: 6, a: 0.5 });
         break;
+      case 'hearth': {
+        // The camp's last fire: a ring of stones, banked high, with everything they own stacked round it to burn.
+        ctx.fillStyle = '#4a4c52';
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.ellipse(s.x + Math.cos(a) * 20 * z, s.y + Math.sin(a) * 10 * z, 6 * z, 4 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.strokeStyle = '#3a2a1c';
+        ctx.lineWidth = 5 * z;
+        ctx.beginPath();
+        for (const [x0, y0, x1, y1] of [[-13, 2, 6, -14], [13, 2, -6, -14], [-9, -3, 11, -4], [0, 5, 0, -16]]) {
+          ctx.moveTo(s.x + x0 * z, s.y + y0 * z);
+          ctx.lineTo(s.x + x1 * z, s.y + y1 * z);
+        }
+        ctx.stroke();
+        flame(s.x, s.y - 10 * z, 20 * z);
+        flame(s.x - 7 * z, s.y - 6 * z, 11 * z);
+        flame(s.x + 7 * z, s.y - 6 * z, 11 * z);
+        lights.push({ x: pr.x + 0.5, y: pr.y + 0.5, r: 10, a: 1 });
+        break;
+      }
+      case 'ruin': {
+        // A tent burnt down to its poles, drifted over.
+        ctx.fillStyle = '#dfe6ee';
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y + 2 * z, 32 * z, 13 * z, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(120,140,170,0.35)';
+        ctx.beginPath();
+        ctx.ellipse(s.x + 6 * z, s.y + 5 * z, 24 * z, 8 * z, 0, 0, Math.PI);
+        ctx.fill();
+        ctx.strokeStyle = '#1e1814';
+        ctx.lineWidth = 3 * z;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(s.x - 20 * z, s.y + 2 * z);
+        ctx.lineTo(s.x - 2 * z, s.y - 38 * z);
+        ctx.moveTo(s.x + 18 * z, s.y + 3 * z);
+        ctx.lineTo(s.x + 3 * z, s.y - 30 * z);
+        ctx.moveTo(s.x - 6 * z, s.y + 6 * z);
+        ctx.lineTo(s.x + 12 * z, s.y - 12 * z);
+        ctx.stroke();
+        ctx.fillStyle = '#4a3a2a';
+        ctx.beginPath();
+        ctx.moveTo(s.x - 2 * z, s.y - 36 * z);
+        ctx.lineTo(s.x + 14 * z, s.y - 8 * z + Math.sin(t * 2 + pr.x) * 2 * z);
+        ctx.lineTo(s.x + 2 * z, s.y - 14 * z);
+        ctx.fill();
+        break;
+      }
+      case 'drift':
+        ctx.fillStyle = 'rgba(236,242,248,0.9)';
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, 17 * z, 6 * z, 0, Math.PI, 0);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(s.x + 8 * z, s.y + 1 * z, 11 * z, 4 * z, 0, Math.PI, 0);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(130,150,185,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(s.x + 2 * z, s.y + 1 * z, 18 * z, 3 * z, 0, 0, Math.PI);
+        ctx.fill();
+        break;
+      case 'icicle': {
+        // Spikes of blue ice growing up out of the floor.
+        for (let i = 0; i < 4; i++) {
+          const dx = ((pr.x * 7 + i * 13) % 22) - 11;
+          const hgt = 10 + ((pr.y * 5 + i * 9) % 14);
+          const g = ctx.createLinearGradient(0, s.y - hgt * z, 0, s.y);
+          g.addColorStop(0, 'rgba(230,246,255,0.95)');
+          g.addColorStop(1, 'rgba(90,150,200,0.75)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.moveTo(s.x + (dx - 3) * z, s.y + (i % 2) * 2 * z);
+          ctx.lineTo(s.x + (dx + (i % 2 ? 1 : -1)) * z, s.y - hgt * z);
+          ctx.lineTo(s.x + (dx + 3) * z, s.y + (i % 2) * 2 * z);
+          ctx.fill();
+        }
+        break;
+      }
+      case 'rubble':
+        for (let i = 0; i < 5; i++) {
+          const dx = ((pr.x * 11 + i * 17) % 24) - 12;
+          const dy = ((pr.y * 7 + i * 5) % 8) - 4;
+          const r = 3 + ((pr.x + i * 3) % 4);
+          ctx.fillStyle = i % 2 ? '#5a5a62' : '#44444c';
+          ctx.beginPath();
+          ctx.moveTo(s.x + (dx - r) * z, s.y + dy * z);
+          ctx.lineTo(s.x + (dx - r * 0.3) * z, s.y + (dy - r * 1.1) * z);
+          ctx.lineTo(s.x + (dx + r) * z, s.y + (dy - r * 0.4) * z);
+          ctx.lineTo(s.x + (dx + r * 0.7) * z, s.y + (dy + r * 0.4) * z);
+          ctx.fill();
+        }
+        ctx.fillStyle = 'rgba(230,240,250,0.6)';
+        ctx.fillRect(s.x - 8 * z, s.y - 5 * z, 9 * z, 1.5 * z);
+        break;
+      case 'anvil':
+        ctx.fillStyle = '#3a2c20';
+        ctx.fillRect(s.x - 6 * z, s.y - 8 * z, 12 * z, 9 * z);
+        ctx.fillStyle = '#4c5058';
+        ctx.beginPath();
+        ctx.moveTo(s.x - 12 * z, s.y - 16 * z);
+        ctx.lineTo(s.x + 9 * z, s.y - 16 * z);
+        ctx.lineTo(s.x + 16 * z, s.y - 13 * z);
+        ctx.lineTo(s.x + 8 * z, s.y - 11 * z);
+        ctx.lineTo(s.x + 5 * z, s.y - 8 * z);
+        ctx.lineTo(s.x - 6 * z, s.y - 8 * z);
+        ctx.lineTo(s.x - 8 * z, s.y - 11 * z);
+        ctx.lineTo(s.x - 12 * z, s.y - 12 * z);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(220,235,250,0.7)';
+        ctx.fillRect(s.x - 12 * z, s.y - 17 * z, 21 * z, 1.6 * z);
+        break;
+      case 'bell': {
+        // A founders' bell, fallen and half sunk in frost. The bronze has gone green along the lip.
+        ctx.save();
+        ctx.translate(s.x, s.y - 4 * z);
+        ctx.rotate(((pr.x * 3 + pr.y) % 2 ? 1 : -1) * 0.5);
+        const g = ctx.createLinearGradient(-12 * z, 0, 12 * z, 0);
+        g.addColorStop(0, '#c89a54');
+        g.addColorStop(0.5, '#8a6a34');
+        g.addColorStop(1, '#4a3618');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(-12 * z, 4 * z);
+        ctx.quadraticCurveTo(-10 * z, -10 * z, -5 * z, -18 * z);
+        ctx.quadraticCurveTo(0, -22 * z, 5 * z, -18 * z);
+        ctx.quadraticCurveTo(10 * z, -10 * z, 12 * z, 4 * z);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#5a8a6a';
+        ctx.fillRect(-12 * z, 2 * z, 24 * z, 2.5 * z);
+        ctx.fillStyle = '#14100c';
+        ctx.beginPath();
+        ctx.ellipse(0, 4.5 * z, 11 * z, 3 * z, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        ctx.fillStyle = 'rgba(230,240,250,0.75)';
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y + 2 * z, 15 * z, 4 * z, 0, 0, Math.PI);
+        ctx.fill();
+        break;
+      }
       case 'scrub':
         ctx.strokeStyle = '#6a6a38';
         ctx.lineWidth = 1.5 * z;
@@ -1114,6 +1336,147 @@ export class Renderer {
       ctx.beginPath();
       ctx.ellipse(s.x, s.y - 30 * z, (6 + i * 4) * z, (12 + i * 7) * z, this.time * (1 + i * 0.5), 0, Math.PI * 1.4);
       ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /** A watch brazier: an iron bowl on a tripod, dark and rimed until the ember lights it. */
+  private drawBrazier(x: number, y: number, lit: boolean) {
+    const ctx = this.ctx;
+    const z = this.cam.zoom;
+    const s = this.cam.toScreen(x, y);
+    const t = this.time;
+    ctx.strokeStyle = '#2c2a2c';
+    ctx.lineWidth = 2.6 * z;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (const dx of [-9, 0, 9]) {
+      ctx.moveTo(s.x + dx * z, s.y + (dx ? 0 : 3) * z);
+      ctx.lineTo(s.x + dx * 0.35 * z, s.y - 24 * z);
+    }
+    ctx.stroke();
+    const g = ctx.createLinearGradient(s.x - 13 * z, 0, s.x + 13 * z, 0);
+    g.addColorStop(0, lit ? '#8a6a4a' : '#6a7078');
+    g.addColorStop(1, lit ? '#3a2a1c' : '#2e3238');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(s.x, s.y - 25 * z, 13 * z, 8 * z, 0, 0, Math.PI);
+    ctx.fill();
+    ctx.fillStyle = lit ? '#2a1408' : '#16181c';
+    ctx.beginPath();
+    ctx.ellipse(s.x, s.y - 25 * z, 13 * z, 4.5 * z, 0, 0, Math.PI * 2);
+    ctx.fill();
+    if (!lit) {
+      // Snow in the bowl, frost on the rim, and a faint pulse so it reads as something to touch.
+      ctx.fillStyle = '#dfe8f0';
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y - 26 * z, 10 * z, 3.4 * z, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = `rgba(255,170,80,${0.25 + 0.2 * Math.sin(t * 3 + x)})`;
+      ctx.lineWidth = 1.5 * z;
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y, 16 * z, 8 * z, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 4; i++) {
+      const r = (12 - i * 2) * z;
+      const fy = s.y - 30 * z - i * 6 * z - Math.abs(Math.sin(t * 8 + i * 1.7 + x)) * 5 * z;
+      const fg = ctx.createRadialGradient(s.x, fy, 0, s.x, fy, r);
+      fg.addColorStop(0, 'rgba(255,240,170,0.9)');
+      fg.addColorStop(0.5, 'rgba(255,120,20,0.6)');
+      fg.addColorStop(1, 'rgba(255,40,0,0)');
+      ctx.fillStyle = fg;
+      ctx.beginPath();
+      ctx.arc(s.x + Math.sin(t * 5 + i) * 1.5 * z, fy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /** The pool of warmth a lit brazier throws: stand in it and the cold cannot find you. */
+  private drawWarmth(x: number, y: number) {
+    const ctx = this.ctx;
+    const z = this.cam.zoom;
+    const s = this.cam.toScreen(x, y);
+    const r = BRAZIER_RADIUS * (TILE_W / 2) * z * 1.42;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.translate(s.x, s.y);
+    ctx.scale(1, 0.5);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+    g.addColorStop(0, 'rgba(255,150,60,0.2)');
+    g.addColorStop(0.8, 'rgba(255,120,40,0.1)');
+    g.addColorStop(1, 'rgba(255,100,30,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255,170,90,${0.22 + 0.08 * Math.sin(this.time * 2 + x)})`;
+    ctx.lineWidth = 1.5 * z;
+    ctx.setLineDash([5 * z, 7 * z]);
+    ctx.lineDashOffset = this.time * 6 * z;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.97, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** A bell's toll spreading over the ground. It fades as it nears the end of its reach. */
+  private drawRing(x: number, y: number, r: number, max: number) {
+    const ctx = this.ctx;
+    const z = this.cam.zoom;
+    const s = this.cam.toScreen(x, y);
+    const rr = r * (TILE_W / 2) * z * 1.42;
+    const a = Math.min(1, (max - r) / 2);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.translate(s.x, s.y);
+    ctx.scale(1, 0.5);
+    for (const [k, w, al] of [[1, 7, 0.75], [0.94, 3, 0.4], [0.86, 2, 0.2]] as const) {
+      ctx.strokeStyle = `rgba(255,214,130,${al * a})`;
+      ctx.lineWidth = w * z;
+      ctx.beginPath();
+      ctx.arc(0, 0, rr * k, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /** A wavering line of stolen heat between two things: a Hearth-Eater's drain, or a phylactery's ward. */
+  private drawTether(x0: number, y0: number, x1: number, y1: number, from: string, to: string) {
+    const ctx = this.ctx;
+    const z = this.cam.zoom;
+    const a = this.cam.toScreen(x0, y0);
+    const b = this.cam.toScreen(x1, y1);
+    const lift = 30 * z;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+    g.addColorStop(0, `rgba(${from},0.85)`);
+    g.addColorStop(1, `rgba(${to},0.85)`);
+    ctx.strokeStyle = g;
+    ctx.lineWidth = 2.2 * z;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y - lift);
+    for (let i = 1; i <= 8; i++) {
+      const t = i / 8;
+      const wob = Math.sin(this.time * 9 + i * 1.3) * 5 * z * Math.sin(t * Math.PI);
+      ctx.lineTo(a.x + (b.x - a.x) * t + wob, a.y + (b.y - a.y) * t - lift + wob * 0.5);
+    }
+    ctx.stroke();
+    // Motes travelling from the hero to the eater.
+    for (let i = 0; i < 4; i++) {
+      const t = 1 - ((this.time * 1.4 + i / 4) % 1);
+      ctx.fillStyle = `rgba(${to},0.9)`;
+      ctx.beginPath();
+      ctx.arc(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t - lift, 2.2 * z, 0, Math.PI * 2);
+      ctx.fill();
     }
     ctx.restore();
   }
@@ -1323,6 +1686,102 @@ export class Renderer {
         ctx.beginPath();
         ctx.ellipse(s.x, s.y, r * (1 - k * 0.3), r * 0.5 * (1 - k * 0.3), 0, 0, Math.PI * 2);
         ctx.stroke();
+        break;
+      }
+      case 'frost_mark': {
+        const r = (f.r ?? 2) * unitX * 1.3;
+        ctx.strokeStyle = `rgba(130,210,255,${0.45 + 0.4 * Math.sin(this.time * 12)})`;
+        ctx.lineWidth = 2 * z;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, r * (1 - k * 0.3), r * 0.5 * (1 - k * 0.3), 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(120,190,255,${0.08 + 0.12 * k})`;
+        ctx.fill();
+        break;
+      }
+      case 'warm_mark': {
+        // Shelter: the brazier's circle flares so it can be found in a hurry.
+        const r = (f.r ?? 4) * unitX * 1.42;
+        ctx.strokeStyle = `rgba(255,190,90,${0.5 + 0.4 * Math.sin(this.time * 10)})`;
+        ctx.lineWidth = (2 + 3 * k) * z;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, r, r * 0.5, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(255,150,60,${0.06 + 0.1 * k})`;
+        ctx.fill();
+        break;
+      }
+      case 'snuff_mark': {
+        // A dark reach spreading from the Unlit: be outside it when it closes.
+        const r = (f.r ?? 6) * unitX * 1.42 * (0.25 + 0.75 * k);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = `rgba(6,8,22,${0.25 + 0.3 * k})`;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, r, r * 0.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalCompositeOperation = 'lighter';
+        const full = (f.r ?? 6) * unitX * 1.42;
+        ctx.strokeStyle = `rgba(150,130,255,${0.5 + 0.35 * Math.sin(this.time * 11)})`;
+        ctx.lineWidth = 2.5 * z;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, full, full * 0.5, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        break;
+      }
+      case 'snuff': {
+        // A flame going out: a ring of dark smoke collapsing inward.
+        const r = (f.r ?? 1.5) * unitX * 1.3 * (1 - k * 0.7);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = `rgba(20,24,44,${0.8 * (1 - k)})`;
+        ctx.lineWidth = 6 * z;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y - 10 * z, r, r * 0.5, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(150,160,190,${0.5 * (1 - k)})`;
+        for (let i = 0; i < 4; i++) {
+          ctx.beginPath();
+          ctx.arc(s.x + Math.sin(i * 2.1 + f.x) * 6 * z, s.y - (26 + k * 30 + i * 6) * z, (3 + k * 4) * z, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+      }
+      case 'kindle': {
+        // A brazier catching: a burst of sparks, and its circle of warmth rolling out.
+        const r = (f.r ?? 4) * unitX * 1.42 * Math.min(1, k * 1.6);
+        ctx.strokeStyle = `rgba(255,180,80,${0.9 * (1 - k)})`;
+        ctx.lineWidth = 4 * z * (1 - k) + 1;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, r, r * 0.5, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(255,220,140,${1 - k})`;
+        for (let i = 0; i < 12; i++) {
+          const a = i * 2.399 + f.x;
+          const d = k * (14 + (i % 4) * 7) * z;
+          ctx.beginPath();
+          ctx.arc(s.x + Math.cos(a) * d, s.y - 28 * z + Math.sin(a) * d * 0.6 - Math.sin(k * Math.PI) * 18 * z, 1.8 * z, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        lights.push({ x: f.x, y: f.y, r: (f.r ?? 4) + 2, a: 1 - k });
+        break;
+      }
+      case 'toll_mark': {
+        // The bell is raised: a tight ring gathering at the ringer's feet before the toll goes out.
+        const r = (f.r ?? 1.8) * unitX * 1.3 * (1 - k * 0.75);
+        ctx.strokeStyle = `rgba(255,214,130,${0.35 + 0.55 * k})`;
+        ctx.lineWidth = (1.5 + 3 * k) * z;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, r, r * 0.5, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        break;
+      }
+      case 'frost': {
+        const g = ctx.createRadialGradient(s.x, s.y - 6 * z, 0, s.x, s.y - 6 * z, 12 * z);
+        g.addColorStop(0, `rgba(230,246,255,${0.9 * (1 - k)})`);
+        g.addColorStop(1, 'rgba(60,140,255,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y - 6 * z - k * 6 * z, 12 * z, 0, Math.PI * 2);
+        ctx.fill();
         break;
       }
       case 'burn': {
@@ -1604,8 +2063,16 @@ export class Renderer {
     for (const n of w.area.npcs) mark(n.x, n.y, '#e8c860', 2.5);
     const pp = w.portalPos();
     if (pp) mark(pp.x, pp.y, '#6aa8ff', 3);
-    if (full) for (const m of w.area.monsters) if (!m.dead && Math.hypot(m.x - p.x, m.y - p.y) < w.area.def.light + 1) mark(m.x, m.y, '#ff4030', 2);
+    if (full) for (const m of w.area.monsters) if (!m.dead && Math.hypot(m.x - p.x, m.y - p.y) < w.sight + 1) mark(m.x, m.y, '#ff4030', 2);
     for (const m of w.stragglers()) mark(m.x, m.y, '#ffb030', 3);
+    // Braziers found so far: lit ones glow, and the last few dark beacons of the quest are shown wherever they are.
+    const dark = w.unlitBeacons();
+    for (const o of w.area.objects) {
+      if (o.kind !== 'brazier') continue;
+      const seen = !!w.area.explored[Math.floor(o.y) * w.area.level.w + Math.floor(o.x)];
+      if (o.used) mark(o.x, o.y, '#ff9a40', 2.5);
+      else if (seen || (dark.length <= 3 && dark.includes(o))) mark(o.x, o.y, '#8ab0d0', 2.5);
+    }
     for (const m of w.area.monsters) if (m.thief?.started && !m.dead) mark(m.x, m.y, '#ffe040', 3.5);
     for (const m of w.minions) mark(m.x, m.y, '#7ad070', 2);
     mark(p.x, p.y, '#ffffff', 3);

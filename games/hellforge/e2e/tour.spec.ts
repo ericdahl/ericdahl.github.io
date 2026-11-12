@@ -1,10 +1,12 @@
 import { expect, test } from '@playwright/test';
 
-const AREAS = ['hollow_cave', 'gloomwood', 'sunken_chapel', 'catacombs2', 'hellforge', 'tel_maresh', 'ashfall_road', 'whisper_cistern', 'glass_sea', 'carrion_mesa', 'hall_of_dials', 'noon_vault'];
+const AREAS = ['hollow_cave', 'gloomwood', 'sunken_chapel', 'catacombs2', 'hellforge', 'tel_maresh', 'ashfall_road', 'whisper_cistern', 'glass_sea', 'carrion_mesa', 'hall_of_dials', 'noon_vault', 'emberwatch_ruins', 'rimefall_pass', 'drowned_mines', 'bellfounders_halls', 'cold_furnace', 'hellforge_heart'];
 
 // Visits every area (and the bosses) and measures frame time, saving screenshots for review.
 test('area tour renders every theme', async ({ page }, info) => {
   test.skip(info.project.name !== 'phone-landscape');
+  // Eighteen areas at a couple of seconds each.
+  test.setTimeout(150_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/?autostart&seed=11&class=arcanist');

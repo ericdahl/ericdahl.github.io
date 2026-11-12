@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ACT, ACT2, playAct } from './bot';
+import { ACT, ACT2, ACT3, playAct } from './bot';
 
 // A simple bot (no kiting, no town trips) must be able to finish the act with every class.
 // This guards overall balance: monster scaling, item drops, skills and leveling together.
@@ -18,12 +18,28 @@ describe('full act playthrough', () => {
 
     it(`${cls} plays on through act 2 and defeats Corvin`, () => {
       // The bot can stall shooting at walls, so this seed is one where every class gets a clean run.
-      const reports = playAct(cls, 42, 900, [...ACT, ...ACT2]);
+      const reports = playAct(cls, 99, 900, [...ACT, ...ACT2]);
       const road = reports[ACT.length];
       const last = reports[reports.length - 1];
       expect(road.enterLevel).toBeGreaterThanOrEqual(12);
       expect(last.enterLevel).toBeGreaterThanOrEqual(26);
       expect(last.bossDead).toBe(true);
     }, 300_000);
+
+    it(`${cls} carries the ember up the Ember Road and defeats the Unlit`, () => {
+      const reports = playAct(cls, 99, 900, [...ACT, ...ACT2, ...ACT3]);
+      expect(reports.map((r) => r.area).slice(-ACT3.length)).toEqual(ACT3);
+      const act3 = reports.slice(-ACT3.length);
+      const last = act3[act3.length - 1];
+      expect(act3[0].enterLevel).toBeGreaterThanOrEqual(28);
+      expect(last.area).toBe('hellforge_heart');
+      expect(last.enterLevel).toBeGreaterThanOrEqual(34);
+      // Every boss on the road falls: the Frostwright, Corvane's Echo behind his phylacteries, and the Unlit.
+      for (const r of act3) expect(r.bossDead, r.area).toBe(true);
+      for (const r of act3) expect(r.killed / r.total, r.area).toBeGreaterThan(0.6);
+      // The bot lights braziers when its ember runs low, so the cold never holds it for long.
+      expect(act3.reduce((n, r) => n + r.frozen, 0)).toBeLessThan(60);
+      expect(act3.reduce((n, r) => n + r.braziers, 0)).toBeGreaterThan(5);
+    }, 420_000);
   }
 });

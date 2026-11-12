@@ -1,4 +1,4 @@
-import { AREA_BY_ID, DIFFICULTY_LEVELS, QUESTS } from '../game/areas';
+import { ACT_NAMES, AREA_BY_ID, areaAct, DIFFICULTY_LEVELS, QUESTS } from '../game/areas';
 import {
   allocStat, canLearn, CLASSES, DIFFICULTIES, INV_COLS, INV_ROWS, learnSkill, requirementError, skillLevel, sortGrid, STASH_COLS,
   STASH_ROWS, type GridEntry,
@@ -302,7 +302,9 @@ function vendorPanel(host: PanelHost, kind: 'healer' | 'smith') {
       ),
     );
   }
-  const greet = w.act === 2
+  const greet = w.act === 3
+    ? kind === 'healer' ? 'Sit by the fire. No, closer. I have buried enough of you this winter.' : 'I burned my bellows for warmth in March. I work it cold now. It holds an edge well enough.'
+    : w.act === 2
     ? kind === 'healer' ? 'Drink. The well is clean again, or clean enough.' : 'Sand makes the keenest edge. Mind your fingers.'
     : kind === 'healer' ? 'Your wounds are mended. Rest a while, friend.' : 'Steel for the brave. Gold for the rest of us.';
   return h(
@@ -448,7 +450,7 @@ function waypointPanel(host: PanelHost) {
   let shownAct = 0;
   for (const wp of w.waypointList()) {
     const here = wp.id === w.area.def.id;
-    if (acts > 1 && wp.act !== shownAct) list.append(h('div', { class: 'wp-act' }, `Act ${wp.act}`));
+    if (acts > 1 && wp.act !== shownAct) list.append(h('div', { class: 'wp-act' }, `Act ${wp.act}: ${ACT_NAMES[wp.act]}`));
     shownAct = wp.act;
     list.append(
       h(
@@ -465,14 +467,22 @@ function waypointPanel(host: PanelHost) {
 function caravanPanel(host: PanelHost) {
   const w = host.world;
   const info = w.npcInfo('caravan');
-  const south = w.act === 1;
+  const stops = w.caravanStops();
+  const north = stops.includes('emberwatch_ruins');
+  const say = w.act === 3 ? 'The oxen will not stand in this for long. Say where, and say it quickly.'
+    : w.act === 1 ? (north ? 'This is the camp as you left it. It is not what is up the road now. South, or north to what is left?' : 'South, then? The road is ash for a week, and after that it is glass. Bring water.')
+    : north ? 'North? I had word from Emberwatch. It is snowing there. In high summer. I will take you, but I will not stay.'
+    : 'Back to the cold country? We leave whenever you say.';
+  const label: Record<string, string> = { town: 'Travel to Emberwatch Camp', tel_maresh: 'Travel to Tel Maresh', emberwatch_ruins: 'Travel north to Emberwatch Ruins' };
+  // The newest road first: that is where the story goes next.
+  const order = stops.slice().sort((a, b) => (areaAct(AREA_BY_ID[b]) - areaAct(AREA_BY_ID[a])));
   return h(
     'div',
     { class: 'panel caravan' },
     header(host, info.name, info.title),
-    h('div', { class: 'npc-say' }, south ? 'South, then? The road is ash for a week, and after that it is glass. Bring water.' : 'Back to the cold country? We leave whenever you say.'),
+    h('div', { class: 'npc-say' }, say),
     h('div', { class: 'p-body' },
-      h('button', { class: 'btn primary', onclick: () => { host.close(); w.travelCaravan(); } }, south ? 'Travel to Tel Maresh' : 'Travel to Emberwatch Camp')),
+      ...order.map((id, i) => h('button', { class: `btn ${i === 0 ? 'primary' : ''}`, 'data-dest': id, onclick: () => { host.close(); w.travelCaravan(id); } }, label[id]))),
   );
 }
 
@@ -491,7 +501,7 @@ function sagePanel(host: PanelHost) {
     'div',
     { class: 'panel sage' },
     header(host, info.name, info.title),
-    h('div', { class: 'npc-say' }, w.act === 2 ? 'The archive survived the glass. Most of what it says, you will not like.' : info.name === 'Wren' ? 'He left in the night. Took his staff and none of his books. He has never done that.' : 'Stay a moment, wanderer. Let an old man share what he knows.'),
+    h('div', { class: 'npc-say' }, w.act === 3 ? 'Keep your hand closed over it when you are out there. It is the only warm thing north of the glass, and everything knows it.' : w.act === 2 ? 'The archive survived the glass. Most of what it says, you will not like.' : info.name === 'Wren' ? 'He left in the night. Took his staff and none of his books. He has never done that.' : 'Stay a moment, wanderer. Let an old man share what he knows.'),
     h('div', { class: 'p-body' },
       h('button', { class: 'btn primary', disabled: !unid, onclick: () => { const n = w.identifyAll(); host.toast(n ? `Identified ${n} item${n > 1 ? 's' : ''}` : 'Nothing to identify'); host.refresh(); } }, unid ? `Identify all items (${unid})` : 'Nothing to identify'),
       quests),
@@ -523,7 +533,7 @@ function fencePanel(host: PanelHost) {
     'div',
     { class: 'panel vend' },
     header(host, w.npcInfo('fence').name, w.npcInfo('fence').title),
-    h('div', { class: 'npc-say' }, w.act === 2 ? 'The bones have opinions about you. Shall we find out what they are?' : 'Care to try your luck? Every one of these could be a treasure... or not.'),
+    h('div', { class: 'npc-say' }, w.act === 3 ? 'Dug it out of the drifts myself. Could be a dead man\'s treasure. Could be a dead man\'s socks. Gold first.' : w.act === 2 ? 'The bones have opinions about you. Shall we find out what they are?' : 'Care to try your luck? Every one of these could be a treasure... or not.'),
     h('div', { class: 'p-body three' }, h('div', { class: 'col' }, h('div', { class: 'sub' }, 'Gamble'), list), h('div', { class: 'col' }, h('div', { class: 'sub' }, 'Your inventory'), grid(host, c.inventory, INV_COLS, INV_ROWS, 'inv'), goldRow(host)), detail(host, 'vendor')),
   );
 }

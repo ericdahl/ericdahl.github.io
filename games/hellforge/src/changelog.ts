@@ -1,6 +1,20 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.12.0',
+    date: '2026-11-12',
+    notes: [
+      'Act 3: The Ember Road. The ember Vhorza left you is dying, and the cold she held back for four hundred years is loose. Finish Act 2 and the caravan will take you north, to what is left of Emberwatch under the snow.',
+      'Five new areas with their own art, music and weather: Rimefall Pass, the frozen Drowned Mines, the Bellfounders\' Halls, the Cold Furnace and the Hellforge\'s Heart. Four new quests, and an ending.',
+      'Warmth. In the cold your ember burns down, and its light shrinks with it. Once it is out, frostbite builds: first it slows you, then it wounds. Walk up to a brazier to light it and stand in its glow to refill the ember. Fire skills, burning blades and burning monsters keep you warm too. A meter under the area name shows how much heat you have left.',
+      'Whiteouts roll down Rimefall Pass and burn the ember down faster. Light every beacon on the pass for Wren and she will teach you something.',
+      'Rime-Thralls burst into shards of ice that sap your ember, unless you burn them. Bellwardens raise a bell and ring a shockwave that you have to dodge-roll through. Slag Golems turn molten in fire and firelight (stronger, faster) and brittle when chilled. Hearth-Eaters drink your ember from a distance, but cannot while you stand by a fire.',
+      'Three new bosses. The Frostwright\'s cold snap spares only those sheltering at a lit brazier. Corvane\'s Echo cannot be hurt until you break his phylactery. And the Unlit, in the heart of the forge, snuffs out fires and feeds whenever your ember is dark.',
+      'New gear for Act 3: fourteen new weapons and armours, ten uniques and a five-piece set, the Vigil of the Ember Road.',
+      'Nightmare and Hell now unlock at the end of Act 3, and both are harder. Heroes who already unlocked them keep them.',
+    ],
+  },
+  {
     version: '0.11.2',
     date: '2026-11-12',
     notes: ['Holding a skill button on a phone no longer pops up the skills panel in the middle of a fight. Skills are assigned from the Skills panel.'],

@@ -46,6 +46,56 @@ export const STORIES = {
       '"Thank you. Keep it lit."',
     ],
   },
+  ember_dims: {
+    title: 'The Ember Dims',
+    lines: [
+      'You open your hand to show the Archivist. The ember is the size of a seed now, and the colour of a coal an hour after the fire.',
+      '"It is going out," Imre says. "Of course it is. It was never a flame, only the last of the thing that fed one. And listen." He holds up a letter, its edges white with frost. "From Emberwatch. Written in June. They are burning the palisade to stay alive."',
+      '"She did not only hold the star in. She held the cold out. Four hundred winters, banked behind one forge. Take it home, before it has nowhere to go home to."',
+    ],
+  },
+  north: {
+    title: 'Emberwatch, Under Snow',
+    lines: [
+      'The caravan stops a mile short. The oxen will not go on. You walk the rest, and for a long time you do not recognise the place you are walking into.',
+      'The palisade is gone, burned stake by stake. The tents are drifts with poles in them. One fire is left, in the middle of the camp, and everyone still alive is standing as close to it as they can bear.',
+      '"You came back," says Wren. She is wearing Corvin\'s second-best robe over two of her own. "Good. Do you still have it? Do not show me here. The cold notices."',
+    ],
+  },
+  frostwright: {
+    title: 'What the Frostwright Made',
+    lines: [
+      'The ice lets go of him all at once. Under it there is a man in a smith\'s apron, old as the mine, with hands burned to the wrist.',
+      '"Founder Odrun. I poured her forge. The Bellfounders cast it the way we cast everything, as a bell, mouth to the sky, so that it would ring if she ever failed. In four hundred years it never rang."',
+      '"Then the fire went south, and the cold came up the shaft and took my hands and told me to make it things. I made them. I am sorry about the imps."',
+      '"The bell is still there, at the Heart. It is cracked, but it will hold an ember. Set it at the lip, not the bowl. She will tell you. She always did like to tell us."',
+    ],
+  },
+  echo: {
+    title: 'The Last Phylactery',
+    lines: [
+      'There is a bell in the middle of the hall that nobody cast. It is the blue of his staff, and it is humming a voice you know.',
+      '"You broke the jar I kept in Imhara. Did you think a man who planned for four centuries kept one jar? I left this with the founders the year I taught them to ring fire out of the earth."',
+      '"I do not want the ember, child. I want what I always wanted, which is for it to go out. Then the cold has her shape and no keeper, and a keeper is a thing I know how to be."',
+    ],
+  },
+  unlit: {
+    title: 'The Unlit',
+    lines: [
+      'The Hellforge is a bell the size of a cathedral, mouth to the sky, and the sky comes down into it as snow. Something is kneeling in the bowl where the fire used to be.',
+      'It has her horns. It has her wings, and the cracks across her chest, but nothing shows through the cracks. It is the hole a fire leaves. It turns towards the warmth in your hand the way a drowning thing turns towards air.',
+      'The ember stirs against your palm. "That is not me," says the tired voice. "That is the winter, wearing what I left behind. Do not let it put me out."',
+    ],
+  },
+  rekindle: {
+    title: 'Keep It Lit',
+    lines: [
+      'The Unlit folds in on itself like paper in a grate, and for the space of a breath the Heart of the Hellforge is nothing but cold iron and falling snow.',
+      'You set the ember at the lip of the bell, where the founder said. It sits there, small and red and unconvinced. Then the crack beside it begins to glow, and the next, and the snow stops reaching the floor.',
+      'Far above you the great bell sounds once, the note it was cast to sound if she failed, and never has. Along the whole of the Ember Road, the braziers you lit lean towards it.',
+      '"There," says Vhorza, from everywhere the light is. "Now it is your fire too. I held it for four hundred years. You only have to hold it until morning."',
+    ],
+  },
 } satisfies Record<string, StoryBeat>;
 
 export type StoryId = keyof typeof STORIES;

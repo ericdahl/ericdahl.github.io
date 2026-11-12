@@ -4,7 +4,8 @@ export const VOID = 0;
 export const FLOOR = 1;
 export const WALL = 2;
 
-export type ThemeId = 'town' | 'fields' | 'cave' | 'forest' | 'chapel' | 'crypt' | 'hell' | 'oasis' | 'desert' | 'glass' | 'mesa' | 'cistern' | 'ruins' | 'vault';
+export type ThemeId = 'town' | 'fields' | 'cave' | 'forest' | 'chapel' | 'crypt' | 'hell' | 'oasis' | 'desert' | 'glass' | 'mesa' | 'cistern' | 'ruins' | 'vault'
+  | 'snowtown' | 'snow' | 'icemine' | 'foundry' | 'furnace' | 'heart';
 export type ExitKind = 'path' | 'down' | 'up';
 
 export interface Point {
@@ -27,12 +28,16 @@ export interface Exit extends Point {
 
 export type PropKind =
   | 'torch' | 'bones' | 'pillar' | 'tent' | 'campfire' | 'grave' | 'brazier' | 'banner' | 'lava'
-  | 'scrub' | 'shards' | 'urn' | 'quicksand' | 'well';
+  | 'scrub' | 'shards' | 'urn' | 'quicksand' | 'well'
+  | 'icicle' | 'anvil' | 'bell' | 'drift' | 'rubble' | 'ruin' | 'hearth';
 export interface Prop extends Point {
   kind: PropKind;
 }
 
-export type ObjectKind = 'chest' | 'barrel' | 'shrine';
+export type ObjectKind = 'chest' | 'barrel' | 'shrine' | 'brazier';
+
+/** Themes where the cold is loose and braziers stand unlit, waiting for the ember. */
+export const COLD_THEMES: ReadonlySet<ThemeId> = new Set<ThemeId>(['snow', 'icemine', 'foundry', 'furnace', 'heart']);
 export interface MapObject extends Point {
   kind: ObjectKind;
 }
@@ -317,12 +322,15 @@ function genRooms(spec: LevelSpec, rng: Rng): Level {
   if (spec.bossLair) {
     const lair = order[0] ? rooms[order[0].i] : rooms[rooms.length - 1];
     l.spots.boss = center(lair);
-    l.props.push(
-      { x: lair.x + 1, y: lair.y + 1, kind: 'brazier' },
-      { x: lair.x + lair.w - 2, y: lair.y + 1, kind: 'brazier' },
-      { x: lair.x + 1, y: lair.y + lair.h - 2, kind: 'brazier' },
-      { x: lair.x + lair.w - 2, y: lair.y + lair.h - 2, kind: 'brazier' },
-    );
+    const corners: Point[] = [
+      { x: lair.x + 1, y: lair.y + 1 },
+      { x: lair.x + lair.w - 2, y: lair.y + 1 },
+      { x: lair.x + 1, y: lair.y + lair.h - 2 },
+      { x: lair.x + lair.w - 2, y: lair.y + lair.h - 2 },
+    ];
+    // In the cold the lair's braziers are real ones: out until the hero lights them, and the only shelter in the fight.
+    if (COLD_THEMES.has(spec.theme)) for (const c of corners) l.objects.push({ ...c, kind: 'brazier' });
+    else for (const c of corners) l.props.push({ ...c, kind: 'brazier' });
   }
   for (const r of rooms) {
     if (r.w >= 9 && r.h >= 9 && rng.chance(0.6)) {
@@ -369,12 +377,18 @@ function finishLevel(l: Level, spec: LevelSpec, rng: Rng, entry: Point, exitPts:
     : l.theme === 'glass' ? ['shards', 'shards', 'bones']
     : l.theme === 'ruins' ? ['bones', 'urn', 'torch']
     : l.theme === 'vault' ? ['urn', 'shards', 'torch']
+    : l.theme === 'snow' ? ['drift', 'drift', 'icicle', 'bones', 'rubble']
+    : l.theme === 'icemine' ? ['icicle', 'icicle', 'rubble', 'bones']
+    : l.theme === 'foundry' ? ['anvil', 'bell', 'rubble', 'bones']
+    : l.theme === 'furnace' ? ['anvil', 'rubble', 'icicle', 'bones']
+    : l.theme === 'heart' ? ['icicle', 'rubble', 'bell', 'bones']
     : ['bones', 'torch'];
   for (const p of rng.shuffle(floors.slice()).slice(0, Math.floor(floors.length / 45))) {
     if (nearExit(p, 3)) continue;
     l.props.push({ x: p.x, y: p.y, kind: rng.pick(decorKinds) });
   }
   if (l.theme === 'desert' || l.theme === 'glass') addQuicksand(l, rng, floors, nearExit);
+  if (COLD_THEMES.has(l.theme)) addBraziers(l, rng, floors, dist, nearExit);
   const objCount = Math.floor(floors.length / 140);
   let shrines = 0;
   for (const p of rng.shuffle(floors.filter((f) => wallNeighbors(l, f.x, f.y) >= 2 && dist[idx(l, f.x, f.y)] > 6)).slice(0, objCount)) {
@@ -383,6 +397,31 @@ function finishLevel(l: Level, spec: LevelSpec, rng: Rng, entry: Point, exitPts:
     const kind: ObjectKind = shrines < 2 && rng.chance(0.15) ? 'shrine' : rng.chance(0.35) ? 'chest' : 'barrel';
     if (kind === 'shrine') shrines++;
     l.objects.push({ ...p, kind });
+  }
+}
+
+/**
+ * Stands unlit braziers through a cold level: one a few steps from the way in, then a fire in sight of a fire.
+ * The pass keeps a fixed number of them, since lighting them all is a quest.
+ */
+function addBraziers(l: Level, rng: Rng, floors: Point[], dist: Int32Array, nearExit: (p: Point, r: number) => boolean) {
+  const taken = new Set(l.props.map((p) => idx(l, p.x, p.y)));
+  const open = floors.filter((p) => wallNeighbors(l, p.x, p.y) === 0 && !taken.has(idx(l, p.x, p.y)) && !nearExit(p, 3) && dist[idx(l, p.x, p.y)] >= 0
+    && !(l.waypoint && Math.abs(l.waypoint.x - p.x) + Math.abs(l.waypoint.y - p.y) < 2));
+  const placed: Point[] = l.objects.filter((o) => o.kind === 'brazier');
+  const far = (p: Point, gap: number) => placed.every((o) => Math.abs(o.x - p.x) + Math.abs(o.y - p.y) >= gap);
+  const first = open.filter((p) => dist[idx(l, p.x, p.y)] >= 4 && dist[idx(l, p.x, p.y)] <= 8);
+  const max = l.theme === 'snow' ? 12 : 99;
+  let n = 0;
+  const put = (p: Point) => {
+    placed.push(p);
+    l.objects.push({ ...p, kind: 'brazier' });
+    n++;
+  };
+  if (first.length) put(rng.pick(first));
+  for (const p of rng.shuffle(open.slice())) {
+    if (n >= max) break;
+    if (far(p, l.theme === 'snow' ? 17 : 13) && !l.objects.some((o) => o.kind !== 'brazier' && Math.abs(o.x - p.x) + Math.abs(o.y - p.y) < 2)) put(p);
   }
 }
 
@@ -414,12 +453,18 @@ function genTown(spec: LevelSpec): Level {
     l.tiles[idx(l, x, y)] = WALL;
     l.props.push({ x, y, kind });
   };
-  block(cx, cy, spec.theme === 'oasis' ? 'well' : 'campfire');
+  const snow = spec.theme === 'snowtown';
+  block(cx, cy, spec.theme === 'oasis' ? 'well' : snow ? 'hearth' : 'campfire');
+  // Under the snow only one tent still stands; the rest are burnt frames.
   block(cx - 7, cy - 6, 'tent');
-  block(cx + 6, cy - 7, 'tent');
-  block(cx - 8, cy + 5, 'tent');
-  block(cx + 5, cy + 7, 'tent');
-  for (let i = 0; i < 6; i++) l.props.push({ x: 4 + i * 6, y: 4, kind: 'banner' });
+  block(cx + 6, cy - 7, snow ? 'ruin' : 'tent');
+  block(cx - 8, cy + 5, snow ? 'ruin' : 'tent');
+  block(cx + 5, cy + 7, snow ? 'ruin' : 'tent');
+  if (snow) {
+    for (const [x, y] of [[cx - 11, cy - 1], [cx + 9, cy - 3], [cx - 4, cy + 8], [cx + 11, cy + 6], [cx - 12, cy + 9], [cx + 1, cy - 9], [cx - 3, cy - 7], [cx + 12, cy - 9]]) l.props.push({ x, y, kind: 'drift' });
+    for (const [x, y] of [[cx - 10, cy + 2], [cx + 8, cy + 3], [cx + 3, cy + 10]]) l.props.push({ x, y, kind: 'rubble' });
+  }
+  for (let i = 0; i < 6; i++) if (!snow || i % 2 === 0) l.props.push({ x: 4 + i * 6, y: 4, kind: 'banner' });
   l.props.push({ x: l.w - 4, y: cy - 2, kind: 'brazier' }, { x: l.w - 4, y: cy + 2, kind: 'brazier' });
   l.spots = {
     healer: { x: cx - 6, y: cy - 4 },

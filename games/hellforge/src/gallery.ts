@@ -82,7 +82,7 @@ for (const cls of Object.keys(LOADOUTS) as ClassId[]) {
 }
 
 const npcs: NpcKind[] = ['healer', 'smith', 'sage', 'fence', 'caravan'];
-for (const act of [1, 2]) {
+for (const act of [1, 2, 3]) {
   const row = section(`Townsfolk, act ${act}`);
   for (const k of npcs) {
     const look: HumanoidLook = npcLook(k, act);

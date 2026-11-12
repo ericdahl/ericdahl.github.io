@@ -1,10 +1,11 @@
 import { allocStat, computeStats, learnSkill, requirementError, slotsFor } from '../src/game/character';
 import { baseOf, type ClassId, type Item } from '../src/game/items';
 import { SKILL_BY_ID } from '../src/game/skills';
-import type { World } from '../src/game/world';
+import { SLAG_BRITTLE, type World } from '../src/game/world';
 import { makeWorld } from './helpers';
 
 export const ACT = ['cinder_fields', 'hollow_cave', 'gloomwood', 'sunken_chapel', 'catacombs1', 'catacombs2', 'hellforge'];
+export const ACT3 = ['rimefall_pass', 'drowned_mines', 'bellfounders_halls', 'cold_furnace', 'hellforge_heart'];
 export const ACT2 = ['ashfall_road', 'whisper_cistern', 'glass_sea', 'carrion_mesa', 'buried_bazaar', 'hall_of_dials', 'noon_vault'];
 
 const PLAN: Record<ClassId, string[]> = {
@@ -53,6 +54,43 @@ function necroThink(w: World) {
   if (lvl('frailty') && boss && !(boss.curse && boss.curse.t > 0)) w.cmdSkill('frailty', boss.x, boss.y);
 }
 
+/**
+ * Act 3's rules. Roll through a bell's toll just before it arrives, and when the ember is nearly out,
+ * walk to the nearest brazier (touching it lights it) rather than fight on in the cold.
+ */
+function emberThink(w: World, t: number, seek: { since: number; restUntil: number }): boolean {
+  const p = w.player;
+  for (const g of w.area.rings) {
+    const gap = Math.hypot(p.x - g.x, p.y - g.y) - g.r;
+    if (!g.passed && gap > -0.2 && gap < 1.1 && w.cmdDodge({ x: g.x - p.x, y: g.y - p.y })) return true;
+  }
+  if (!w.cold || w.ember > 0.15 || w.nearFire || p.action || t < seek.restUntil) {
+    seek.since = -1;
+    return false;
+  }
+  // A brazier that cannot be reached in a few seconds is not worth dying for: fight on, and try again later.
+  if (seek.since < 0) seek.since = t;
+  if (t - seek.since > 7) {
+    seek.restUntil = t + 15;
+    w.stop();
+    return false;
+  }
+  let best: { x: number; y: number } | null = null;
+  let bd = 16;
+  for (const o of w.area.objects) {
+    if (o.kind !== 'brazier') continue;
+    const d = Math.hypot(o.x - p.x, o.y - p.y);
+    if (d < bd) (bd = d), (best = o);
+  }
+  if (!best) return false;
+  if (p.intent?.kind !== 'move' || !p.path.length) w.cmdMoveTo(best.x, best.y);
+  return true;
+}
+
+/** Test hook for looking over the bot's shoulder. */
+export let DEBUG: ((w: World, t: number) => void) | undefined;
+export const setDebug = (f: typeof DEBUG) => (DEBUG = f);
+
 export interface AreaReport {
   area: string;
   enterLevel: number;
@@ -63,6 +101,10 @@ export interface AreaReport {
   total: number;
   bossDead: boolean;
   weapon: string;
+  /** Seconds spent with frostbite at full, taking damage from the cold. */
+  frozen: number;
+  /** Braziers alight when the hero left. */
+  braziers: number;
 }
 
 /** Plays the act end to end without town trips; infinite potions are counted, not limited. */
@@ -73,10 +115,13 @@ export function playAct(classId: ClassId, seed: number, maxPerArea = 900, route 
   let planIdx = 0;
   for (const area of route) {
     w.enterArea(area, 'start');
-    const rep: AreaReport = { area, enterLevel: c.level, time: 0, deaths: 0, potions: 0, killed: 0, total: w.area.monsters.length, bossDead: false, weapon: '' };
+    const rep: AreaReport = { area, enterLevel: c.level, time: 0, deaths: 0, potions: 0, killed: 0, total: w.area.monsters.length, bossDead: false, weapon: '', frozen: 0, braziers: 0 };
     let t = 0;
     let think = 0;
     let lastPos = { x: 0, y: 0, t: 0 };
+    let lastKill = { n: -1, t: 0 };
+    const seek = { since: -1, restUntil: 0 };
+    let still = { x: 0, y: 0, t: 0 };
     while (t < maxPerArea) {
       const dt = 1 / 30;
       t += dt;
@@ -86,6 +131,8 @@ export function playAct(classId: ClassId, seed: number, maxPerArea = 900, route 
         w.respawn();
         w.enterArea(area, 'start');
       }
+      // Chasing something past the way in can carry the hero out of the area: turn round and come back.
+      if (w.area.def.id !== area) w.enterArea(area, 'start');
       const p = w.player;
       const s = w.stats;
       if (p.life < s.maxLife * 0.4 && !p.heal.length) (p.heal.push({ hp: s.maxLife * 0.5, mp: 0, t: 3 }), rep.potions++);
@@ -115,17 +162,44 @@ export function playAct(classId: ClassId, seed: number, maxPerArea = 900, route 
         // Unstick: if we have not moved for a while, wander.
         if (Math.hypot(p.x - lastPos.x, p.y - lastPos.y) > 0.5) lastPos = { x: p.x, y: p.y, t };
       }
+      DEBUG?.(w, t);
+      // Walking somewhere but going nowhere (snagged on a corner): step back onto the middle of the tile.
+      if (Math.hypot(w.player.x - still.x, w.player.y - still.y) > 0.05 || w.player.intent?.kind !== 'move') still = { x: w.player.x, y: w.player.y, t };
+      else if (t - still.t > 1.5) {
+        const cx = Math.floor(w.player.x) + 0.5 - w.player.x;
+        const cy = Math.floor(w.player.y) + 0.5 - w.player.y;
+        w.stop();
+        if (Math.hypot(cx, cy) > 0.05) w.cmdDodge({ x: cx, y: cy });
+        still.t = t;
+      }
       w.refreshStats();
+      if (w.frost >= 1) rep.frozen += dt;
+      if (emberThink(w, t, seek)) {
+        w.step(dt);
+        continue;
+      }
       for (const g of w.area.ground.slice()) if (Math.hypot(g.x - p.x, g.y - p.y) < 3 && (g.gold || (g.item && (g.item.rarity !== 'normal' || slotsFor(g.item).length)))) w.pickup(g);
       if (!p.action && !p.intent) {
-        const live = w.area.monsters.filter((m) => !m.dead);
-        if (!live.length) break;
-        const boss = live.find((m) => m.superId);
+        // A boss behind a phylactery cannot be hurt: go for the phylactery.
+        const warded = (m: { wardId?: number }) => m.wardId !== undefined && w.area.monsters.some((o) => o.id === m.wardId && !o.dead);
+        const all = w.area.monsters.filter((m) => !m.dead);
+        const live = all.some((m) => !warded(m)) ? all.filter((m) => !warded(m)) : all;
+        if (!all.length) break;
+        const boss = all.find((m) => m.superId);
         const alive = live.length / Math.max(1, rep.total);
         if (alive < 0.12 && !boss) break;
         live.sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
         const m = live[0];
-        const skill = MAIN[classId].find((id) => (c.skills[id] ?? 0) > 0 && SKILL_BY_ID[id].mana(c.skills[id]) <= p.mana) ?? 'attack';
+        // Nothing has died for a while and the nearest monster is out of reach: stop shooting at walls and walk to it.
+        if (all.length !== lastKill.n) lastKill = { n: all.length, t };
+        if (t - lastKill.t > 8 && Math.hypot(m.x - p.x, m.y - p.y) > 10) {
+          w.cmdMoveTo(m.x, m.y);
+          w.step(dt);
+          continue;
+        }
+        let skill = MAIN[classId].find((id) => (c.skills[id] ?? 0) > 0 && SKILL_BY_ID[id].mana(c.skills[id]) <= p.mana) ?? 'attack';
+        // Fire stokes a Slag Golem: an Arcanist tempers it brittle with ice first, then goes back to fire.
+        if (m.def.slag && (m.heat ?? 0) > SLAG_BRITTLE && (c.skills.ice_bolt ?? 0) > 0 && SKILL_BY_ID.ice_bolt.mana(c.skills.ice_bolt) <= p.mana) skill = 'ice_bolt';
         w.cmdSkill(skill, m.x, m.y, m.id);
       }
       w.step(dt);
@@ -134,6 +208,7 @@ export function playAct(classId: ClassId, seed: number, maxPerArea = 900, route 
     rep.bossDead = !w.area.monsters.some((m) => m.superId && !m.dead);
     rep.weapon = c.equipment.weapon ? `${c.equipment.weapon.base}/${c.equipment.weapon.rarity}` : '-';
     rep.killed = rep.total - w.area.monsters.filter((m) => !m.dead && !m.summoned).length;
+    rep.braziers = w.area.objects.filter((o) => o.kind === 'brazier' && o.used).length;
     reports.push(rep);
   }
   return reports;
