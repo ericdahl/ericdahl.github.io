@@ -6,7 +6,7 @@ import { Camera, TILE_H, TILE_W } from './camera';
 import { baseIconCanvas } from './icons';
 import { Weather } from './weather';
 import { floorTile, treeSprite, wallBlock, WALL_H, TREE_W, TREE_H } from './sprites';
-import { drawHumanoid, drawTinted, shade, type HumanoidLook, type Pose } from './figures';
+import { bake, drawBaked, drawHumanoid, drawTinted, shade, type Baked, type HumanoidLook, type Pose } from './figures';
 import { drawMonsterShape } from './creatures';
 import { heroLook, npcLook } from './looks';
 
@@ -44,7 +44,9 @@ export class Renderer {
   automap: 'off' | 'mini' | 'full' = 'mini';
   hoverId = -1;
   private propIndex = new WeakMap<Level, Map<number, Prop>>();
-  private mapCache = new WeakMap<AreaState, { canvas: HTMLCanvasElement; t: number; ox: number; oy: number }>();
+  private mapCache = new WeakMap<AreaState, { canvas: HTMLCanvasElement; rev: number; ox: number; oy: number }>();
+  /** Corpses that have settled, drawn once and stamped from then on. Rebaked if the zoom changes. */
+  private corpses = new WeakMap<Monster, { baked: Baked; zoom: number }>();
   private time = 0;
   private weather = new Weather();
   private flashFx = { color: '#fff', a: 0 };
@@ -539,11 +541,23 @@ export class Renderer {
       const id = m.def.id;
       const still = this.pose(m.facing, 0, false, 0, 0);
       const corpse = (c: CanvasRenderingContext2D) => drawMonsterShape(c, deadShape, col, still, 0, { dead: true, id });
-      corpse(ctx);
-      if (how === 'burn') drawTinted(ctx, corpse, '#140e0a', 0.85, 'source-over');
-      if (how === 'melt') drawTinted(ctx, corpse, '#4a6a20', 0.6, 'source-over');
-      if (how === 'shock' && m.deadT < 0.8 && Math.sin(this.time * 60) > 0) drawTinted(ctx, corpse, '#80b0ff', 0.6 * (1 - m.deadT / 0.8));
-      if (how === 'burn' && m.deadT < 1.5) drawTinted(ctx, corpse, '#ff5010', 0.3 * (1 - m.deadT / 1.5));
+      // The body and its lasting tint. Nothing here changes once the corpse has settled.
+      const body = (c: CanvasRenderingContext2D) => {
+        corpse(c);
+        if (how === 'burn') drawTinted(c, corpse, '#140e0a', 0.85, 'source-over');
+        if (how === 'melt') drawTinted(c, corpse, '#4a6a20', 0.6, 'source-over');
+      };
+      if (m.deadT < CORPSE_SETTLE) {
+        this.corpses.delete(m);
+        body(ctx);
+        if (how === 'shock' && m.deadT < 0.8 && Math.sin(this.time * 60) > 0) drawTinted(ctx, corpse, '#80b0ff', 0.6 * (1 - m.deadT / 0.8));
+        if (how === 'burn' && m.deadT < 1.5) drawTinted(ctx, corpse, '#ff5010', 0.3 * (1 - m.deadT / 1.5));
+      } else {
+        // A corpse lies there for most of a minute: draw it once and stamp it after that.
+        let hit = this.corpses.get(m);
+        if (!hit || hit.zoom !== z) this.corpses.set(m, (hit = { baked: bake(ctx, body), zoom: z }));
+        drawBaked(ctx, hit.baked);
+      }
       ctx.restore();
       return;
     }
@@ -1514,15 +1528,16 @@ export class Renderer {
     const l = a.level;
     let c = this.mapCache.get(a);
     const S = 6;
-    if (c && this.time - c.t < 0.5) return { ...c, S };
+    // Only what has been explored is drawn, so the map changes only when more is.
+    if (c && c.rev === a.exploredRev) return { ...c, S };
     if (!c) {
       const canvas = document.createElement('canvas');
       canvas.width = (l.w + l.h) * (S / 2) + S;
       canvas.height = (l.w + l.h) * (S / 4) + S;
-      c = { canvas, t: 0, ox: l.h * (S / 2), oy: 0 };
+      c = { canvas, rev: -1, ox: l.h * (S / 2), oy: 0 };
       this.mapCache.set(a, c);
     }
-    c.t = this.time;
+    c.rev = a.exploredRev;
     const ctx = c.canvas.getContext('2d')!;
     ctx.clearRect(0, 0, c.canvas.width, c.canvas.height);
     const town = !!a.def.town;
@@ -1598,6 +1613,9 @@ export class Renderer {
     if (full) this.text(w.area.def.name, cam.w / 2, 24, '#e8d9a8', 16, true);
   }
 }
+
+/** Seconds after death before a corpse stops changing: it has fallen, melted down and stopped glowing. */
+const CORPSE_SETTLE = 2.6;
 
 function touchesFloor(l: Level, x: number, y: number): boolean {
   for (let dy = -1; dy <= 1; dy++)

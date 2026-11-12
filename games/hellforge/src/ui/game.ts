@@ -26,6 +26,10 @@ export class Game implements PanelHost {
   private panelEl!: HTMLElement;
   private overlayEl!: HTMLElement;
   private last = 0;
+  private lastRaf = 0;
+  /** Smoothed time between animation frames, in milliseconds: the display's refresh interval. */
+  private rafMs = 1000 / 60;
+  private skipFrame = false;
   private acc = 0;
   private saveT = 0;
   private running = true;
@@ -60,7 +64,7 @@ export class Game implements PanelHost {
     document.addEventListener('visibilitychange', this.onHide);
     window.addEventListener('pagehide', this.onHide);
     this.renderer.cam.snap(this.world.player.x, this.world.player.y);
-    this.last = performance.now();
+    this.last = this.lastRaf = performance.now();
     this.raf = requestAnimationFrame(this.frame);
     (window as unknown as { game: Game }).game = this;
   }
@@ -94,6 +98,15 @@ export class Game implements PanelHost {
 
   private frame = (now: number) => {
     if (!this.running) return;
+    // The world moves 60 times a second, so a 120 Hz screen would draw every moment twice, and drawing is
+    // what costs. On displays faster than about 100 Hz, draw every other frame.
+    this.rafMs += (Math.min(50, now - this.lastRaf) - this.rafMs) * 0.1;
+    this.lastRaf = now;
+    this.skipFrame = this.rafMs < 10 && !this.skipFrame;
+    if (this.skipFrame) {
+      this.raf = requestAnimationFrame(this.frame);
+      return;
+    }
     const dt = Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
     const w = this.world;
@@ -448,7 +461,7 @@ export class Game implements PanelHost {
         H.spree.style.setProperty('--spree', col);
         H.spree.classList.toggle('ranked', !!tier);
       }
-      H.spreeFill.style.width = `${Math.max(0, Math.min(1, sk2.t / SPREE_WINDOW)) * 100}%`;
+      H.spreeFill.style.transform = `scaleX(${Math.max(0, Math.min(1, sk2.t / SPREE_WINDOW))})`;
       if (this.hudCache.spk !== String(sk2.n)) {
         this.hudCache.spk = String(sk2.n);
         H.spreeN.classList.remove('pop');
