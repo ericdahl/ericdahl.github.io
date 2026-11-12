@@ -3,7 +3,7 @@ import { POTION_POOLS, potionCount, potionSummary, potionTiers, type Character }
 import { MOD_LABEL } from '../game/monsters';
 import { SKILL_BY_ID } from '../game/skills';
 import { STORIES, type StoryBeat } from '../game/story';
-import { DODGE_COOLDOWN, SPREE_TIERS, SPREE_WINDOW, World, type Interactable } from '../game/world';
+import { DODGE_COOLDOWN, HEAT_MAX, HEAT_SLAG, HEAT_VENT, SPREE_TIERS, SPREE_WINDOW, World, type Interactable } from '../game/world';
 import { baseIconUrl, skillIconUrl } from '../render/icons';
 import { Renderer } from '../render/renderer';
 import { Audio } from './audio';
@@ -289,6 +289,12 @@ export class Game implements PanelHost {
     const spree = h('div', { class: 'spree hidden' }, h('div', { class: 'spree-n' }), h('div', { class: 'spree-t' }), h('div', { class: 'spree-bar' }, h('div', { class: 'spree-fill' })));
     const buffs = h('div', { class: 'buffs' });
     const ember = h('div', { class: 'ember hidden', title: "Vhorza's ember" }, h('span', { class: 'ember-icon' }), h('div', { class: 'ember-bar' }, h('div', { class: 'ember-fill' }), h('div', { class: 'frost-fill' })), h('span', { class: 'ember-t' }));
+    // The Forgewright's Heat gauge: a wide bar over the middle of the bottom row, with marks where Slag Burst unlocks and where it leaves fire.
+    const heat = h('div', { class: 'heat hidden', role: 'meter', 'aria-label': 'Heat', 'aria-valuemin': 0, 'aria-valuemax': HEAT_MAX },
+      h('div', { class: 'heat-fill' }),
+      h('div', { class: 'heat-mark', style: { left: `${HEAT_VENT}%` } }),
+      h('div', { class: 'heat-mark slag', style: { left: `${HEAT_SLAG}%` } }),
+      h('div', { class: 'heat-txt' }));
     const ctxBtn = h('button', { class: 'ctxbtn hidden', onpointerdown: (e: Event) => e.stopPropagation(), onclick: (e: Event) => { e.stopPropagation(); this.useContext(); } });
     const target = h('div', { class: 'target hidden' }, h('div', { class: 'tname' }), h('div', { class: 'tbar' }, h('div', { class: 'tfill' })), h('div', { class: 'tmods' }));
     const msgs = h('div', { class: 'msgs' });
@@ -308,6 +314,7 @@ export class Game implements PanelHost {
         h(
           'div',
           { class: 'mid' },
+          heat,
           xp,
           h('div', { class: 'midrow' }, belt, h('div', { class: 'menubtns' }, btn('char', '☗', 'Character (C)', () => this.toggle('character')), btn('inv', '▣', 'Inventory (I)', () => this.toggle('inventory')), btn('skills', '✦', 'Skills (K)', () => this.toggle('skills')), btn('tp', '◎', 'Town Portal (T)', () => this.world.castTownPortal()))),
         ),
@@ -342,6 +349,7 @@ export class Game implements PanelHost {
       tp: q('.hb-tp'), skillsBtn: q('.hb-skills'), charBtn: q('.hb-char'),
       dodge, spree, spreeN: q('.spree-n'), spreeT: q('.spree-t'), spreeFill: q('.spree-fill'), buffs,
       ember, emberFill: q('.ember-fill'), frostFill: q('.frost-fill'), emberT: q('.ember-t'),
+      heat, heatFill: q('.heat-fill'), heatTxt: q('.heat-txt'),
     };
   }
 
@@ -406,20 +414,23 @@ export class Game implements PanelHost {
       });
       H.skills.classList.toggle('town', w.inTown);
     }
-    const manaKey = c.hotbar.map((id) => (id && SKILL_BY_ID[id].mana(Math.max(1, c.skills[id] ?? 1)) > p.mana ? 1 : 0)).join('');
+    // Greyed out: not enough mana, or (for Slag Burst) not enough Heat.
+    const manaKey = c.hotbar.map((id) => (id && (SKILL_BY_ID[id].mana(Math.max(1, c.skills[id] ?? 1)) > p.mana || (SKILL_BY_ID[id].kind === 'vent' && p.heat < HEAT_VENT)) ? 1 : 0)).join('');
     if (this.hudCache.mk !== manaKey) {
       this.hudCache.mk = manaKey;
       H.skills.querySelectorAll<HTMLElement>('.sbtn').forEach((el, i) => el.classList.toggle('nomana', manaKey[i] === '1'));
     }
     const skels = w.skeletonCount();
-    const skelKey = `${c.hotbar.join(',')}:${skels?.alive}/${skels?.max}`;
+    const built = c.hotbar.map((id) => (id ? w.constructCount(id) : null));
+    const skelKey = `${c.hotbar.join(',')}:${skels?.alive}/${skels?.max}:${built.map((b) => (b ? `${b.alive}/${b.max}` : '')).join()}`;
     if (this.hudCache.skel !== skelKey) {
       this.hudCache.skel = skelKey;
       H.skills.querySelectorAll<HTMLElement>('.sbtn').forEach((el, i) => {
         const badge = el.querySelector('.sbadge') as HTMLElement;
-        const on = c.hotbar[i] === 'raise_skeleton' && skels;
-        badge.textContent = on ? `${skels.alive}/${skels.max}` : '';
-        badge.classList.toggle('full', !!on && skels.alive >= skels.max);
+        // Servants standing against the cap: skeletons, or what a construct skill has built (once something is up).
+        const n = c.hotbar[i] === 'raise_skeleton' ? skels : built[i]?.alive ? built[i] : null;
+        badge.textContent = n ? `${n.alive}/${n.max}` : '';
+        badge.classList.toggle('full', !!n && n.alive >= n.max);
       });
     }
     this.setText('tp', H.tp, `◎${c.tpCharges}`);
@@ -468,6 +479,24 @@ export class Game implements PanelHost {
         H.spreeN.classList.remove('pop');
         void H.spreeN.offsetWidth;
         H.spreeN.classList.add('pop');
+      }
+    }
+    // Heat gauge.
+    const forge = c.classId === 'forgewright';
+    if (this.hudCache.forge !== String(forge)) {
+      this.hudCache.forge = String(forge);
+      H.heat.classList.toggle('hidden', !forge);
+    }
+    if (forge) {
+      const hv = Math.round(p.heat);
+      const state = p.buffs.white_heat ? 'white' : p.overheat ? 'over' : hv >= HEAT_SLAG ? 'hot' : hv >= HEAT_VENT ? 'warm' : 'cool';
+      const hk = `${hv}${state}${state === 'white' ? Math.ceil(p.buffs.white_heat.t) : ''}`;
+      if (this.hudCache.heat !== hk) {
+        this.hudCache.heat = hk;
+        H.heatFill.style.transform = `scaleX(${hv / HEAT_MAX})`;
+        H.heat.dataset.state = state;
+        H.heat.setAttribute('aria-valuenow', String(hv));
+        H.heatTxt.textContent = state === 'over' ? `OVERHEATED ${hv}` : state === 'white' ? `WHITE HEAT ${Math.ceil(p.buffs.white_heat.t)}s` : `HEAT ${hv}`;
       }
     }
     // Shrine blessings and how long they have left.

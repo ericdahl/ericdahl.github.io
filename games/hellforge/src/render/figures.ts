@@ -38,6 +38,8 @@ export interface HumanoidLook {
   accent?: string;
   bones?: boolean;
   bareArms?: boolean;
+  /** Smith's goggles pushed up on the brow (lens colour). */
+  goggles?: string;
   /** Shoulder width multiplier. */
   build?: number;
   /** Pale, drowned skin with dripping water. */
@@ -336,6 +338,10 @@ const METAL = '#a8acb4';
 const GOLD = '#d8b050';
 const WOOD = '#6a4a2a';
 const LEATHER = '#4a3420';
+/** Two-handed hammers: half-width and height of the head, and its colour. */
+const HAMMERS: Record<string, [number, number, string]> = {
+  sledge: [4.4, 5.6, '#7e828a'], war_hammer: [5.2, 6.4, '#9aa0aa'], great_maul: [6, 7.6, '#a8acb4'], obsidian_maul: [6.2, 8, '#2a2630'],
+};
 
 /** Draws a standing figure with feet at (0,0), height ~50 at scale 1. */
 export function drawHumanoid(ctx: CanvasRenderingContext2D, L: HumanoidLook, pose: Pose, t = 0) {
@@ -929,6 +935,24 @@ function drawHead(ctx: CanvasRenderingContext2D, L: HumanoidLook, back: boolean,
   switch (L.head) {
     case 'hair':
       drawHairCap(ctx, hc, L.hair ?? 'short', cy, back, t);
+      if (L.goggles) {
+        // Strap right round the head, lenses up on the brow.
+        ctx.strokeStyle = '#2a1c12';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(-5, cy - 2.6);
+        ctx.quadraticCurveTo(0.5, cy - 5.2, 5.8, cy - 3.2);
+        ctx.stroke();
+        if (!back) {
+          for (const [gx, gr] of [[1.7, 1.7], [4.6, 1.5]]) {
+            circle(ctx, gx, cy - 4.1, gr);
+            fillInk(ctx, rad(ctx, gx, cy - 4.1, gr, '#8a6a30', 0.4, -0.4), 0.6);
+            circle(ctx, gx, cy - 4.1, gr * 0.58);
+            ctx.fillStyle = art.dead ? '#3a3020' : L.goggles;
+            ctx.fill();
+          }
+        }
+      }
       break;
     case 'cap': {
       ctx.beginPath();
@@ -1464,7 +1488,7 @@ function drawWeapon(ctx: CanvasRenderingContext2D, L: HumanoidLook, hx: number, 
     return;
   }
   // Hafted weapons.
-  const len = w === 'club' ? 13 : 15 + tier * 2 + (id === 'great_axe' ? 3 : 0);
+  const len = w === 'club' ? 13 : 15 + tier * 2 + (id === 'great_axe' ? 3 : 0) + (HAMMERS[id] ? 2 : 0);
   if (w === 'club') {
     ctx.beginPath();
     ctx.moveTo(-1.2, -3);
@@ -1507,7 +1531,32 @@ function drawWeapon(ctx: CanvasRenderingContext2D, L: HumanoidLook, hx: number, 
   } else {
     // Mace family: flanged mace, spiked morning star, the smith's hammer.
     const cy = -len - 2.5;
-    if (id === 'hammer') {
+    if (HAMMERS[id]) {
+      // Two-handed hammers: a block of a head with a striking face, banded to the haft.
+      const [hw, hh, headCol] = HAMMERS[id];
+      const top = cy - hh / 2 + 1;
+      roundRect(ctx, -hw, top, hw * 2, hh, 1);
+      fillInk(ctx, lin(ctx, -hw, top, hw, top + hh, headCol, 0.45, -0.4), 0.9);
+      // Striking faces, a little proud of the block.
+      roundRect(ctx, hw - 0.6, top - 0.6, 1.8, hh + 1.2, 0.5);
+      fillInk(ctx, lin(ctx, hw, top, hw + 2, top + hh, shade(headCol, 0.2), 0.5, -0.3), 0.6);
+      roundRect(ctx, -hw - 1.2, top - 0.6, 1.8, hh + 1.2, 0.5);
+      fillInk(ctx, lin(ctx, -hw - 1, top, -hw + 1, top + hh, shade(headCol, -0.1), 0.3, -0.4), 0.6);
+      ctx.fillStyle = tier >= 2 ? GOLD : shade(headCol, -0.35);
+      ctx.fillRect(-1.5, top - 0.2, 3, hh + 0.4);
+      if (id === 'obsidian_maul') {
+        ctx.strokeStyle = alpha('#ff7a30', 0.85);
+        ctx.lineWidth = 0.7;
+        ctx.beginPath();
+        ctx.moveTo(-hw + 1, top + 1.2);
+        ctx.lineTo(-2.4, top + hh * 0.55);
+        ctx.lineTo(-hw + 2, top + hh - 1);
+        ctx.moveTo(hw - 1.4, top + 1);
+        ctx.lineTo(2.6, top + hh * 0.45);
+        ctx.stroke();
+        if (!art.dead) glow(ctx, 0, cy, 9, '#ff6a20', 0.3 + 0.1 * Math.sin(t * 3));
+      }
+    } else if (id === 'hammer') {
       roundRect(ctx, -3.8, cy - 2.6, 7.6, 5.2, 0.8);
       fillInk(ctx, lin(ctx, -4, cy - 3, 4, cy + 3, steel, 0.45, -0.35), 0.8);
     } else if (id === 'morning_star' || id === 'sun_flail') {

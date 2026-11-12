@@ -100,6 +100,10 @@ const CLASS_BASE: Record<ClassId, HumanoidLook> = {
     body: '#26262c', trim: '#9aa87a', skin: '#d8d2c4', legs: '#2e2a24', boots: '#1a1a1e', head: 'hood', headColor: '#1c1c22', robe: true,
     cape: '#141218', eyeGlow: '#a8ff70', accent: '#e8e0c8', bones: true,
   },
+  forgewright: {
+    body: '#6a5648', trim: '#2a1c12', skin: '#b8805c', legs: '#3a2c20', boots: '#241810', head: 'hair', hair: 'short', headColor: '#5a2a14',
+    beard: '#5a2a14', armor: 'cloth', apron: '#4a2c18', build: 1.22, bareArms: true, gloves: '#c8782a', goggles: '#ffb040', accent: '#d8a848',
+  },
 };
 
 /** The hero's look: their class silhouette, dressed in whatever they have equipped. */
@@ -112,6 +116,7 @@ export function heroLook(classId: ClassId, eq: Gear): HumanoidLook {
     look.armor = ARMOR_KIND[id] ?? 'leather';
     look.body = ARMOR_COLOR[id] ?? '#6b4a2e';
     look.robe = false;
+    look.bareArms = false;
     if (look.armor === 'plate' || look.armor === 'scale' || look.armor === 'mail') look.pauldrons = look.body;
     // Casters keep a tabard of their colour over whatever armour they wear.
     if (caster) look.tabard = base.body;

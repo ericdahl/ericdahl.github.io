@@ -8,7 +8,7 @@ export type StatKey =
   | 'fireRes' | 'coldRes' | 'lightRes' | 'poisonRes' | 'allRes'
   | 'fireMin' | 'fireMax' | 'coldMin' | 'coldMax' | 'lightMin' | 'lightMax' | 'poisonDmg'
   | 'lifeSteal' | 'manaSteal' | 'ias' | 'frw' | 'fcr' | 'mf' | 'gf' | 'thorns'
-  | 'lifeRegen' | 'manaRegen' | 'allSkills' | 'skills_reaver' | 'skills_arcanist' | 'skills_huntress' | 'skills_necromancer'
+  | 'lifeRegen' | 'manaRegen' | 'allSkills' | 'skills_reaver' | 'skills_arcanist' | 'skills_huntress' | 'skills_necromancer' | 'skills_forgewright'
   | 'block' | 'crit' | 'dmgReduce' | 'lifeOnKill' | 'manaOnKill';
 
 export interface Mod {
@@ -22,7 +22,7 @@ export type ItemKind =
 export type WeaponCat = 'sword' | 'axe' | 'mace' | 'dagger' | 'wand' | 'staff' | 'bow';
 export type Rarity = 'normal' | 'magic' | 'rare' | 'set' | 'unique';
 export type Slot = 'head' | 'body' | 'weapon' | 'offhand' | 'gloves' | 'belt' | 'boots' | 'amulet' | 'ring1' | 'ring2';
-export type ClassId = 'reaver' | 'arcanist' | 'huntress' | 'necromancer';
+export type ClassId = 'reaver' | 'arcanist' | 'huntress' | 'necromancer' | 'forgewright';
 
 export interface PotionInfo {
   type: 'hp' | 'mp' | 'rejuv';
@@ -54,6 +54,8 @@ export interface BaseItem {
   maxSockets?: number;
   potion?: PotionInfo;
   gem?: { type: GemType; grade: number };
+  /** Made for one class: it drops often for them and seldom for anyone else. */
+  forClass?: ClassId;
   /** Only spawns as magic or better (jewelry, circlets). */
   magicOnly?: boolean;
   value?: number;
@@ -99,6 +101,10 @@ export const BASES: BaseItem[] = [
   W('broad_sword', 'Broad Sword', 'sword', 15, 8, 16, 1.35, 2, 3, { reqStr: 60, reqDex: 30 }),
   W('great_axe', 'Great Axe', 'axe', 12, 10, 30, 1.0, 2, 4, { twoHanded: true, reqStr: 70, maxSockets: 4 }),
   W('claymore', 'Claymore', 'sword', 17, 14, 32, 1.05, 2, 4, { twoHanded: true, reqStr: 85, maxSockets: 4 }),
+  // Two-handed hammers: slow, heavy, and the Forgewright's weapon of choice.
+  W('sledge', 'Sledge', 'mace', 1, 3, 9, 1.2, 2, 3, { twoHanded: true, forClass: 'forgewright' }),
+  W('war_hammer', 'War Hammer', 'mace', 8, 8, 22, 1.1, 2, 4, { twoHanded: true, reqStr: 45, maxSockets: 4, forClass: 'forgewright' }),
+  W('great_maul', 'Great Maul', 'mace', 15, 14, 34, 1.05, 2, 4, { twoHanded: true, reqStr: 75, maxSockets: 4, forClass: 'forgewright' }),
   W('yew_wand', 'Yew Wand', 'wand', 1, 2, 4, 1.35, 1, 2, { maxSockets: 1 }),
   W('bone_wand', 'Bone Wand', 'wand', 10, 3, 7, 1.35, 1, 2, { maxSockets: 2 }),
   W('short_staff', 'Short Staff', 'staff', 1, 2, 6, 1.3, 1, 3, { twoHanded: true, maxSockets: 2 }),
@@ -114,6 +120,7 @@ export const BASES: BaseItem[] = [
   W('crescent_axe', 'Crescent Axe', 'axe', 21, 14, 27, 1.3, 2, 3, { reqStr: 75 }),
   W('sun_flail', 'Sun Flail', 'mace', 22, 15, 26, 1.3, 2, 3, { reqStr: 72 }),
   W('khopesh', 'Khopesh', 'sword', 24, 18, 32, 1.4, 2, 3, { reqStr: 80, reqDex: 50 }),
+  W('obsidian_maul', 'Obsidian Maul', 'mace', 23, 24, 48, 1.05, 2, 4, { twoHanded: true, reqStr: 90, maxSockets: 4, forClass: 'forgewright' }),
   W('glass_wand', 'Glass Wand', 'wand', 20, 5, 11, 1.4, 1, 2, { maxSockets: 2 }),
   W('dial_staff', 'Dial Staff', 'staff', 24, 9, 22, 1.3, 1, 4, { twoHanded: true, maxSockets: 4 }),
   W('recurve_bow', 'Recurve Bow', 'bow', 21, 9, 20, 1.45, 2, 3, { twoHanded: true, reqDex: 72, reqStr: 35 }),
@@ -320,6 +327,7 @@ export const AFFIXES: Affix[] = [
   P('magus', "Magus's", 6, ['caster', 'amulet', 'helm'], 'skills', [m('skills_arcanist', 1, 1)], 4),
   P('rangers', "Ranger's", 6, ['bow', 'amulet', 'gloves'], 'skills', [m('skills_huntress', 1, 1)], 4),
   P('gravecallers', "Gravecaller's", 6, ['caster', 'amulet', 'helm'], 'skills', [m('skills_necromancer', 1, 1)], 4),
+  P('smiths', "Smith's", 6, ['melee', 'amulet', 'gloves'], 'skills', [m('skills_forgewright', 1, 1)], 4),
   P('lucky', 'Lucky', 3, ['jewelry', 'boots', 'gloves', 'helm'], 'mf', [m('mf', 5, 12)]),
   P('fortuitous', 'Fortuitous', 12, ['jewelry', 'boots', 'gloves', 'helm'], 'mf', [m('mf', 13, 25)]),
   P('lapis', 'Lapis', 4, ['jewelry', 'helm', 'caster', 'shield'], 'mana', [m('mana', 5, 15)]),
@@ -430,6 +438,10 @@ export const UNIQUES: UniqueDef[] = [
   U('unlit_crown', 'Crown of the Unlit', 'watch_helm', 31, [m('allSkills', 2, 2), m('defPct', 110, 140), m('coldRes', 40, 40), m('life', 40, 40), m('mana', 40, 40)]),
   U('bell_of_the_deep', 'Bell of the Deep', 'bell_shield', 28, [m('defPct', 120, 150), m('block', 18, 18), m('dmgReduce', 6, 6), m('thorns', 20, 20), m('coldRes', 25, 25)]),
   U('hearthstriders', 'Hearthstriders', 'snow_treads', 26, [m('frw', 35, 35), m('coldRes', 35, 35), m('fireRes', 20, 20), m('lifeRegen', 3, 3), m('vit', 10, 10)]),
+  U('first_strike', 'The First Strike', 'sledge', 3, [m('skills_forgewright', 1, 1), m('edPct', 60, 90), m('fireMin', 1, 1), m('fireMax', 5, 5), m('life', 12, 12)]),
+  U('bellowsmaw', 'Bellowsmaw', 'war_hammer', 11, [m('skills_forgewright', 2, 2), m('edPct', 90, 120), m('fireMin', 4, 4), m('fireMax', 14, 14), m('fireRes', 25, 25)]),
+  U('quenchers_mitts', "Quencher's Mitts", 'heavy_gloves', 9, [m('skills_forgewright', 1, 1), m('ias', 15, 15), m('fireRes', 30, 30), m('str', 8, 8)]),
+  U('anvil_of_imhara', 'Anvil of Imhara', 'obsidian_maul', 24, [m('skills_forgewright', 2, 2), m('edPct', 130, 170), m('crit', 12, 12), m('str', 15, 15), m('allRes', 12, 12)]),
   U('crown_of_ash', 'Crown of Ash', 'full_helm', 18, [m('defPct', 100, 130), m('allSkills', 1, 1), m('life', 30, 30), m('fireRes', 30, 30), m('lifeSteal', 4, 4)]),
 ];
 export const UNIQUE_BY_ID: Record<string, UniqueDef> = Object.fromEntries(UNIQUES.map((u) => [u.id, u]));
@@ -555,6 +567,22 @@ export const SETS: SetDef[] = [
     },
   },
   {
+    id: 'emberwright',
+    name: "Emberwright's Harness",
+    classId: 'forgewright',
+    pieces: [
+      { id: 'emberwright_visor', name: 'Emberwright Visor', base: 'helm', mods: [m('life', 20, 20), m('fireRes', 20, 20)] },
+      { id: 'emberwright_apron', name: 'Emberwright Apron', base: 'studded_leather', mods: [m('defPct', 60, 60), m('str', 8, 8)] },
+      { id: 'emberwright_mitts', name: 'Emberwright Mitts', base: 'heavy_gloves', mods: [m('ias', 15, 15), m('fireMin', 2, 2), m('fireMax', 8, 8)] },
+      { id: 'emberwright_girdle', name: 'Emberwright Girdle', base: 'belt', mods: [m('life', 25, 25), m('dmgReduce', 2, 2)] },
+    ],
+    bonuses: {
+      2: [{ stat: 'edPct', value: 30 }],
+      3: [{ stat: 'life', value: 40 }, { stat: 'fireRes', value: 20 }],
+      4: [{ stat: 'skills_forgewright', value: 2 }, { stat: 'allRes', value: 15 }, { stat: 'ias', value: 15 }],
+    },
+  },
+  {
     id: 'imharan',
     name: 'Regalia of Lost Imhara',
     pieces: [
@@ -594,6 +622,7 @@ const CLASS_WEAPONS: Record<ClassId, WeaponCat[]> = {
   arcanist: ['wand', 'staff'],
   huntress: ['bow', 'dagger'],
   necromancer: ['wand', 'dagger'],
+  forgewright: ['mace', 'axe'],
 };
 
 export function makeItem(baseId: string, ilvl = 1, rarity: Rarity = 'normal'): Item {
@@ -649,7 +678,8 @@ export function pickBase(rng: Rng, ilvl: number, classId?: ClassId, kinds = EQUI
   return rng.weighted(
     fallback.map((b) => {
       let w = 1 + b.qlvl / Math.max(1, ilvl);
-      if (b.kind === 'weapon') w *= classId && CLASS_WEAPONS[classId].includes(b.cat!) ? 1.6 : 0.6;
+      if (b.forClass) w *= b.forClass === classId ? 2 : 0.15;
+      else if (b.kind === 'weapon') w *= classId && CLASS_WEAPONS[classId].includes(b.cat!) ? 1.6 : 0.6;
       if (b.kind === 'ring' || b.kind === 'amulet') w *= 0.7;
       return { w, v: b };
     }),
@@ -835,6 +865,7 @@ const STAT_TEXT: Record<StatKey, (v: number) => string> = {
   skills_arcanist: (v) => `+${v} to Arcanist Skills`,
   skills_huntress: (v) => `+${v} to Huntress Skills`,
   skills_necromancer: (v) => `+${v} to Necromancer Skills`,
+  skills_forgewright: (v) => `+${v} to Forgewright Skills`,
   block: (v) => `${v}% Increased Chance of Blocking`,
   crit: (v) => `${v}% Chance of Deadly Strike`,
   dmgReduce: (v) => `Damage Reduced by ${v}`,

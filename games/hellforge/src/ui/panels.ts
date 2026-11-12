@@ -583,6 +583,7 @@ function helpPanel(host: PanelHost) {
         'Dodging makes you untouchable for a moment and cuts short a swing or a cast. Kill quickly to build a <span class="gold2">spree</span>: each rank makes you faster, kills worth more experience, and gives you a second wind.',
         'Red and blue soul orbs restore life and mana when you walk over them. A <span class="gold2">Tithe Imp</span> drops gold with every blow and a hoard if you kill it before it escapes. A purple Cursed Shrine calls an ambush and pays out if you survive it. Clearing an area completely earns a reward.',
         'Necromancers raise skeletons from fresh corpses: cast Raise Skeleton near a body (or tap its button to use the nearest one). Servants follow you between areas.',
+        'Forgewrights build <span class="gold2">Heat</span> with every hammer blow that lands (the gauge above the experience bar). Heat adds fire to your blows with Temper, and Slag Burst spends it all at once. Let it reach 100 and you overheat and burn until it cools or you vent it. Turrets and the Furnace stay where you build them and wind down after a while; the Brass Sentinel follows you between areas.',
       ].map((t) => `<p>${t}</p>`).join('') }),
       h('button', { class: 'btn', onclick: () => host.open('menu') }, 'Back')),
   );

@@ -4,7 +4,8 @@ export type Element = 'phys' | 'fire' | 'cold' | 'light' | 'poison';
 export type SkillKind =
   | 'attack' | 'passive' | 'buff' | 'projectile' | 'nova' | 'teleport' | 'leap' | 'whirlwind'
   | 'meteor' | 'multishot' | 'strafe' | 'bolts'
-  | 'summon' | 'curse' | 'corpse' | 'shards' | 'ring';
+  | 'summon' | 'curse' | 'corpse' | 'shards' | 'ring'
+  | 'construct' | 'anvil' | 'cone' | 'quake' | 'vent';
 
 export interface SkillParams {
   /** Bonus % weapon damage for attack skills. */
@@ -23,6 +24,8 @@ export interface SkillParams {
   chains?: number;
   /** Minion stats for summons. */
   life?: number;
+  /** Life restored per second (the Furnace). */
+  heal?: number;
 }
 
 export interface SkillDef {
@@ -268,6 +271,89 @@ export const SKILLS: SkillDef[] = [
     desc: 'Erupt in a storm of bone lances flying in every direction.',
     lines: (p) => [`Damage: ${p.min}-${p.max} each`, `Lances: ${p.count}`, 'Pierces'],
     synergies: [{ skill: 'bone_lance', pct: 10 }], color: '#fff6dc', glyph: '✵',
+  },
+  // ------------------------------------------------------------ Forgewright
+  // Hammer
+  {
+    id: 'sunder', name: 'Sunder', classId: 'forgewright', reqLevel: 1, kind: 'attack', weapon: 'melee',
+    mana: () => 2, params: (l) => ({ dmgPct: 50 + 18 * l, arPct: 20 + 8 * l, pct: Math.min(60, 12 + 3 * l), duration: 5 }),
+    desc: 'A two-handed blow that cracks armor: the target takes more physical damage for a while.',
+    lines: (p) => [`+${p.dmgPct}% Damage`, `+${p.arPct}% Attack Rating`, `Target takes +${p.pct}% Physical Damage for ${p.duration}s`], color: '#c9a070', glyph: '⚒',
+  },
+  {
+    id: 'anvil_drop', name: 'Anvil Drop', classId: 'forgewright', reqLevel: 6, prereq: ['sunder'], kind: 'anvil', weapon: 'melee', element: 'phys',
+    mana: (l) => 6 + 0.4 * l, params: (l) => ({ dmgPct: 90 + 30 * l, radius: 2.2, stun: 0.8 + 0.1 * l }),
+    desc: 'Call an anvil down out of the smoke. It lands a moment later, crushing and stunning everything beneath it.',
+    lines: (p) => [`+${p.dmgPct}% Weapon Damage`, `Stun: ${p.stun!.toFixed(1)}s`, `Radius: ${p.radius} yards`],
+    synergies: [{ skill: 'sunder', pct: 6 }, { skill: 'earthshaker', pct: 8 }], color: '#8e939c', glyph: '▼', castTime: 0.8,
+  },
+  {
+    id: 'shockwave', name: 'Shockwave', classId: 'forgewright', reqLevel: 12, prereq: ['anvil_drop'], kind: 'cone', weapon: 'melee',
+    mana: (l) => 5 + 0.3 * l, params: (l) => ({ dmgPct: 30 + 14 * l, range: Math.min(7, 4.5 + 0.15 * l) }),
+    desc: 'Hammer the ground and send a wave of force rolling out in front of you, throwing enemies back.',
+    lines: (p) => [`+${p.dmgPct}% Weapon Damage`, `Reach: ${p.range!.toFixed(1)} yards`, 'Knocks back'],
+    synergies: [{ skill: 'anvil_drop', pct: 6 }], color: '#d8c090', glyph: '⟫',
+  },
+  {
+    id: 'earthshaker', name: 'Earthshaker', classId: 'forgewright', reqLevel: 24, prereq: ['shockwave', 'slag_burst'], kind: 'quake', weapon: 'melee',
+    mana: (l) => 12 + 0.5 * l, params: (l) => ({ dmgPct: 40 + 16 * l, radius: 4.5, count: 3, stun: 0.5 }),
+    desc: 'Bring the hammer down with everything you have. Three tremors roll out around you, each wider than the last.',
+    lines: (p) => [`+${p.dmgPct}% Weapon Damage per tremor`, `Tremors: ${p.count}`, `Radius: up to ${p.radius} yards`],
+    synergies: [{ skill: 'shockwave', pct: 6 }, { skill: 'anvil_drop', pct: 6 }], color: '#b07840', glyph: '❖',
+  },
+  // Constructs
+  {
+    id: 'ballista', name: 'Ballista Turret', classId: 'forgewright', reqLevel: 1, kind: 'construct',
+    mana: (l) => 7 + 0.5 * l, params: (l) => ({ count: Math.min(3, 1 + Math.floor(l / 5)), pct: 12 * (l - 1), pct2: 10 * (l - 1), range: 8.5, duration: 30 + 2 * l }),
+    desc: 'Bolt together a ballista that shoots at anything in range. Monsters will attack it.',
+    lines: (p) => [`Turrets: ${p.count}`, `+${p.pct}% Bolt Damage`, `+${p.pct2}% Turret Life`, `Lasts ${p.duration}s`],
+    synergies: [{ skill: 'brass_sentinel', pct: 6 }], color: '#b08a50', glyph: '⤞', castTime: 0.8,
+  },
+  {
+    id: 'bellows', name: 'Bellows Turret', classId: 'forgewright', reqLevel: 6, prereq: ['ballista'], kind: 'construct', element: 'fire',
+    mana: (l) => 9 + 0.5 * l, params: (l) => ({ count: 1, min: 3 + 3 * l, max: 6 + 4 * l, pct2: 12 * (l - 1), range: 3.6, duration: 24 + 2 * l }),
+    desc: 'A forge bellows on a tripod that roasts everything close in front of it.',
+    lines: (p) => [`Fire Damage: ${p.min}-${p.max} per second`, `+${p.pct2}% Turret Life`, `Reach: ${p.range} yards`, `Lasts ${p.duration}s`],
+    synergies: [{ skill: 'slag_burst', pct: 8 }, { skill: 'temper', pct: 5 }], color: '#ff8a3a', glyph: '♨', castTime: 0.8,
+  },
+  {
+    id: 'gearwork', name: 'Gearwork', classId: 'forgewright', reqLevel: 12, prereq: ['bellows'], kind: 'passive',
+    mana: () => 0, params: (l) => ({ pct: 12 * l, pct2: 15 * l }),
+    desc: 'Passive: better fittings. Everything you build hits harder and stands longer.',
+    lines: (p) => [`+${p.pct}% Construct Damage`, `+${p.pct2}% Construct Life`], color: '#c8b060', glyph: '⚙',
+  },
+  {
+    id: 'brass_sentinel', name: 'Brass Sentinel', classId: 'forgewright', reqLevel: 12, prereq: ['ballista'], kind: 'construct',
+    mana: (l) => 14 + l, params: (l) => ({ count: 1, pct: 15 * (l - 1), pct2: 25 * (l - 1) }),
+    desc: 'Wind up a brass golem that walks beside you, follows you between areas and draws enemies to itself.',
+    lines: (p) => [`+${p.pct}% Sentinel Damage`, `+${p.pct2}% Sentinel Life`, 'One at a time'], color: '#d8a848', glyph: '♜',
+  },
+  {
+    id: 'furnace', name: 'Furnace', classId: 'forgewright', reqLevel: 18, prereq: ['gearwork'], kind: 'construct',
+    mana: (l) => 12 + l, params: (l) => ({ count: 1, heal: 4 + 3 * l, pct2: 15 * (l - 1), radius: 4.5, duration: 20 + l }),
+    desc: 'Set down a field furnace. Its warmth mends you, your constructs and anything else on your side that stands near it.',
+    lines: (p) => [`Heals ${p.heal} life per second`, `+${p.pct2}% Furnace Life`, `Radius: ${p.radius} yards`, `Lasts ${p.duration}s`],
+    synergies: [{ skill: 'temper', pct: 5 }], color: '#e86a30', glyph: '♥', castTime: 0.8,
+  },
+  // Heat
+  {
+    id: 'temper', name: 'Temper', classId: 'forgewright', reqLevel: 1, kind: 'passive',
+    mana: () => 0, params: (l) => ({ pct: 20 + 8 * l, pct2: Math.min(50, 8 + 3 * l) }),
+    desc: 'Passive: the hotter you run, the harder you hit. Your blows add fire damage in proportion to your Heat.',
+    lines: (p) => [`Up to +${p.pct}% of weapon damage as Fire at full Heat`, `+${p.pct2}% Fire Resistance`], color: '#ff9a4a', glyph: '♁',
+  },
+  {
+    id: 'slag_burst', name: 'Slag Burst', classId: 'forgewright', reqLevel: 6, prereq: ['temper'], kind: 'vent', element: 'fire',
+    mana: () => 0, params: (l) => ({ min: 14 + 10 * l, max: 24 + 14 * l, radius: 3.2, duration: 3 }),
+    desc: 'Vent all your Heat as a burst of molten slag. The more Heat, the bigger the burst; above 75 it leaves the ground burning. Costs Heat, not mana.',
+    lines: (p) => [`Fire Damage: ${p.min}-${p.max} at full Heat`, `Radius: ${p.radius}-${(p.radius! + 2).toFixed(1)} yards`, 'Needs 25 Heat'],
+    synergies: [{ skill: 'temper', pct: 8 }, { skill: 'white_heat', pct: 6 }], color: '#ff5a1a', glyph: '✸', castTime: 0.5,
+  },
+  {
+    id: 'white_heat', name: 'White Heat', classId: 'forgewright', reqLevel: 18, prereq: ['slag_burst'], kind: 'buff', element: 'fire',
+    mana: (l) => 10 + 0.5 * l, params: (l) => ({ duration: 6 + 0.5 * l, pct: 10 + 2 * l }),
+    desc: 'Stoke yourself to full Heat and hold it there without burning. When it ends you are left at full Heat: vent it or pay for it.',
+    lines: (p) => [`Full Heat for ${p.duration}s`, `+${p.pct}% Attack Speed`], color: '#fff0c0', glyph: '☼', castTime: 0.6,
   },
 ];
 

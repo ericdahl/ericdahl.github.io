@@ -1,6 +1,19 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.13.0',
+    date: '2026-11-12',
+    notes: [
+      'A fifth class: the Forgewright, a smith-warden who fights with a great two-handed hammer and builds things mid-fight. Pick one on the New Hero screen.',
+      'Hammer skills. Sunder cracks armor so the target takes more physical damage, Anvil Drop brings an anvil down out of the smoke to crush and stun, Shockwave throws back everything in front of you, and Earthshaker sends out three widening tremors.',
+      'Constructs. A Ballista Turret shoots whatever comes in range (up to three at once), a Bellows Turret roasts what stands in front of it, and a Furnace mends you and everything on your side that stands near it. Turrets and furnaces stay where you build them and wind down after a while. The Brass Sentinel is a wind-up golem that walks with you, follows you between areas and draws enemies to itself. Monsters attack all of them, and Gearwork makes them tougher.',
+      'Heat. Every hammer blow that lands builds Heat, shown on a gauge above the experience bar. With Temper, the hotter you are the more fire your blows carry. Slag Burst spends all of it in one blast, bigger the more you had, and above 75 it leaves the ground burning. Reach 100 and you overheat: you burn until you cool below 60 or vent. White Heat holds you at full Heat without burning for a few seconds, then leaves you there.',
+      'On the Ember Road, a Furnace warms the ember like a brazier, and a smith running at 75 Heat or more keeps a little of the cold off.',
+      'New gear: two-handed hammers (Sledge, War Hammer, Great Maul, Obsidian Maul), which any melee class can swing; four Forgewright uniques; the Emberwright\'s Harness set; and "Smith\'s" items that add to Forgewright skills.',
+      'Skill buttons for constructs show how many are standing against the limit, and Slag Burst greys out until there is enough Heat to vent.',
+    ],
+  },
+  {
     version: '0.12.0',
     date: '2026-11-12',
     notes: [

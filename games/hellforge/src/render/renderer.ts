@@ -249,7 +249,7 @@ export class Renderer {
     // Projectiles drawn in world order too.
     for (const pr of a.projectiles) {
       add(pr.x + pr.y + 0.2, () => this.drawProjectile(pr));
-      if (pr.kind !== 'arrow' && pr.kind !== 'm_arrow') lights.push({ x: pr.x, y: pr.y, r: 2.2, a: 0.6 });
+      if (pr.kind !== 'arrow' && pr.kind !== 'm_arrow' && pr.kind !== 'bolt') lights.push({ x: pr.x, y: pr.y, r: 2.2, a: 0.6 });
     }
 
     items.sort((q, r) => q.depth - r.depth);
@@ -458,6 +458,11 @@ export class Renderer {
     const frozen = w.frost > 0.5;
     const tint = p.hurt > 0 ? '#ff4020' : p.chill > 0 || frozen ? '#3080ff' : p.poison.t > 0 ? '#40a010' : null;
     if (tint) drawTinted(ctx, (c) => drawHumanoid(c, look, pose, this.time), tint, p.hurt > 0 ? p.hurt * 1.2 : frozen ? 0.2 + 0.25 * w.frost : 0.3);
+    // A Forgewright glows as Heat builds: a dull orange, flaring when overheated, white under White Heat.
+    if (p.heat > 30 && !p.dead) {
+      const hot = p.buffs.white_heat ? 0.4 : p.overheat ? 0.34 + 0.14 * Math.sin(this.time * 14) : ((p.heat - 30) / 70) * 0.26;
+      drawTinted(ctx, (c) => drawHumanoid(c, look, pose, this.time), p.buffs.white_heat ? '#fff0c0' : p.overheat ? '#ff3a10' : '#ff7a18', hot);
+    }
     ctx.restore();
     if (w.cold && !p.dead) {
       // Vhorza's ember, carried at the chest: bright while it has heat, a dull red seed when it is nearly out.
@@ -615,7 +620,7 @@ export class Renderer {
       return;
     }
     // Aura ring for special monsters; servants get a pale green one.
-    const ring = m.thief ? '#ffd040' : m.ally ? '#7ad070' : m.rarity === 'champion' ? '#5c7cff' : m.rarity === 'unique' ? '#d8b050' : m.rarity === 'boss' ? '#ff4020' : null;
+    const ring = m.thief ? '#ffd040' : m.built ? '#e8b050' : m.ally ? '#7ad070' : m.rarity === 'champion' ? '#5c7cff' : m.rarity === 'unique' ? '#d8b050' : m.rarity === 'boss' ? '#ff4020' : null;
     if (ring) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
@@ -697,12 +702,14 @@ export class Renderer {
     if (m.thief) this.drawThiefExtras(m, s.x, s.y, z * k);
     if (m.stun > 0.3) this.text('✦', s.x, s.y - 54 * z * k, '#ffe080', 12);
     if (m.curse && m.curse.t > 0) this.text('⛧', s.x, s.y - 58 * z * k, '#c070e0', 13);
+    if (m.sunder && m.sunder.t > 0) this.text('⚒', s.x + (m.curse && m.curse.t > 0 ? 14 : 0), s.y - 58 * z * k, '#e8c890', 13);
+    if (m.ttl !== undefined && m.ttl < 5 && Math.sin(this.time * 12) > 0.2) this.text('⌛', s.x, s.y - 58 * z * k, '#e8c890', 11);
     if (m.ally && m.life < m.maxLife) {
       const bw = 26 * z;
       const by = s.y - 50 * z * k;
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       ctx.fillRect(s.x - bw / 2, by, bw, 3 * z);
-      ctx.fillStyle = '#6ad060';
+      ctx.fillStyle = m.built ? '#e8b050' : '#6ad060';
       ctx.fillRect(s.x - bw / 2, by, (bw * m.life) / m.maxLife, 3 * z);
     }
   }
@@ -760,10 +767,10 @@ export class Renderer {
     const ang = Math.atan2(sdy, sdx);
     ctx.save();
     ctx.translate(s.x, s.y - h);
-    if (pr.kind === 'arrow' || pr.kind === 'm_arrow' || pr.kind === 'frostarrow' || pr.kind === 'firearrow') {
+    if (pr.kind === 'arrow' || pr.kind === 'm_arrow' || pr.kind === 'frostarrow' || pr.kind === 'firearrow' || pr.kind === 'bolt') {
       ctx.rotate(ang);
-      ctx.strokeStyle = pr.kind === 'm_arrow' ? '#d8d0b8' : '#8a6a40';
-      ctx.lineWidth = 2 * z;
+      ctx.strokeStyle = pr.kind === 'm_arrow' ? '#d8d0b8' : pr.kind === 'bolt' ? '#5a4630' : '#8a6a40';
+      ctx.lineWidth = (pr.kind === 'bolt' ? 3 : 2) * z;
       ctx.beginPath();
       ctx.moveTo(-14 * z, 0);
       ctx.lineTo(6 * z, 0);
@@ -1799,7 +1806,7 @@ export class Renderer {
       case 'revive':
       case 'shrine':
       case 'heal': {
-        const col = f.kind === 'teleport' ? '170,110,255' : f.kind === 'levelup' ? '255,220,120' : f.kind === 'revive' ? '255,120,40' : f.kind === 'shrine' ? '120,190,255' : f.color === '#4f7dff' ? '80,120,255' : '255,70,70';
+        const col = f.kind === 'teleport' ? '170,110,255' : f.kind === 'levelup' ? '255,220,120' : f.kind === 'revive' ? '255,120,40' : f.kind === 'shrine' ? '120,190,255' : f.color === '#4f7dff' ? '80,120,255' : f.color === '#ff9040' ? '255,150,60' : '255,70,70';
         const hgt = (f.kind === 'levelup' ? 140 : 70) * z;
         const g = ctx.createLinearGradient(0, s.y - hgt, 0, s.y);
         g.addColorStop(0, `rgba(${col},0)`);
@@ -1913,6 +1920,111 @@ export class Renderer {
           else ctx.lineTo(px, py);
         }
         ctx.stroke();
+        break;
+      }
+      case 'anvil': {
+        // A shadow that tightens on the ground while the anvil drops out of the smoke above.
+        ctx.globalCompositeOperation = 'source-over';
+        const r = (f.r ?? 2) * unitX * (1.1 - 0.5 * k);
+        ctx.fillStyle = `rgba(0,0,0,${0.2 + 0.4 * k})`;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, r, r * 0.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(232,200,144,${0.35 + 0.4 * k})`;
+        ctx.lineWidth = 1.5 * z;
+        ctx.stroke();
+        const u = 1.5 * z;
+        const y = s.y - (1 - k * k) * 330 * z;
+        ctx.save();
+        ctx.translate(s.x, y);
+        ctx.scale(u, u);
+        ctx.beginPath();
+        ctx.moveTo(-13, -16);
+        ctx.lineTo(9, -16);
+        ctx.lineTo(18, -12);
+        ctx.lineTo(9, -9);
+        ctx.lineTo(5, -9);
+        ctx.quadraticCurveTo(3, -5, 8, -3);
+        ctx.lineTo(8, 0);
+        ctx.lineTo(-9, 0);
+        ctx.lineTo(-9, -3);
+        ctx.quadraticCurveTo(-4, -5, -6, -9);
+        ctx.lineTo(-13, -9);
+        ctx.closePath();
+        const g = ctx.createLinearGradient(-12, -16, 10, 0);
+        g.addColorStop(0, '#b4b8c0');
+        g.addColorStop(0.5, '#6e727a');
+        g.addColorStop(1, '#2e3036');
+        ctx.fillStyle = g;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(14,9,6,0.85)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.fillRect(-12, -15.4, 20, 1.4);
+        ctx.restore();
+        // Streaks behind it.
+        ctx.strokeStyle = `rgba(200,200,210,${0.35 * (1 - k)})`;
+        ctx.lineWidth = 2 * z;
+        ctx.beginPath();
+        for (const dx of [-12, 0, 12]) {
+          ctx.moveTo(s.x + dx * z, y - 30 * z);
+          ctx.lineTo(s.x + dx * z, y - 80 * z);
+        }
+        ctx.stroke();
+        break;
+      }
+      case 'wave': {
+        // A crescent of force rolling out along the ground.
+        const dx = Math.cos(f.ang ?? 0);
+        const dy = Math.sin(f.ang ?? 0);
+        const sa = Math.atan2(dx + dy, dx - dy);
+        for (let i = 0; i < 3; i++) {
+          const kk = Math.max(0, k - i * 0.12);
+          if (kk <= 0) continue;
+          const r = (f.r ?? 4) * unitX * 1.25 * kk;
+          ctx.strokeStyle = `rgba(232,208,150,${(0.85 - i * 0.2) * (1 - k)})`;
+          ctx.lineWidth = (7 - i * 2) * z * (1 - k) + 1;
+          ctx.beginPath();
+          ctx.ellipse(s.x, s.y, r, r * 0.5, 0, sa - 0.75, sa + 0.75);
+          ctx.stroke();
+        }
+        break;
+      }
+      case 'flame': {
+        // A tongue of fire from a bellows: puffs that swell as they travel.
+        const dx = Math.cos(f.ang ?? 0);
+        const dy = Math.sin(f.ang ?? 0);
+        const reach = f.r ?? 3;
+        for (let i = 0; i < 7; i++) {
+          const kk = (k * 0.7 + i / 7) % 1;
+          const d = 0.5 + kk * (reach - 0.4);
+          const side = Math.sin(i * 2.4 + f.x * 7) * 0.5 * kk;
+          const q = this.cam.toScreen(f.x + dx * d - dy * side, f.y + dy * d + dx * side);
+          const r = (5 + kk * 13) * z;
+          const g = ctx.createRadialGradient(q.x, q.y - 16 * z, 0, q.x, q.y - 16 * z, r);
+          const al = (1 - kk) * (1 - k * 0.6);
+          g.addColorStop(0, `rgba(255,236,160,${al})`);
+          g.addColorStop(0.5, `rgba(255,120,30,${al * 0.7})`);
+          g.addColorStop(1, 'rgba(255,40,0,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(q.x, q.y - 16 * z, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        lights.push({ x: f.x + dx * reach * 0.5, y: f.y + dy * reach * 0.5, r: 3, a: 0.5 * (1 - k) });
+        break;
+      }
+      case 'warmth': {
+        // The furnace's reach: a warm ring breathing out to the edge of where it mends.
+        const r = (f.r ?? 4) * unitX * 1.4 * (0.35 + 0.65 * k);
+        ctx.strokeStyle = `rgba(255,150,60,${0.5 * (1 - k)})`;
+        ctx.lineWidth = 3 * z;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, r, r * 0.5, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(255,120,40,${0.07 * (1 - k)})`;
+        ctx.fill();
         break;
       }
       case 'whirl': {

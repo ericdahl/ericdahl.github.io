@@ -101,6 +101,17 @@ function paint(ctx: CanvasRenderingContext2D, b: BaseItem, w: number, h: number)
               ctx.fill();
             }
           } else {
+            if (b.twoHanded) {
+              // Hammers: a square head across the haft.
+              ctx.fillStyle = b.id === 'obsidian_maul' ? '#3a3440' : m;
+              ctx.fillRect(-W * 0.36, -L / 2 + 1, W * 0.72, L * 0.2);
+              ctx.fillStyle = 'rgba(255,255,255,0.25)';
+              ctx.fillRect(-W * 0.36, -L / 2 + 1, W * 0.72, 3);
+              ctx.fillStyle = 'rgba(0,0,0,0.35)';
+              ctx.fillRect(-3, -L / 2 + 1, 6, L * 0.2);
+              ctx.restore();
+              break;
+            }
             ctx.beginPath();
             ctx.arc(0, -L / 2 + 8, b.id === 'club' ? 6 : 8, 0, Math.PI * 2);
             ctx.fill();

@@ -12,9 +12,10 @@ const PLAN: Record<ClassId, string[]> = {
   reaver: ['bash', 'iron_skin', 'bash', 'bash', 'bash', 'weapon_mastery', 'war_cry', 'weapon_mastery', 'iron_skin', 'weapon_mastery', 'frenzy', 'frenzy', 'frenzy', 'frenzy', 'frenzy', 'weapon_mastery', 'frenzy', 'frenzy'],
   arcanist: ['fire_bolt', 'fire_bolt', 'fire_bolt', 'fire_bolt', 'ice_bolt', 'frost_shell', 'fire_bolt', 'fire_bolt', 'fire_bolt', 'fire_bolt', 'teleport', 'fire_bolt', 'fire_bolt', 'fire_bolt', 'fire_bolt', 'fire_bolt', 'fireball', 'fireball', 'fireball'],
   necromancer: ['raise_skeleton', 'raise_skeleton', 'bone_shards', 'raise_skeleton', 'frailty', 'skeletal_mastery', 'skeletal_mastery', 'raise_skeleton', 'skeletal_mastery', 'bone_ward', 'raise_skeleton', 'grave_golem', 'skeletal_mastery', 'raise_skeleton', 'bone_shards', 'skeletal_mastery', 'raise_skeleton', 'corpse_burst', 'bone_lance', 'bone_lance', 'bone_lance'],
+  forgewright: ['ballista', 'temper', 'sunder', 'sunder', 'slag_burst', 'anvil_drop', 'sunder', 'temper', 'ballista', 'sunder', 'shockwave', 'brass_sentinel', 'shockwave', 'bellows', 'shockwave', 'gearwork', 'furnace', 'shockwave', 'slag_burst', 'white_heat', 'shockwave', 'gearwork', 'earthshaker', 'earthshaker', 'temper'],
   huntress: ['power_shot', 'critical_eye', 'power_shot', 'power_shot', 'power_shot', 'multishot', 'multishot', 'multishot', 'multishot', 'multishot', 'evade', 'multishot', 'multishot', 'multishot', 'multishot', 'multishot', 'strafe', 'strafe'],
 };
-const MAIN: Record<ClassId, string[]> = { reaver: ['frenzy', 'bash'], arcanist: ['fireball', 'fire_bolt'], huntress: ['multishot', 'power_shot'], necromancer: ['bone_lance', 'bone_shards'] };
+const MAIN: Record<ClassId, string[]> = { reaver: ['frenzy', 'bash'], arcanist: ['fireball', 'fire_bolt'], huntress: ['multishot', 'power_shot'], necromancer: ['bone_lance', 'bone_shards'], forgewright: ['shockwave', 'sunder'] };
 
 function score(w: World, it: Item): number {
   const b = baseOf(it);
@@ -29,7 +30,7 @@ function score(w: World, it: Item): number {
   if (b.kind === 'weapon') {
     const want = c.classId === 'huntress' ? 'bow' : c.classId === 'arcanist' ? 'staff' : null;
     if (want === 'bow' && b.cat !== 'bow') return -1;
-    if (c.classId === 'reaver' && (b.cat === 'bow' || b.cat === 'wand' || b.cat === 'staff')) return -1;
+    if ((c.classId === 'reaver' || c.classId === 'forgewright') && (b.cat === 'bow' || b.cat === 'wand' || b.cat === 'staff')) return -1;
     if (c.classId === 'arcanist' || c.classId === 'necromancer') return after.skillBonus - before.skillBonus + (after.maxLife - before.maxLife) / 20;
     return (after.minDmg + after.maxDmg) * after.attackSpeed - (before.minDmg + before.maxDmg) * before.attackSpeed;
   }
@@ -91,6 +92,24 @@ function emberThink(w: World, t: number, seek: { since: number; restUntil: numbe
 export let DEBUG: ((w: World, t: number) => void) | undefined;
 export const setDebug = (f: typeof DEBUG) => (DEBUG = f);
 
+/** Keep the workshop running: vent Heat before it burns, keep the sentinel wound and turrets up, light the furnace when hurt. */
+function forgeThink(w: World) {
+  const c = w.char;
+  const p = w.player;
+  const has = (id: string) => (c.skills[id] ?? 0) > 0 && SKILL_BY_ID[id].mana(c.skills[id]) <= p.mana;
+  const near = (r: number) => w.area.monsters.find((m) => !m.dead && !m.sub && Math.hypot(m.x - p.x, m.y - p.y) < r);
+  const up = (id: string) => w.constructCount(id);
+  if (c.skills.slag_burst && (p.overheat || p.heat >= 80) && near(4)) return w.cmdSkill('slag_burst', p.x, p.y);
+  if (has('brass_sentinel') && !up('brass_sentinel')!.alive) return w.cmdAutoSkill('brass_sentinel');
+  if (!near(9)) return;
+  if (has('ballista') && up('ballista')!.alive < up('ballista')!.max) return w.cmdAutoSkill('ballista');
+  if (has('furnace') && !up('furnace')!.alive && p.life < w.stats.maxLife * 0.6) return w.cmdAutoSkill('furnace');
+  if (has('bellows') && !up('bellows')!.alive && near(4)) return w.cmdAutoSkill('bellows');
+  const boss = w.area.monsters.find((m) => !m.dead && m.superId && Math.hypot(m.x - p.x, m.y - p.y) < 8);
+  if (boss && has('white_heat') && !p.buffs.white_heat && !p.overheat) return w.cmdSkill('white_heat', p.x, p.y);
+  if (boss && has('anvil_drop') && p.mana > 20) w.cmdSkill('anvil_drop', boss.x, boss.y, boss.id);
+}
+
 export interface AreaReport {
   area: string;
   enterLevel: number;
@@ -142,6 +161,7 @@ export function playAct(classId: ClassId, seed: number, maxPerArea = 900, route 
         while (c.statPoints > 0) {
           const st = computeStats(c);
           if (classId === 'reaver') allocStat(c, st.str < 60 ? 'str' : 'vit');
+          else if (classId === 'forgewright') allocStat(c, st.str < 75 ? 'str' : 'vit');
           else if (classId === 'huntress') allocStat(c, st.dex < 70 ? 'dex' : 'vit');
           else allocStat(c, c.alloc.vit <= c.alloc.ene * 2 ? 'vit' : 'ene');
         }
@@ -159,6 +179,7 @@ export function playAct(classId: ClassId, seed: number, maxPerArea = 900, route 
         }
         if (c.skills.frost_shell && !p.buffs.frost_shell && p.mana > 20) w.cmdSkill('frost_shell', p.x, p.y);
         if (classId === 'necromancer' && !p.action) necroThink(w);
+        if (classId === 'forgewright' && !p.action) forgeThink(w);
         // Unstick: if we have not moved for a while, wander.
         if (Math.hypot(p.x - lastPos.x, p.y - lastPos.y) > 0.5) lastPos = { x: p.x, y: p.y, t };
       }
