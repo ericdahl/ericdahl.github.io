@@ -50,6 +50,12 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     desc: 'A pale scholar of the grave. Raises the dead as servants, curses foes and shatters them with bone.',
     start: ['yew_wand'], starter: 'bone_shards',
   },
+  forgewright: {
+    id: 'forgewright', name: 'Forgewright', str: 28, dex: 18, vit: 24, ene: 15, life: 55, lifePerLvl: 2, lifePerVit: 3.5,
+    mana: 18, manaPerLvl: 1.5, manaPerEne: 1.5, arBonus: 15, castTime: 0.55, color: '#c8782a',
+    desc: 'A smith-warden of the old forges. Swings a great hammer, builds turrets and golems mid-fight, and runs hot: Heat makes every blow burn, until it burns the smith.',
+    start: ['sledge'], starter: 'sunder',
+  },
 };
 
 export const SAVE_VERSION = 2;
@@ -343,7 +349,7 @@ export function computeStats(c: Character, buffs: Buffs = {}): Stats {
   const frw = dimin(g('frw') + (buffs.frw ?? 0), 150);
   const penalty = resistPenalty(c.difficulty);
   const allRes = g('allRes');
-  const r = (k: StatKey) => Math.min(75, g(k) + allRes - penalty);
+  const r = (k: StatKey) => Math.min(75, g(k) + allRes - penalty + (k === 'fireRes' ? (p('temper')?.pct2 ?? 0) : 0));
 
   let block = 0;
   const off = c.equipment.offhand;

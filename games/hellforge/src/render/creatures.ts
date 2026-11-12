@@ -71,6 +71,10 @@ export function drawMonsterShape(ctx: CanvasRenderingContext2D, shape: string, c
       case 'eater': eater(ctx, color, s); break;
       case 'phylactery': phylactery(ctx, color, s); break;
       case 'frostwright': frostwright(ctx, color, s); break;
+      case 'ballista': ballista(ctx, color, s); break;
+      case 'bellows': bellows(ctx, color, s); break;
+      case 'sentinel': sentinel(ctx, color, s); break;
+      case 'furnace': furnace(ctx, color, s); break;
     }
   } finally {
     ctx.restore();
@@ -2228,4 +2232,260 @@ function mother(ctx: CanvasRenderingContext2D, c: string, s: S, unlit = false) {
   limb(ctx, [9, -35, 15 + atk * 3, -29 - atk * 6, hx, hy2], 4.4, shade(c, -0.05), 1.3);
   claws(ctx, hx, hy2, -0.6 - atk, 4.6, '#2a1a10');
   glow(ctx, hx, hy2, 9, F.glow, 0.3 + atk * 0.5);
+}
+
+// ------------------------------------------------------------------ Forgewright constructs
+
+const BRASS = '#c89a3c';
+const IRON = '#5a5e66';
+
+/** A riveted plate: a polygon with a metal gradient and an ink edge. */
+function plate(ctx: CanvasRenderingContext2D, pts: number[], col: string, w = 0.9) {
+  poly(ctx, pts);
+  const xs = pts.filter((_, i) => i % 2 === 0);
+  const ys = pts.filter((_, i) => i % 2 === 1);
+  fillInk(ctx, lin(ctx, Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), col, 0.4, -0.45), w);
+}
+
+function rivets(ctx: CanvasRenderingContext2D, pts: number[], c = '#f0d890') {
+  ctx.fillStyle = c;
+  for (let i = 0; i < pts.length; i += 2) {
+    circle(ctx, pts[i], pts[i + 1], 0.6);
+    ctx.fill();
+  }
+}
+
+function tripod(ctx: CanvasRenderingContext2D, top: number, c: string) {
+  limb(ctx, [0, top, -9, -1], 2, shade(c, -0.25));
+  limb(ctx, [0, top, 9, -1], 2, c);
+  limb(ctx, [0, top, 1, -4], 2.2, shade(c, -0.1));
+}
+
+/** Ballista turret: a crossbow on a tripod. The arms flex and the string snaps forward as it shoots. */
+function ballista(ctx: CanvasRenderingContext2D, c: string, s: S) {
+  const { atk, t } = s;
+  tripod(ctx, -17, c);
+  // Swivel
+  circle(ctx, 0, -17, 3);
+  fillInk(ctx, rad(ctx, 0, -17, 3.2, BRASS), 0.8);
+  ctx.save();
+  ctx.translate(0, -20);
+  ctx.rotate(-0.12 + (art.dead ? 0.5 : Math.sin(t * 1.3) * 0.02));
+  // Stock
+  plate(ctx, [-10, -2, 13, -1.6, 13, 1.6, -10, 2.4], shade(c, 0.05));
+  // Bow arms, seen edge on: they spring forward on the shot.
+  const flex = 1 - atk;
+  curve(ctx, () => {
+    ctx.beginPath();
+    ctx.moveTo(9 - flex * 3, -11);
+    ctx.quadraticCurveTo(13, -5, 11, 0);
+    ctx.quadraticCurveTo(13, 5, 9 - flex * 3, 11);
+  }, 2.2, lin(ctx, 8, -11, 12, 11, IRON, 0.5, -0.3));
+  // String
+  ctx.strokeStyle = alpha('#e8e0c8', 0.9);
+  ctx.lineWidth = 0.6;
+  const sx = -6 * flex + 6 * (1 - flex);
+  ctx.beginPath();
+  ctx.moveTo(9 - flex * 3, -11);
+  ctx.lineTo(sx, 0);
+  ctx.lineTo(9 - flex * 3, 11);
+  ctx.stroke();
+  // Bolt on the rail while it is drawn.
+  if (atk < 0.3 && !art.dead) {
+    limb(ctx, [-5, 0, 15, 0], 1.1, '#d8d0b8', 0.8);
+    poly(ctx, [15, -1.6, 19, 0, 15, 1.6]);
+    fillInk(ctx, '#c8ccd4', 0.6);
+  }
+  // Winch and brass fittings
+  circle(ctx, -8, 0, 2.6);
+  fillInk(ctx, rad(ctx, -8, 0, 2.8, BRASS), 0.7);
+  ctx.strokeStyle = shade(BRASS, -0.45);
+  ctx.lineWidth = 0.7;
+  const wa = t * 0.6 + atk * 5;
+  ctx.beginPath();
+  ctx.moveTo(-8 - Math.cos(wa) * 2.4, -Math.sin(wa) * 2.4);
+  ctx.lineTo(-8 + Math.cos(wa) * 2.4, Math.sin(wa) * 2.4);
+  ctx.stroke();
+  rivets(ctx, [-3, -0.6, 2, -0.5, 7, -0.4]);
+  ctx.restore();
+}
+
+/** Bellows turret: a leather bellows on legs with a hooded brass nozzle that glows as it breathes. */
+function bellows(ctx: CanvasRenderingContext2D, c: string, s: S) {
+  const { atk, t } = s;
+  const blow = art.dead ? 0 : atk > 0 ? atk : 0.15 + 0.15 * Math.sin(t * 2.5);
+  tripod(ctx, -15, IRON);
+  ctx.save();
+  ctx.translate(0, -20);
+  // Lower board
+  plate(ctx, [-12, 2, 6, 3, 6, 5, -12, 5], shade('#6a4a2a', -0.1));
+  // Pleated leather, squeezing shut as it blows.
+  const open = 9 - blow * 5;
+  for (let i = 0; i < 4; i++) {
+    const y0 = 2 - (open * i) / 4;
+    const y1 = 2 - (open * (i + 1)) / 4;
+    plate(ctx, [-12, y0, 5, y0 + 0.4, 4, y1 + 0.4, -11 + i * 0.4, y1], i % 2 ? shade(c, -0.18) : c, 0.6);
+  }
+  // Upper board and handle
+  plate(ctx, [-12, 2 - open - 2, 6, 2 - open - 0.6, 6, 2 - open + 1, -12, 2 - open], '#6a4a2a');
+  limb(ctx, [-12, 2 - open - 1, -16, 2 - open - 2.5], 1.6, '#6a4a2a');
+  // Nozzle
+  plate(ctx, [5, -3, 13, -1.4, 15, 1.8, 13, 4.6, 5, 5.4], BRASS);
+  rivets(ctx, [7, -1.4, 7, 4, 11, 1.4]);
+  ctx.fillStyle = art.dead ? '#1a1410' : mix('#3a1408', '#ffd070', Math.min(1, blow * 1.3));
+  ellipse(ctx, 14.6, 1.7, 1.2, 2.4);
+  ctx.fill();
+  if (!art.dead) {
+    glow(ctx, 15, 1.6, 6 + blow * 9, '#ff7a20', 0.35 + blow * 0.5);
+    if (atk > 0) {
+      for (let i = 0; i < 3; i++) {
+        const k = (t * 3 + i / 3) % 1;
+        ctx.fillStyle = alpha(i % 2 ? '#ffd070' : '#ff7a20', 0.8 * (1 - k));
+        ellipse(ctx, 16 + k * 12, 1.6 + Math.sin(k * 9 + i) * 2, 2.6 - k * 1.6, 1.8 - k);
+        ctx.fill();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+/** Brass Sentinel: a wound-up golem of riveted plate, with a furnace grille for a chest and a hammer for a fist. */
+function sentinel(ctx: CanvasRenderingContext2D, c: string, s: S) {
+  const { sw, atk, t } = s;
+  const fire = '#ff9a3a';
+  // Legs: piston shins and block feet.
+  for (const [x, k, sh] of [[-5, sw, -0.25], [4, -sw, -0.05]] as const) {
+    plate(ctx, [x - 3 + k * 2, -17, x + 3 + k * 2, -17, x + 2.4 + k * 3, -4, x - 2.4 + k * 3, -4], shade(c, sh));
+    plate(ctx, [x - 3.4 + k * 3, -4, x + 4.6 + k * 3, -4, x + 5.4 + k * 3, 0, x - 3.4 + k * 3, 0], shade(IRON, sh));
+    circle(ctx, x + k * 2, -17, 2.2);
+    fillInk(ctx, rad(ctx, x + k * 2, -17, 2.4, shade(c, 0.1)), 0.6);
+  }
+  // Far arm
+  plate(ctx, [-11, -37, -15, -35, -16, -24, -12 + sw, -20, -9, -27], shade(c, -0.3));
+  // Wind-up key turning in its back.
+  {
+    const ka = art.dead ? 0.4 : t * 2.2;
+    limb(ctx, [-10, -31, -15, -31], 1.6, IRON);
+    const kw = Math.abs(Math.cos(ka)) * 3.6 + 0.6;
+    ellipse(ctx, -16.5, -31, 1.4, kw);
+    fillInk(ctx, lin(ctx, -18, -34, -15, -28, BRASS, 0.5, -0.3), 0.7);
+  }
+  // Barrel torso
+  plate(ctx, [-10, -40, 0, -43, 11, -40, 12, -27, 8, -17, -8, -17, -11, -27], c, 1);
+  ctx.strokeStyle = alpha('#000000', 0.35);
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(-10.5, -34);
+  ctx.quadraticCurveTo(0, -36.5, 11.5, -34);
+  ctx.moveTo(-10, -22);
+  ctx.quadraticCurveTo(0, -20, 10, -22);
+  ctx.stroke();
+  rivets(ctx, [-8, -37.5, -3, -39.6, 8, -37.6, -8, -20, 7, -19.6]);
+  // Furnace grille: the fire inside shows through the bars.
+  roundRect(ctx, -1.5, -32, 9, 8, 1.2);
+  ctx.fillStyle = art.dead ? '#17110c' : mix('#a03008', fire, 0.5 + 0.4 * Math.sin(t * 5));
+  ctx.fill();
+  ink(ctx, 0.8);
+  ctx.strokeStyle = shade(c, -0.5);
+  ctx.lineWidth = 0.9;
+  for (let i = 1; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-1.5 + i * 2.25, -32);
+    ctx.lineTo(-1.5 + i * 2.25, -24);
+    ctx.stroke();
+  }
+  if (!art.dead) glow(ctx, 3, -28, 11, fire, 0.4 + 0.15 * Math.sin(t * 5));
+  // Head: a bucket helm with one slit, and a stubby chimney.
+  plate(ctx, [-1, -42, 9, -43, 10, -49, 5, -52, -1, -50], shade(c, 0.08));
+  plate(ctx, [0, -51, 3, -52, 3, -56, 0, -55.4], IRON, 0.7);
+  if (!art.dead) {
+    for (let i = 0; i < 2; i++) {
+      const k = (t * 0.8 + i * 0.5) % 1;
+      ctx.fillStyle = alpha('#c8c0b8', 0.35 * (1 - k));
+      ellipse(ctx, 1.5 - k * 4, -57 - k * 9, 1.5 + k * 2.5, 1.2 + k * 2);
+      ctx.fill();
+    }
+  }
+  ctx.fillStyle = '#17110c';
+  ctx.fillRect(3.4, -47.6, 6.2, 1.8);
+  if (!art.dead) slitEyes(ctx, 6.4, -46.7, 2.6, fire, 1.8);
+  // Hammer arm: raises and comes down with the attack.
+  const hx = 16 + atk * 5;
+  const hy = -22 - atk * 19;
+  plate(ctx, [9, -39, 14, -39, hx + 2, hy - 2, hx - 3, hy + 1], shade(c, -0.05));
+  circle(ctx, 11.5, -38.5, 3.2);
+  fillInk(ctx, rad(ctx, 11.5, -38.5, 3.4, shade(c, 0.12)), 0.7);
+  plate(ctx, [hx - 5, hy - 4, hx + 5, hy - 5, hx + 6, hy + 4, hx - 4, hy + 5], IRON);
+  ctx.fillStyle = alpha('#ffffff', 0.25);
+  ctx.fillRect(hx - 4, hy - 3.6, 8.6, 1.2);
+}
+
+/** Furnace: a squat brick stove with a glowing mouth, bellows-pipe chimney and heat rolling off it. */
+function furnace(ctx: CanvasRenderingContext2D, c: string, s: S) {
+  const { t } = s;
+  const fire = '#ff8a30';
+  const p = art.dead ? 0 : 0.6 + 0.3 * Math.sin(t * 4) + 0.1 * Math.sin(t * 11);
+  // Feet
+  plate(ctx, [-12, -3, -7, -3, -6, 0, -13, 0], IRON, 0.7);
+  plate(ctx, [7, -3, 12, -3, 13, 0, 6, 0], IRON, 0.7);
+  // Body: a domed barrel of fire-brick banded in brass.
+  ctx.beginPath();
+  ctx.moveTo(-13, -3);
+  ctx.lineTo(-13, -19);
+  ctx.quadraticCurveTo(-12, -31, 0, -32);
+  ctx.quadraticCurveTo(12, -31, 13, -19);
+  ctx.lineTo(13, -3);
+  ctx.closePath();
+  fillInk(ctx, lin(ctx, -13, -30, 13, -3, c, 0.3, -0.5), 1.1);
+  ctx.strokeStyle = alpha('#000000', 0.3);
+  ctx.lineWidth = 0.6;
+  for (let r = 0; r < 4; r++) {
+    const y = -7 - r * 5.5;
+    ctx.beginPath();
+    ctx.moveTo(-12.6, y);
+    ctx.lineTo(12.6, y);
+    for (let x = -9 + (r % 2) * 3; x < 12; x += 6) {
+      ctx.moveTo(x, y);
+      ctx.lineTo(x, y - 5.5);
+    }
+    ctx.stroke();
+  }
+  plate(ctx, [-13.6, -21, 13.6, -21, 13.6, -18.6, -13.6, -18.6], BRASS, 0.7);
+  rivets(ctx, [-10, -19.8, -5, -19.8, 5, -19.8, 10, -19.8]);
+  // Mouth: an arched door standing open on the coals.
+  ctx.beginPath();
+  ctx.moveTo(-6, -4);
+  ctx.lineTo(-6, -11);
+  ctx.quadraticCurveTo(0, -17.5, 6, -11);
+  ctx.lineTo(6, -4);
+  ctx.closePath();
+  ctx.fillStyle = art.dead ? '#120c08' : rad(ctx, 0, -6, 9, mix('#c03808', '#ffe090', p), 0.3, -0.5);
+  ctx.fill();
+  ink(ctx, 1);
+  if (!art.dead) {
+    ctx.fillStyle = alpha('#fff0b0', 0.8);
+    for (let i = 0; i < 3; i++) {
+      const fx = -3.5 + i * 3.5;
+      const fh = 4 + 2.5 * Math.sin(t * 9 + i * 2);
+      poly(ctx, [fx - 1.6, -4.5, fx, -4.5 - fh, fx + 1.6, -4.5]);
+      ctx.fill();
+    }
+    glow(ctx, 0, -8, 20, fire, 0.35 + 0.25 * p);
+  }
+  // Chimney with a brass collar, and smoke.
+  plate(ctx, [-9, -29, -4, -31, -4, -41, -9, -40], IRON, 0.8);
+  plate(ctx, [-10, -40, -3, -41.4, -3, -39, -10, -37.8], BRASS, 0.6);
+  if (!art.dead) {
+    for (let i = 0; i < 3; i++) {
+      const k = (t * 0.5 + i / 3) % 1;
+      ctx.fillStyle = alpha('#b8b0a8', 0.4 * (1 - k));
+      ellipse(ctx, -6.5 + Math.sin(k * 5 + i) * 2.5, -43 - k * 16, 2 + k * 3.5, 1.6 + k * 2.6);
+      ctx.fill();
+    }
+    // A hammered-brass heart on the door plate: this one mends.
+    ctx.fillStyle = alpha('#ffd890', 0.9);
+    ctx.font = '5px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('♥', 7.5, -24);
+  }
 }

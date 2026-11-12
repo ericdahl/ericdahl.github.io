@@ -4,7 +4,7 @@ import {
   removeFromGrid, skillLevel, STASH_COLS, STASH_ROWS, takePotion, unequip, xpForLevel, xpMultiplier,
   type Buffs, type Character, type PotionPool, type Stats,
 } from './character';
-import { applyResists, hitChance, reducePhysical, roll, type Damage } from './combat';
+import { applyResists, hitChance, reducePhysical, roll, ZERO_DAMAGE, type Damage } from './combat';
 import {
   baseOf, buyPrice, displayName, gamble, gamblePrice, generateItem, itemColor, makeItem, potionFor, rollDrops,
   sellPrice, type DropTier, type Item, type ItemKind, type Slot,
@@ -51,7 +51,8 @@ export type FxKind =
   | 'blood' | 'spark' | 'nova' | 'explosion' | 'chain' | 'meteor_mark' | 'burn' | 'teleport' | 'levelup' | 'heal'
   | 'shrine' | 'text' | 'shout' | 'revive' | 'whirl' | 'slam' | 'portal_open' | 'raise' | 'curse'
   | 'shatter' | 'cinders' | 'zap' | 'gore' | 'shade_mark' | 'dust' | 'dash' | 'coins'
-  | 'frost_mark' | 'warm_mark' | 'snuff_mark' | 'kindle' | 'snuff' | 'toll_mark' | 'frost';
+  | 'frost_mark' | 'warm_mark' | 'snuff_mark' | 'kindle' | 'snuff' | 'toll_mark' | 'frost'
+  | 'anvil' | 'wave' | 'flame' | 'warmth';
 
 export interface Fx {
   kind: FxKind;
@@ -65,6 +66,8 @@ export interface Fx {
   pts?: Point[];
   /** Font size for floating text. */
   size?: number;
+  /** World-space direction, for effects that point somewhere. */
+  ang?: number;
 }
 
 /** How a monster died, for its death effect and corpse. */
@@ -111,8 +114,16 @@ export interface Monster {
   superId?: string;
   charge?: { dx: number; dy: number; t: number; hit: boolean };
   summoned?: boolean;
-  /** Set on the player's raised servants. */
-  ally?: 'skeleton' | 'golem';
+  /** Set on the player's servants: raised dead and built constructs. */
+  ally?: Ally;
+  /** A construct that stays where it was built. */
+  fixed?: boolean;
+  /** Seconds before a construct winds down. */
+  ttl?: number;
+  /** The skill numbers a construct was built with, and its synergy multiplier. */
+  built?: { pr: SkillParams; syn: number };
+  /** Armor cracked by Sunder: more physical damage taken. */
+  sunder?: { t: number; pct: number };
   /** Current opponent: a minion id for monsters, a monster id for minions. */
   foe?: number;
   curse?: { t: number; pct: number };
@@ -178,6 +189,18 @@ export const BRAZIER_RADIUS = 4.5;
 /** Seconds a full ember lasts in the cold with no fire near, and how long frostbite takes to set in once it is out. */
 export const EMBER_TIME = 60;
 export const FROST_TIME = 10;
+export type Ally = 'skeleton' | 'golem' | 'ballista' | 'bellows' | 'sentinel' | 'furnace';
+const ALLY_DEF: Record<Ally, string> = {
+  skeleton: 'raised_skeleton', golem: 'grave_golem', ballista: 'ballista_turret', bellows: 'bellows_turret', sentinel: 'brass_sentinel', furnace: 'furnace',
+};
+/** Which servant each Forgewright construct skill builds. */
+export const CONSTRUCT_OF: Record<string, Ally> = { ballista: 'ballista', bellows: 'bellows', brass_sentinel: 'sentinel', furnace: 'furnace' };
+
+/** Heat: where Slag Burst becomes usable, where it leaves burning ground, and where an overheated smith stops burning. */
+export const HEAT_MAX = 100;
+export const HEAT_VENT = 25;
+export const HEAT_SLAG = 75;
+const HEAT_COOLED = 60;
 
 export interface Projectile {
   id: number;
@@ -201,6 +224,8 @@ export interface Projectile {
   wobble?: boolean;
   hit: Set<number>;
   srcId?: number;
+  /** The construct that fired it, so its target can turn on it. */
+  servant?: Monster;
 }
 
 export interface GroundItem {
@@ -311,6 +336,9 @@ export interface Hazard {
   quiet?: boolean;
   /** Ice rather than fire: it chills, saps the ember, and gives no warmth. */
   cold?: boolean;
+  /** A falling anvil: lands with a slam and stuns. */
+  anvil?: boolean;
+  stun?: number;
 }
 
 export interface AreaState {
@@ -384,6 +412,10 @@ export interface PlayerState {
   poison: { dps: number; t: number };
   hurt: number;
   xpBonus: number;
+  /** The Forgewright's Heat, 0 to HEAT_MAX, seconds since it last rose, and whether it has boiled over. */
+  heat: number;
+  heatT: number;
+  overheat: boolean;
 }
 
 export interface Portal {
@@ -455,7 +487,7 @@ export class World {
     this.player = {
       x: 0, y: 0, life: 1, mana: 1, facing: Math.PI / 4, moving: false, walk: 0, path: [], pathT: 0, moveDir: null,
       intent: null, action: null, heal: [], buffs: {}, frenzy: { stacks: 0, t: 0 }, invuln: 0, dead: false, chill: 0,
-      poison: { dps: 0, t: 0 }, hurt: 0, xpBonus: 0,
+      poison: { dps: 0, t: 0 }, hurt: 0, xpBonus: 0, heat: 0, heatT: 0, overheat: false,
     };
     this.refreshStats();
     this.player.life = this.stats.maxLife;
@@ -572,6 +604,7 @@ export class World {
     if (p.shrine_armor) add('defPct', 100);
     if (p.shrine_combat) add('edPct', 80), add('ar', 150);
     if (p.shrine_haste) add('ias', 30), add('frw', 30);
+    if (p.white_heat) add('ias', p.white_heat.p.pct!);
     // A spree quickens the feet: each rank is worth a little more speed.
     if (this.streak.tier >= 0) add('frw', 5 * (this.streak.tier + 1));
     const fr = this.player.frenzy;
@@ -779,7 +812,8 @@ export class World {
     if (a.def.town) this.endSpree(true);
     // The ember is fed at every town fire, and anywhere the cold is not loose.
     if (!a.def.cold) (this.ember = 1), (this.frost = 0);
-    this.minions = this.minions.filter((mi) => !mi.dead);
+    // Turrets and furnaces are left behind; anything that walks comes along.
+    this.minions = this.minions.filter((mi) => !mi.dead && !mi.fixed);
     for (const mi of this.minions) this.placeMinion(mi);
     a.flow.update(p.x, p.y);
     this.markExplored(true);
@@ -880,7 +914,7 @@ export class World {
     const def = SKILL_BY_ID[skill];
     if (!def) return;
     const p = this.player;
-    const self = ['buff', 'nova', 'ring'].includes(def.kind) || def.id === 'grave_golem';
+    const self = ['buff', 'nova', 'ring', 'vent', 'quake'].includes(def.kind) || def.id === 'grave_golem';
     if (self) return this.cmdSkill(skill, p.x, p.y);
     if (def.kind === 'summon' || def.kind === 'corpse') {
       // Raise from the corpse nearest you; explode the corpse nearest your target.
@@ -888,7 +922,14 @@ export class World {
       const c = this.findCorpse(near.x, near.y, def.kind === 'corpse' ? 6 : 10);
       return this.cmdSkill(skill, c?.x ?? p.x, c?.y ?? p.y);
     }
-    const range = def.kind === 'teleport' ? 0 : this.isMeleeSkill(def) ? 5 : 11;
+    if (def.kind === 'construct') {
+      // Turrets go up a step toward the enemy, the sentinel between you and them, the furnace behind you.
+      const foe = this.autoTarget(10);
+      const dir = (foe ? Math.atan2(foe.y - p.y, foe.x - p.x) : p.moveDir ? Math.atan2(p.moveDir.y, p.moveDir.x) : p.facing) + (def.id === 'furnace' ? Math.PI : 0);
+      const dist = def.id === 'brass_sentinel' ? 1.6 : 1.2;
+      return this.cmdSkill(skill, p.x + Math.cos(dir) * dist, p.y + Math.sin(dir) * dist);
+    }
+    const range = def.kind === 'teleport' ? 0 : this.isMeleeSkill(def) ? 5 : def.kind === 'cone' ? 6 : 11;
     const target = range ? this.autoTarget(range) : null;
     if (target) return this.cmdSkill(skill, target.x, target.y, target.id);
     const dist = def.kind === 'teleport' || def.kind === 'leap' ? 6 : 4;
@@ -1534,6 +1575,8 @@ export class World {
         delete p.buffs[k];
         buffChanged = true;
         if (k === 'shrine_experience') p.xpBonus = 0;
+        // White Heat leaves the smith at the top of the gauge with nothing holding it back.
+        if (k === 'white_heat') this.boilOver();
       }
     }
     if (p.frenzy.stacks > 0) {
@@ -1544,6 +1587,7 @@ export class World {
       }
     }
     if (buffChanged) this.refreshStats();
+    if (this.char.classId === 'forgewright') this.updateHeat(dt);
 
     if (p.action) {
       this.updateAction(dt);
@@ -1671,7 +1715,7 @@ export class World {
       }
     }
     // Ranged skills need line of sight to their target, and short-ranged ones need to get close.
-    const castRange = def.kind === 'shards' ? 6.5 : def.kind === 'curse' ? 10 : Infinity;
+    const castRange = def.kind === 'shards' ? 6.5 : def.kind === 'curse' ? 10 : def.kind === 'anvil' ? 9 : def.kind === 'cone' ? 3.2 : Infinity;
     if (target && !melee && def.kind !== 'teleport' && (!lineOfSight(this.area.level, p, target) || Math.hypot(tx - p.x, ty - p.y) > castRange)) {
       p.pathT -= dt;
       if (p.pathT <= 0 || !p.path.length) this.repath(tx, ty);
@@ -1698,6 +1742,7 @@ export class World {
     if (def.id === 'raise_skeleton' || def.kind === 'corpse') {
       if (!this.findCorpse(tx, ty, 2.5) && !this.findCorpse(p.x, p.y, 10)) return this.msg('No corpse nearby', '#c8b890', 'corpse');
     }
+    if (def.kind === 'vent' && p.heat < HEAT_VENT) return this.msg('Not enough Heat', '#ff9a5a', 'heat');
     const cost = def.mana(lvl);
     if (p.mana < cost) {
       this.msg('Not enough mana', '#7f9fff', 'mana');
@@ -1732,7 +1777,7 @@ export class World {
       p.action = { ...base, kind: 'whirl', dur: d / 7, hitAt: 0, x: p.x + Math.cos(ang) * d, y: p.y + Math.sin(ang) * d, tick: 0 };
       return;
     }
-    if (def.kind === 'attack' || def.kind === 'multishot' || def.kind === 'strafe') {
+    if (def.kind === 'attack' || def.kind === 'multishot' || def.kind === 'strafe' || def.kind === 'cone' || def.kind === 'quake') {
       const bow = st.isBow && def.weapon !== 'melee';
       if (bow) {
         const dur = def.kind === 'strafe' ? attackDur * 2.2 : attackDur;
@@ -1843,12 +1888,49 @@ export class World {
     const p = this.player;
     const pr = def.params(lvl);
     const ang = Math.atan2(act.y - p.y, act.x - p.x);
+    if (act.kind === 'melee' && def.kind === 'cone') {
+      // Shockwave: everything in an arc in front of the hammer.
+      const wpr = this.withSynergy(def, pr);
+      const reach = pr.range!;
+      let landed = false;
+      for (const m of this.monstersNear(p.x, p.y, reach)) {
+        if (Math.abs(angleDiff(Math.atan2(m.y - p.y, m.x - p.x), ang)) > 0.7 || !lineOfSight(this.area.level, p, m)) continue;
+        landed = this.playerWeaponHit(m, def, wpr, { knock: 1.3 }) || landed;
+      }
+      this.fx({ kind: 'wave', x: p.x, y: p.y, dur: 0.45, r: reach, ang });
+      this.emit({ type: 'shake', amount: 4 });
+      this.sound('boom');
+      if (landed) this.gainHeat(12);
+      return;
+    }
+    if (act.kind === 'melee' && def.kind === 'quake') {
+      // Earthshaker: tremors that widen as they go. Whatever stands close is struck by every one.
+      const wpr = this.withSynergy(def, pr);
+      const a = this.area;
+      const n = pr.count!;
+      for (let i = 0; i < n; i++) {
+        this.addTimer(i * 0.26, () => {
+          if (this.area !== a || p.dead) return;
+          const r = (pr.radius! * (i + 1)) / n;
+          let landed = false;
+          for (const m of this.monstersNear(p.x, p.y, r)) landed = this.playerWeaponHit(m, def, wpr, { knock: 0.5, stun: pr.stun }) || landed;
+          this.fx({ kind: 'slam', x: p.x, y: p.y, dur: 0.5, r });
+          this.emit({ type: 'shake', amount: 4 + i * 2 });
+          this.sound('boom');
+          if (landed) this.gainHeat(7);
+        });
+      }
+      return;
+    }
     if (act.kind === 'melee') {
       const target = act.targetId !== undefined ? this.area.monsters.find((m) => m.id === act.targetId && !m.dead) : undefined;
       const victims = target ? [target] : this.monstersNear(p.x + Math.cos(ang) * 0.7, p.y + Math.sin(ang) * 0.7, 0.9).slice(0, 1);
       for (const m of victims) {
         if (Math.hypot(m.x - p.x, m.y - p.y) > m.def.radius + this.stats.range + 0.6) continue;
-        this.playerWeaponHit(m, def, pr, { knock: def.id === 'bash' ? 1.2 : 0 });
+        if (this.playerWeaponHit(m, def, pr, { knock: def.id === 'bash' ? 1.2 : 0 })) {
+          this.gainHeat(def.id === 'attack' ? 5 : 8);
+          if (def.id === 'sunder' && !m.dead) m.sunder = { t: pr.duration!, pct: pr.pct! };
+        }
       }
       return;
     }
@@ -1939,6 +2021,58 @@ export class World {
         this.sound('fire');
         break;
       }
+      case 'construct': {
+        const kind = CONSTRUCT_OF[def.id];
+        const l = this.area.level;
+        const ok = isWalkable(l, act.x, act.y) && Math.hypot(act.x - p.x, act.y - p.y) < 7 && lineOfSight(l, p, { x: act.x, y: act.y });
+        const spot = ok ? { x: act.x, y: act.y } : nearestFloor(l, { x: p.x + Math.cos(ang) * 1.2, y: p.y + Math.sin(ang) * 1.2 });
+        const at = ok ? spot : { x: spot.x + 0.5, y: spot.y + 0.5 };
+        // At the cap, the oldest one is taken apart for the new one.
+        const have = this.minions.filter((mi) => mi.ally === kind && !mi.dead);
+        while (have.length >= (pr.count ?? 1)) this.scrapConstruct(have.shift()!);
+        this.minions = this.minions.filter((mi) => !mi.dead);
+        const mi = this.raiseMinion(kind, at.x, at.y, pr, synergyBonus(def, this.char.skills));
+        mi.facing = ang;
+        this.sound('block');
+        break;
+      }
+      case 'anvil': {
+        const wpr = this.withSynergy(def, pr);
+        this.area.hazards.push({
+          x: act.x, y: act.y, t: 0, delay: 0.65, dur: 0, radius: pr.radius!, dmg: this.weaponDamage(def, wpr).dmg, owner: 'player',
+          burnDps: 0, srcLevel: this.char.level, fired: false, anvil: true, stun: pr.stun,
+        });
+        this.fx({ kind: 'anvil', x: act.x, y: act.y, dur: 0.65, r: pr.radius });
+        this.sound('swing');
+        break;
+      }
+      case 'vent': {
+        // Slag Burst: everything the smith has been holding in, all at once.
+        const k = Math.min(1, p.heat / HEAT_MAX);
+        const r = pr.radius! + 2 * k;
+        this.fx({ kind: 'explosion', x: p.x, y: p.y, dur: 0.55, r });
+        this.fx({ kind: 'shout', x: p.x, y: p.y, dur: 0.45, r, color: '#ff8a30' });
+        this.emit({ type: 'shake', amount: 3 + 6 * k });
+        this.emit({ type: 'flash', color: '#ff7a20', a: 0.12 + 0.14 * k });
+        this.sound('boom');
+        for (const m of this.monstersNear(p.x, p.y, r)) {
+          this.damageMonster(m, elemDamage('fire', roll(this.rng, pr.min!, pr.max!) * syn * k), { knock: { x: m.x - p.x, y: m.y - p.y, f: 0.6 } });
+        }
+        if (p.heat >= HEAT_SLAG) {
+          this.area.hazards.push({
+            x: p.x, y: p.y, t: 0, delay: 0, dur: pr.duration!, radius: r * 0.85, dmg: { ...ZERO_DAMAGE }, owner: 'player',
+            burnDps: ((pr.min! + pr.max!) / 2) * syn * 0.3, srcLevel: this.char.level, fired: true, quiet: true,
+          });
+        }
+        p.heat = 0;
+        p.heatT = 0;
+        p.overheat = false;
+        if (p.buffs.white_heat) {
+          delete p.buffs.white_heat;
+          this.refreshStats();
+        }
+        break;
+      }
       case 'bolts': {
         for (let i = 0; i < pr.count!; i++) {
           const a2 = ang + this.rng.range(-0.9, 0.9);
@@ -1993,9 +2127,13 @@ export class World {
       }
       case 'buff': {
         p.buffs[def.id] = { t: pr.duration!, p: pr };
-        const col = def.id === 'frost_shell' ? '#bfefff' : def.id === 'bone_ward' ? '#e8dcc0' : '#ffe080';
+        const col = def.id === 'frost_shell' ? '#bfefff' : def.id === 'bone_ward' ? '#e8dcc0' : def.id === 'white_heat' ? '#ffd8a0' : '#ffe080';
         this.fx({ kind: def.id === 'battle_shout' ? 'shout' : 'nova', x: p.x, y: p.y, dur: 0.6, r: 1.6, color: col });
-        this.sound(def.id === 'battle_shout' ? 'roar' : def.id === 'bone_ward' ? 'swing' : 'cold');
+        this.sound(def.id === 'battle_shout' ? 'roar' : def.id === 'bone_ward' ? 'swing' : def.id === 'white_heat' ? 'fire' : 'cold');
+        if (def.id === 'white_heat') {
+          p.heat = HEAT_MAX;
+          p.overheat = false;
+        }
         this.refreshStats();
         break;
       }
@@ -2032,14 +2170,70 @@ export class World {
     };
     if (def.id === 'frost_arrow') dmg.cold += roll(rng, pr.min!, pr.max!);
     if (def.id === 'exploding_arrow') dmg.fire += roll(rng, pr.min!, pr.max!);
+    // Temper: a hot smith's blows burn.
+    const heat = this.player.heat;
+    if (heat > 0 && !st.isBow) {
+      const tl = skillLevel(this.char, 'temper');
+      if (tl) dmg.fire += (phys * SKILL_BY_ID.temper.params(tl).pct! * heat) / (100 * HEAT_MAX);
+    }
     return { dmg, crit };
   }
 
-  private playerWeaponHit(m: Monster, def: SkillDef, pr: SkillParams, opts: { knock?: number }) {
+  /** A weapon skill's numbers with its synergies folded into the damage bonus. */
+  private withSynergy(def: SkillDef, pr: SkillParams): SkillParams {
+    const syn = synergyBonus(def, this.char.skills);
+    return syn === 1 ? pr : { ...pr, dmgPct: ((1 + (pr.dmgPct ?? 0) / 100) * syn - 1) * 100 };
+  }
+
+  // ---------------------------------------------------------------- heat
+
+  /** Hammer blows that land build Heat. At the top of the gauge the smith overheats and starts to burn. */
+  private gainHeat(n: number) {
+    const p = this.player;
+    if (this.char.classId !== 'forgewright' || p.buffs.white_heat) return;
+    p.heatT = 0;
+    p.heat = Math.min(HEAT_MAX, p.heat + n);
+    if (p.heat >= HEAT_MAX && !p.overheat) this.boilOver();
+  }
+
+  private boilOver() {
+    const p = this.player;
+    p.overheat = true;
+    p.heat = HEAT_MAX;
+    p.heatT = 0;
+    this.floatText(p.x, p.y, 'Overheated!', '#ff6a2a', 17);
+    this.msg(skillLevel(this.char, 'slag_burst') ? 'Overheated! Vent with Slag Burst.' : 'Overheated! Stop swinging and cool off.', '#ff8a4a', 'overheat');
+    this.sound('fire');
+  }
+
+  private updateHeat(dt: number) {
+    const p = this.player;
+    if (p.buffs.white_heat) {
+      p.heat = HEAT_MAX;
+      p.overheat = false;
+      return;
+    }
+    if (!p.heat && !p.overheat) return;
+    p.heatT += dt;
+    // Heat holds while the hammer is busy, then bleeds away. Town is cool.
+    if (this.inTown) p.heat = Math.max(0, p.heat - 40 * dt);
+    else if (p.heatT > 1.2) p.heat = Math.max(0, p.heat - 8 * dt);
+    if (!p.overheat) return;
+    if (p.heat < HEAT_COOLED) return void (p.overheat = false);
+    // Burning from the inside. Fire resistance only helps so much, and it never quite kills.
+    const burn = this.stats.maxLife * 0.03 * (1 - Math.max(0, this.stats.res.fire) / 200) * dt;
+    p.life = Math.max(1, p.life - burn);
+    if (Math.floor((p.heatT - dt) * 2.5) !== Math.floor(p.heatT * 2.5)) {
+      this.fx({ kind: 'burn', x: p.x + this.luck.range(-0.3, 0.3), y: p.y + this.luck.range(-0.3, 0.3), dur: 0.5 });
+      p.hurt = Math.max(p.hurt, 0.12);
+    }
+  }
+
+  private playerWeaponHit(m: Monster, def: SkillDef, pr: SkillParams, opts: { knock?: number; stun?: number }): boolean {
     const p = this.player;
     const { dmg, crit } = this.weaponDamage(def, pr);
     const hit = this.damageMonster(m, dmg, {
-      ar: this.stats.ar * (1 + (pr.arPct ?? 0) / 100), crit, leech: true,
+      ar: this.stats.ar * (1 + (pr.arPct ?? 0) / 100), crit, leech: true, stun: opts.stun,
       knock: opts.knock ? { x: m.x - p.x, y: m.y - p.y, f: opts.knock } : undefined,
     });
     if (hit) {
@@ -2054,6 +2248,7 @@ export class World {
     } else {
       this.sound('miss');
     }
+    return hit;
   }
 
   monstersNear(x: number, y: number, r: number): Monster[] {
@@ -2065,12 +2260,12 @@ export class World {
   spawnProjectile(o: {
     x: number; y: number; ang: number; speed: number; ttl: number; owner: 'player' | 'monster'; dmg: Damage; kind: string;
     radius: number; ar?: number; pierce?: boolean; explode?: number; chill?: number; chains?: Projectile['chains']; wobble?: boolean;
-    srcLevel: number; srcId?: number; sap?: number;
+    srcLevel: number; srcId?: number; sap?: number; servant?: Monster;
   }) {
     this.area.projectiles.push({
       id: this.id(), x: o.x + Math.cos(o.ang) * 0.3, y: o.y + Math.sin(o.ang) * 0.3, vx: Math.cos(o.ang) * o.speed, vy: Math.sin(o.ang) * o.speed,
       ttl: o.ttl, owner: o.owner, dmg: o.dmg, radius: o.radius, kind: o.kind, ar: o.ar, pierce: o.pierce, explode: o.explode,
-      chill: o.chill, chains: o.chains, wobble: o.wobble, hit: new Set(), srcLevel: o.srcLevel, srcId: o.srcId, sap: o.sap,
+      chill: o.chill, chains: o.chains, wobble: o.wobble, hit: new Set(), srcLevel: o.srcLevel, srcId: o.srcId, sap: o.sap, servant: o.servant,
     });
   }
 
@@ -2091,6 +2286,7 @@ export class World {
       return false;
     }
     if (m.curse && m.curse.t > 0 && d.phys > 0) d = { ...d, phys: d.phys * (1 + m.curse.pct / 100) };
+    if (m.sunder && m.sunder.t > 0 && d.phys > 0) d = { ...d, phys: d.phys * (1 + m.sunder.pct / 100) };
     // Struck by a servant: turn on it some of the time.
     if (o.minion && (m.foe === undefined || this.rng.chance(0.3))) m.foe = o.minion.id;
     let { total, poison } = applyResists(d, m.res);
@@ -2375,6 +2571,8 @@ export class World {
     this.ember = 1;
     this.frost = 0;
     p.frenzy = { stacks: 0, t: 0 };
+    p.heat = 0;
+    p.overheat = false;
     p.poison.t = 0;
     p.heal = [];
     this.refreshStats();
@@ -2434,6 +2632,7 @@ export class World {
       }
       if (m.flash > 0) m.flash -= dt;
       if (m.curse && m.curse.t > 0) m.curse.t -= dt;
+      if (m.sunder && m.sunder.t > 0) m.sunder.t -= dt;
       if (m.shieldT && (m.shieldT -= dt) <= 0) m.shield = m.shieldT = 0;
       if (m.invulnT && (m.invulnT -= dt) <= 0) m.invulnT = 0;
       if (m.burnT && (m.burnT -= dt) <= 0) m.burnT = 0;
@@ -2610,7 +2809,7 @@ export class World {
     let bd = Math.min(8, dp - 0.75);
     for (const mi of this.minions) {
       if (mi.dead) continue;
-      const d = Math.hypot(mi.x - m.x, mi.y - m.y) * (mi.ally === 'golem' ? 0.6 : 1);
+      const d = Math.hypot(mi.x - m.x, mi.y - m.y) * (mi.ally === 'golem' || mi.ally === 'sentinel' ? 0.6 : mi.ally === 'furnace' ? 1.3 : 1);
       if (d < bd) (bd = d), (best = mi);
     }
     m.foe = best?.id;
@@ -2653,9 +2852,11 @@ export class World {
         const push = (min - d) / 2;
         const ux = dx / d;
         const uy = dy / d;
-        this.moveEntity(a, -ux * push, -uy * push, a.def.radius);
-        this.moveEntity(b, ux * push, uy * push, b.def.radius);
+        // Whatever is bolted down stays put, and the other one gives all the way.
+        if (!a.fixed) this.moveEntity(a, -ux * push * (b.fixed ? 2 : 1), -uy * push * (b.fixed ? 2 : 1), a.def.radius);
+        if (!b.fixed) this.moveEntity(b, ux * push * (a.fixed ? 2 : 1), uy * push * (a.fixed ? 2 : 1), b.def.radius);
       }
+      if (a.fixed) continue;
       // Monsters do not stand inside the player.
       const dx = a.x - p.x;
       const dy = a.y - p.y;
@@ -3079,6 +3280,9 @@ export class World {
     const a = this.area;
     for (const o of a.objects) if (o.kind === 'brazier' && o.used && Math.hypot(o.x - x, o.y - y) <= BRAZIER_RADIUS) return 1;
     for (const h of a.hazards) if (h.fired && !h.cold && h.burnDps > 0 && Math.hypot(h.x - x, h.y - y) <= h.radius + 1) return 1;
+    // A Forgewright's furnace is a fire like any other, and a smith running hot is warm company.
+    for (const mi of this.minions) if (mi.ally === 'furnace' && !mi.dead && Math.hypot(mi.x - x, mi.y - y) <= mi.built!.pr.radius!) return 1;
+    if (this.player.heat >= HEAT_SLAG && Math.hypot(this.player.x - x, this.player.y - y) <= 1.5) return 0.5;
     for (const m of a.monsters) {
       if (m.dead || m.sub) continue;
       const hot = (m.burnT ?? 0) > 0 || (m.heat ?? 0) >= SLAG_MOLTEN || m.mods.includes('fireEnch');
@@ -3373,7 +3577,7 @@ export class World {
             pr.ttl = 0;
             break;
           }
-          const hit = this.damageMonster(m, pr.dmg, { ar: pr.ar, chill: pr.chill, leech: pr.ar !== undefined });
+          const hit = this.damageMonster(m, pr.dmg, { ar: pr.ar, chill: pr.chill, leech: pr.ar !== undefined && !pr.servant, minion: pr.servant });
           if (hit && pr.chains) this.chainLightning(m, pr.chains.n, pr.chains.dmg);
           if (hit && pr.ar !== undefined) this.sound('hit');
           if (!pr.pierce) {
@@ -3436,25 +3640,50 @@ export class World {
     return { alive: this.minions.filter((mi) => mi.ally === 'skeleton' && !mi.dead).length, max: SKILL_BY_ID.raise_skeleton.params(lvl).count! };
   }
 
-  private raiseMinion(kind: 'skeleton' | 'golem', x: number, y: number, pr: SkillParams): Monster {
-    const def = MONSTERS[kind === 'skeleton' ? 'raised_skeleton' : 'grave_golem'];
+  /** Living constructs of the kind a skill builds against its cap, or null if the skill is not learned or builds nothing. */
+  constructCount(skillId: string): { alive: number; max: number } | null {
+    const kind = CONSTRUCT_OF[skillId];
+    const lvl = kind ? skillLevel(this.char, skillId) : 0;
+    if (!lvl) return null;
+    return { alive: this.minions.filter((mi) => mi.ally === kind && !mi.dead).length, max: SKILL_BY_ID[skillId].params(lvl).count ?? 1 };
+  }
+
+  private scrapConstruct(mi: Monster) {
+    mi.dead = true;
+    mi.action = null;
+    this.fx({ kind: 'dust', x: mi.x, y: mi.y, dur: 0.5 });
+    this.fx({ kind: 'spark', x: mi.x, y: mi.y, dur: 0.5, color: '#e8b860' });
+  }
+
+  private raiseMinion(kind: Ally, x: number, y: number, pr: SkillParams, syn = 1): Monster {
+    const def = MONSTERS[ALLY_DEF[kind]];
     const lvl = this.char.level;
-    const ml = skillLevel(this.char, 'skeletal_mastery');
-    const mp = ml ? SKILL_BY_ID.skeletal_mastery.params(ml) : { pct: 0, pct2: 0 };
-    const dmgK = (1 + (pr.pct ?? 0) / 100) * (1 + (mp.pct ?? 0) / 100);
+    const undead = kind === 'skeleton' || kind === 'golem';
+    const mastery = undead ? 'skeletal_mastery' : 'gearwork';
+    const ml = skillLevel(this.char, mastery);
+    const mp = ml ? SKILL_BY_ID[mastery].params(ml) : { pct: 0, pct2: 0 };
+    const dmgK = (1 + (pr.pct ?? 0) / 100) * (1 + (mp.pct ?? 0) / 100) * syn;
     const lifeK = (1 + (pr.pct2 ?? 0) / 100) * (1 + (mp.pct2 ?? 0) / 100);
     const life = Math.round(baseLife(lvl) * def.lifeMul * lifeK);
     const dmg = baseDamage(lvl) * def.dmgMul * dmgK;
     const pos = isWalkable(this.area.level, x, y) ? { x, y } : { x: this.player.x, y: this.player.y };
     const mi: Monster = {
       id: this.id(), def, x: pos.x, y: pos.y, life, maxLife: life, level: lvl, dmgMin: Math.max(1, Math.round(dmg * 0.6)), dmgMax: Math.max(2, Math.round(dmg * 1.25)),
-      ar: Math.round(20 + lvl * 13), def_: Math.round(10 + lvl * 9 * (kind === 'golem' ? 1.5 : 1)), res: { phys: 0, fire: 0, cold: 0, light: 0, poison: 0, ...def.res },
+      ar: Math.round(20 + lvl * 13), def_: Math.round(10 + lvl * 9 * (kind === 'golem' || kind === 'sentinel' ? 1.5 : 1)), res: { phys: 0, fire: 0, cold: 0, light: 0, poison: 0, ...def.res },
       speed: def.speed, xp: 0, rarity: 'normal', name: def.name, mods: [], alert: true, homeX: pos.x, homeY: pos.y, wanderT: 0, wanderTo: null,
       atkCd: 0.4, action: null, abilityCd: 0, chill: 0, stun: 0, poison: { dps: 0, t: 0 }, fleeT: 0, knock: { x: 0, y: 0 }, dead: false, deadT: 0,
       packId: -1, facing: this.player.facing, walk: 0, flash: 0, revived: 0, ally: kind,
     };
+    if (!undead) {
+      mi.built = { pr, syn: syn * (1 + (mp.pct ?? 0) / 100) };
+      if (!def.speed) (mi.fixed = true), (mi.ttl = pr.duration);
+    }
     this.minions.push(mi);
-    this.fx({ kind: 'raise', x: pos.x, y: pos.y, dur: 0.8 });
+    if (undead) this.fx({ kind: 'raise', x: pos.x, y: pos.y, dur: 0.8 });
+    else {
+      this.fx({ kind: 'dust', x: pos.x, y: pos.y, dur: 0.5 });
+      this.fx({ kind: 'spark', x: pos.x, y: pos.y, dur: 0.5, color: '#ffd080' });
+    }
     return mi;
   }
 
@@ -3481,8 +3710,9 @@ export class World {
       mi.dead = true;
       mi.life = 0;
       mi.action = null;
-      this.fx({ kind: 'spark', x: mi.x, y: mi.y, dur: 0.5, color: '#e8e0c8' });
-      this.sound('death');
+      this.fx({ kind: 'spark', x: mi.x, y: mi.y, dur: 0.5, color: mi.built ? '#e8b860' : '#e8e0c8' });
+      if (mi.built) this.fx({ kind: 'dust', x: mi.x, y: mi.y, dur: 0.5 });
+      this.sound(mi.built ? 'thud' : 'death');
     }
   }
 
@@ -3498,6 +3728,14 @@ export class World {
       if (mi.knock.x || mi.knock.y) mi.knock = { x: 0, y: 0 };
       const slow = mi.chill > 0 ? 0.5 : 1;
       mi.atkCd -= dt * slow;
+      if (mi.ttl !== undefined && (mi.ttl -= dt) <= 0) {
+        this.scrapConstruct(mi);
+        continue;
+      }
+      if (mi.fixed) {
+        this.updateConstruct(mi, dt * slow, calm);
+        continue;
+      }
       const dp = Math.hypot(p.x - mi.x, p.y - mi.y);
       if (dp > 16) {
         this.placeMinion(mi);
@@ -3570,6 +3808,70 @@ export class World {
     this.minions = this.minions.filter((mi) => !mi.dead);
   }
 
+  /** Turrets and the furnace: they stay where they were built and do one job. */
+  private updateConstruct(mi: Monster, dt: number, calm: boolean) {
+    const p = this.player;
+    const l = this.area.level;
+    const b = mi.built!;
+    if (mi.action && (mi.action.t += dt) >= mi.action.dur) mi.action = null;
+    if (mi.ally === 'furnace') {
+      if (mi.atkCd > 0) return;
+      mi.atkCd = 0.5;
+      const r = b.pr.radius!;
+      const heal = b.pr.heal! * b.syn * 0.5;
+      mi.walk += 1;
+      if (mi.walk % 3 === 1) this.fx({ kind: 'warmth', x: mi.x, y: mi.y, dur: 1.4, r });
+      if (!p.dead && p.life < this.stats.maxLife && Math.hypot(p.x - mi.x, p.y - mi.y) <= r) {
+        p.life = Math.min(this.stats.maxLife, p.life + heal);
+        if (mi.walk % 2 === 0) this.fx({ kind: 'heal', x: p.x, y: p.y, dur: 0.5, color: '#ff9040' });
+      }
+      // Servants have a monster's life rather than a hero's, so they mend by proportion as well.
+      for (const o of this.minions) {
+        if (o === mi || o.dead || o.life >= o.maxLife || Math.hypot(o.x - mi.x, o.y - mi.y) > r) continue;
+        o.life = Math.min(o.maxLife, o.life + Math.max(heal, o.maxLife * 0.03));
+      }
+      return;
+    }
+    if (calm) return;
+    const range = b.pr.range ?? mi.def.range;
+    let foe = mi.foe !== undefined ? this.area.monsters.find((m) => m.id === mi.foe && !m.dead && !m.sub) : undefined;
+    if (foe && Math.hypot(foe.x - mi.x, foe.y - mi.y) > range + foe.def.radius) foe = undefined;
+    mi.wanderT -= dt;
+    if (!foe || mi.wanderT <= 0) {
+      mi.wanderT = 0.5;
+      let bd = range;
+      foe = undefined;
+      for (const m of this.area.monsters) {
+        if (m.dead || m.sub || Math.abs(m.x - mi.x) > range + 1 || Math.abs(m.y - mi.y) > range + 1) continue;
+        const d = Math.hypot(m.x - mi.x, m.y - mi.y) - m.def.radius;
+        if (d < bd && lineOfSight(l, mi, m)) (bd = d), (foe = m);
+      }
+    }
+    mi.foe = foe?.id;
+    if (!foe) return;
+    const ang = Math.atan2(foe.y - mi.y, foe.x - mi.x);
+    mi.facing = ang;
+    if (mi.atkCd > 0) return;
+    mi.atkCd = 1 / mi.def.attackRate;
+    if (mi.ally === 'ballista') {
+      mi.action = { t: 0, hitAt: 0, dur: 0.45, done: true, kind: 'shoot' };
+      this.spawnProjectile({
+        x: mi.x, y: mi.y, ang, speed: 17, ttl: range / 17 + 0.15, owner: 'player', dmg: elemDamage('phys', roll(this.rng, mi.dmgMin, mi.dmgMax)), kind: 'bolt',
+        radius: 0.3, srcLevel: mi.level, servant: mi,
+      });
+      if (Math.hypot(p.x - mi.x, p.y - mi.y) < 12) this.sound('bow');
+      return;
+    }
+    // Bellows: a tongue of flame over everything close in front of it.
+    mi.action = { t: 0, hitAt: 0, dur: 0.5, done: true, kind: 'cast' };
+    this.fx({ kind: 'flame', x: mi.x, y: mi.y, dur: 0.5, r: range, ang });
+    const perTick = mi.atkCd;
+    for (const m of this.monstersNear(mi.x, mi.y, range)) {
+      if (Math.abs(angleDiff(Math.atan2(m.y - mi.y, m.x - mi.x), ang)) > 0.75 || !lineOfSight(l, mi, m)) continue;
+      this.damageMonster(m, elemDamage('fire', roll(this.rng, b.pr.min!, b.pr.max!) * b.syn * perTick), { minion: mi });
+    }
+  }
+
   private chainLightning(from: Monster, n: number, dmg: Damage) {
     const hit = new Set<number>([from.id]);
     let cur: Monster = from;
@@ -3594,6 +3896,17 @@ export class World {
       h.t += dt;
       if (!h.fired && h.t >= h.delay) {
         h.fired = true;
+        if (h.anvil) {
+          this.fx({ kind: 'slam', x: h.x, y: h.y, dur: 0.5, r: h.radius });
+          this.fx({ kind: 'dust', x: h.x, y: h.y, dur: 0.6 });
+          this.emit({ type: 'shake', amount: 8 });
+          this.emit({ type: 'hitstop', t: 0.05 });
+          this.sound('boom');
+          let landed = false;
+          for (const m of this.monstersNear(h.x, h.y, h.radius)) landed = this.damageMonster(m, h.dmg, { stun: h.stun, leech: true }) || landed;
+          if (landed) this.gainHeat(10);
+          continue;
+        }
         this.fx(h.cold ? { kind: 'nova', x: h.x, y: h.y, dur: 0.45, r: h.radius, color: '#a8e8ff' } : { kind: 'explosion', x: h.x, y: h.y, dur: 0.6, r: h.radius });
         if (!h.quiet) {
           this.emit({ type: 'shake', amount: 7 });
