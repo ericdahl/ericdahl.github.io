@@ -222,6 +222,41 @@ export function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w
   ctx.closePath();
 }
 
+// ------------------------------------------------------------------ baking
+
+/** A figure rendered once to its own canvas, to be stamped instead of redrawn. */
+export interface Baked {
+  canvas: HTMLCanvasElement;
+  /** Half the canvas size: where the figure's origin sits in it. */
+  half: number;
+}
+
+/**
+ * Renders `draw` once into a canvas of its own, at the caller's current scale and rotation. Use it for figures that
+ * have stopped changing (corpses): stamping the result with drawBaked costs one image instead of dozens of paths.
+ * `reach` is how far the figure extends from its origin, in its own units.
+ */
+export function bake(ctx: CanvasRenderingContext2D, draw: (c: CanvasRenderingContext2D) => void, reach = 80): Baked {
+  const m = ctx.getTransform();
+  const s = Math.max(Math.hypot(m.a, m.b), Math.hypot(m.c, m.d));
+  const size = Math.max(2, Math.min(1024, Math.ceil(reach * 2 * s)));
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const c = canvas.getContext('2d')!;
+  c.setTransform(m.a, m.b, m.c, m.d, size / 2, size / 2);
+  draw(c);
+  return { canvas, half: size / 2 };
+}
+
+/** Stamps a baked figure at the caller's current origin. The caller's alpha applies; its scale was baked in. */
+export function drawBaked(ctx: CanvasRenderingContext2D, b: Baked) {
+  const m = ctx.getTransform();
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(b.canvas, m.e - b.half, m.f - b.half);
+  ctx.restore();
+}
+
 // ------------------------------------------------------------------ tinting
 
 let scratch: HTMLCanvasElement | null = null;

@@ -1,6 +1,13 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.11.1',
+    date: '2026-11-12',
+    notes: [
+      'Smoother on phones, most of all in long fights and on 120 Hz screens. Corpses no longer cost anything to keep on screen, the automap only redraws when you explore, and fast displays no longer draw every moment twice.',
+    ],
+  },
+  {
     version: '0.11.0',
     date: '2026-11-11',
     notes: [

@@ -365,7 +365,7 @@ button {
 .spree-n.pop { animation: spree-pop 0.22s ease-out; }
 .spree-t { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 2px; }
 .spree-bar { width: 96px; height: 3px; margin: 3px auto 0; background: rgba(0, 0, 0, 0.6); }
-.spree-fill { height: 100%; background: var(--spree); }
+.spree-fill { height: 100%; background: var(--spree); transform-origin: left; }
 @keyframes spree-pop { from { transform: scale(1.7); } to { transform: scale(1); } }
 
 .buffs {

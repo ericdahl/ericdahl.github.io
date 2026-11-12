@@ -280,6 +280,8 @@ export interface AreaState {
   hazards: Hazard[];
   fx: Fx[];
   explored: Uint8Array;
+  /** Goes up whenever a new tile is explored, so the automap knows when to redraw. */
+  exploredRev: number;
   flow: FlowField;
   /** Every monster here has been killed and the reward paid. */
   purged?: boolean;
@@ -534,7 +536,7 @@ export class World {
     const level = generateLevel(def.spec, rng);
     const a: AreaState = {
       def, level, monsters: [], ground: [], orbs: [], projectiles: [], objects: [], npcs: [], hazards: [], fx: [],
-      explored: new Uint8Array(level.w * level.h), flow: new FlowField(level, 26),
+      explored: new Uint8Array(level.w * level.h), exploredRev: 0, flow: new FlowField(level, 26),
     };
     for (const o of level.objects) {
       const obj: WorldObject = { id: this.id(), x: o.x + 0.5, y: o.y + 0.5, kind: o.kind, used: false };
@@ -1395,12 +1397,17 @@ export class World {
     const px = Math.floor(this.player.x);
     const py = Math.floor(this.player.y);
     if (!force && a.def.town) return;
+    let found = false;
     for (let y = py - r; y <= py + r; y++)
       for (let x = px - r; x <= px + r; x++) {
         if (x < 0 || y < 0 || x >= l.w || y >= l.h) continue;
-        if ((x - px) ** 2 + (y - py) ** 2 <= r * r) a.explored[y * l.w + x] = 1;
+        const i = y * l.w + x;
+        if (a.explored[i] || (x - px) ** 2 + (y - py) ** 2 > r * r) continue;
+        a.explored[i] = 1;
+        found = true;
       }
     if (a.def.town) a.explored.fill(1);
+    if (found) a.exploredRev++;
   }
 
   private updatePlayer(dt: number) {
