@@ -1,4 +1,4 @@
-import { AREA_BY_ID, areaAct, DIFFICULTY_LEVELS, QUEST_BY_ID, TOWN_OF_ACT, WAYPOINT_AREAS, type AreaDef } from './areas';
+import { AREA_BY_ID, areaAct, DIFFICULTY_LEVELS, QUEST_BY_ID, QUESTS, TOWN_OF_ACT, WAYPOINT_AREAS, type AreaDef } from './areas';
 import {
   addPotion, addToGrid, addToInventory, addXp, choosePotion, CLASSES, computeStats, equipFromInventory, INV_COLS, INV_ROWS,
   removeFromGrid, skillLevel, STASH_COLS, STASH_ROWS, takePotion, unequip, xpForLevel, xpMultiplier,
@@ -22,7 +22,7 @@ import type { StoryId } from './story';
 export type SoundId =
   | 'swing' | 'hit' | 'miss' | 'death' | 'hurt' | 'gold' | 'item' | 'unique' | 'potion' | 'levelup' | 'fire' | 'cold'
   | 'light' | 'bow' | 'portal' | 'nova' | 'block' | 'shrine' | 'chest' | 'boom' | 'nomana' | 'roar' | 'quest' | 'step' | 'thud' | 'rare'
-  | 'spree' | 'orb' | 'dodge' | 'jackpot' | 'cackle' | 'curse';
+  | 'spree' | 'orb' | 'dodge' | 'jackpot' | 'cackle' | 'curse' | 'bell' | 'kindle' | 'snuff';
 
 /** Seconds a ground item takes to bounce when it lands or refuses to be picked up. */
 export const LOOT_BOUNCE = 0.4;
@@ -50,7 +50,8 @@ export type GameEvent =
 export type FxKind =
   | 'blood' | 'spark' | 'nova' | 'explosion' | 'chain' | 'meteor_mark' | 'burn' | 'teleport' | 'levelup' | 'heal'
   | 'shrine' | 'text' | 'shout' | 'revive' | 'whirl' | 'slam' | 'portal_open' | 'raise' | 'curse'
-  | 'shatter' | 'cinders' | 'zap' | 'gore' | 'shade_mark' | 'dust' | 'dash' | 'coins';
+  | 'shatter' | 'cinders' | 'zap' | 'gore' | 'shade_mark' | 'dust' | 'dash' | 'coins'
+  | 'frost_mark' | 'warm_mark' | 'snuff_mark' | 'kindle' | 'snuff' | 'toll_mark' | 'frost';
 
 export interface Fx {
   kind: FxKind;
@@ -93,7 +94,7 @@ export interface Monster {
   wanderT: number;
   wanderTo: Point | null;
   atkCd: number;
-  action: { t: number; hitAt: number; dur: number; done: boolean; kind: 'melee' | 'shoot' | 'cast' } | null;
+  action: { t: number; hitAt: number; dur: number; done: boolean; kind: 'melee' | 'shoot' | 'cast' | 'toll' } | null;
   abilityCd: number;
   chill: number;
   stun: number;
@@ -145,7 +146,38 @@ export interface Monster {
   shape?: MonsterShape;
   color?: string;
   invulnT?: number;
+  /** Seconds left ablaze after a fire hit. A burning monster is warm to stand beside. */
+  burnT?: number;
+  /** A Slag Golem's temper: above SLAG_MOLTEN it is molten, below SLAG_BRITTLE it is brittle. */
+  heat?: number;
+  /** A Hearth-Eater is drinking the ember while this is above zero. */
+  drainT?: number;
+  /** The phylactery (a monster id) that keeps this boss from harm while it stands. */
+  wardId?: number;
 }
+
+/** A Slag Golem at or past these tempers is molten or brittle. */
+export const SLAG_MOLTEN = 0.3;
+export const SLAG_BRITTLE = -0.3;
+
+/** A bell's toll: a shockwave spreading from where it was rung. It strikes once as it passes, unless rolled through. */
+export interface Ring {
+  x: number;
+  y: number;
+  r: number;
+  speed: number;
+  max: number;
+  dmg: Damage;
+  srcLevel: number;
+  passed: boolean;
+  hit: Set<number>;
+}
+
+/** Tiles of warmth around a lit brazier. */
+export const BRAZIER_RADIUS = 4.5;
+/** Seconds a full ember lasts in the cold with no fire near, and how long frostbite takes to set in once it is out. */
+export const EMBER_TIME = 60;
+export const FROST_TIME = 10;
 
 export interface Projectile {
   id: number;
@@ -163,6 +195,8 @@ export interface Projectile {
   pierce?: boolean;
   explode?: number;
   chill?: number;
+  /** Ember taken from the hero on a hit (rime shards). */
+  sap?: number;
   chains?: { n: number; dmg: Damage };
   wobble?: boolean;
   hit: Set<number>;
@@ -212,7 +246,8 @@ export interface WorldObject {
   id: number;
   x: number;
   y: number;
-  kind: 'chest' | 'barrel' | 'shrine';
+  kind: 'chest' | 'barrel' | 'shrine' | 'brazier';
+  /** Opened, spent or, for a brazier, lit. */
   used: boolean;
   shrine?: ShrineKind;
 }
@@ -252,6 +287,14 @@ const NPC_ACT2: Record<NpcKind, { name: string; title: string }> = {
   caravan: { name: 'Dov', title: 'Caravan Master' },
 };
 
+const NPC_ACT3: Record<NpcKind, { name: string; title: string }> = {
+  healer: { name: 'Sister Ilsa', title: 'Hearth-Keeper' },
+  smith: { name: 'Brannoc', title: 'Blacksmith' },
+  sage: { name: 'Wren', title: 'Last of the Watch' },
+  fence: { name: 'Ysolde', title: 'Scavenger' },
+  caravan: { name: 'Dov', title: 'Caravan Master' },
+};
+
 export interface Hazard {
   x: number;
   y: number;
@@ -266,6 +309,8 @@ export interface Hazard {
   fired: boolean;
   /** Skip the shake and boom, for attacks made of many small blasts. */
   quiet?: boolean;
+  /** Ice rather than fire: it chills, saps the ember, and gives no warmth. */
+  cold?: boolean;
 }
 
 export interface AreaState {
@@ -278,6 +323,7 @@ export interface AreaState {
   objects: WorldObject[];
   npcs: Npc[];
   hazards: Hazard[];
+  rings: Ring[];
   fx: Fx[];
   explored: Uint8Array;
   /** Goes up whenever a new tile is explored, so the automap knows when to redraw. */
@@ -394,6 +440,12 @@ export class World {
   private stormShrineT = 0;
   /** Rolls for the extras (orbs, elite tricks), kept apart so they never shift loot or level generation. */
   private luck: Rng;
+  /** 0..1: how much heat Vhorza's ember has left. It burns down in the cold and is fed by fire. */
+  ember = 1;
+  /** 0..1 frostbite. It builds once the ember is out: past half it slows, when full it wounds. */
+  frost = 0;
+  /** Whether the hero is standing in something's warmth right now. */
+  nearFire = false;
 
   constructor(char: Character, seed = Date.now() >>> 0) {
     this.char = char;
@@ -408,7 +460,8 @@ export class World {
     this.refreshStats();
     this.player.life = this.stats.maxLife;
     this.player.mana = this.stats.maxMana;
-    this.enterArea(this.char.waypoints.includes(this.wpKey('tel_maresh')) ? 'tel_maresh' : 'town', 'start');
+    const has = (id: string) => this.char.waypoints.includes(this.wpKey(id));
+    this.enterArea(has('emberwatch_ruins') ? 'emberwatch_ruins' : has('tel_maresh') ? 'tel_maresh' : 'town', 'start');
   }
 
   // ---------------------------------------------------------------- helpers
@@ -457,6 +510,21 @@ export class World {
   /** Killing Vhorza opens the road south. */
   get roadSouthOpen() {
     return this.questState('forge') === 'done' || this.questState('forge') === 'rewarded';
+  }
+
+  /** Ending Corvane opens the road back north. */
+  get roadNorthOpen() {
+    return this.questState('hollow_sun') === 'done' || this.questState('hollow_sun') === 'rewarded';
+  }
+
+  /** The cold is loose in this area, so the ember matters. */
+  get cold() {
+    return !!this.area.def.cold;
+  }
+
+  /** How far the hero can see: the ember's light shrinks as it dies, and storms close it in. */
+  get sight() {
+    return this.area.def.light * (1 - 0.42 * this.storm) * (this.cold ? 0.55 + 0.45 * this.ember : 1);
   }
 
   get difficulty() {
@@ -535,7 +603,7 @@ export class World {
     const rng = new Rng(hashSeed(this.seed, id, this.char.difficulty));
     const level = generateLevel(def.spec, rng);
     const a: AreaState = {
-      def, level, monsters: [], ground: [], orbs: [], projectiles: [], objects: [], npcs: [], hazards: [], fx: [],
+      def, level, monsters: [], ground: [], orbs: [], projectiles: [], objects: [], npcs: [], hazards: [], rings: [], fx: [],
       explored: new Uint8Array(level.w * level.h), exploredRev: 0, flow: new FlowField(level, 26),
     };
     for (const o of level.objects) {
@@ -554,7 +622,7 @@ export class World {
 
   private addNpc(a: AreaState, k: NpcKind) {
     const s = a.level.spots[k];
-    const info = areaAct(a.def) === 2 ? NPC_ACT2 : NPC_INFO;
+    const info = { 1: NPC_INFO, 2: NPC_ACT2, 3: NPC_ACT3 }[areaAct(a.def)];
     a.npcs.push({ id: this.id(), kind: k, ...info[k], x: s.x + 0.5, y: s.y + 0.5, facing: Math.PI / 2 });
   }
 
@@ -597,8 +665,9 @@ export class World {
   private populate(a: AreaState, rng: Rng) {
     const def = a.def;
     const l = a.level;
-    // Corvin is waiting alone, so packs keep out of his chamber.
-    const boss = def.superUnique === 'corvin' ? l.spots.boss : undefined;
+    // Corvin (and his echo) wait alone, so packs keep out of the chamber.
+    const alone = def.superUnique === 'corvin' || def.superUnique === 'echo';
+    const boss = alone ? l.spots.boss : undefined;
     const spots = rng.shuffle(l.spawns.filter((s) => !boss || Math.hypot(s.x - boss.x, s.y - boss.y) > 12));
     let packId = 1;
     const occupied = new Set<number>();
@@ -610,20 +679,23 @@ export class World {
     if (def.superUnique) {
       const sd = MONSTERS[def.superUnique];
       const spot = l.spots.boss ?? spots.pop() ?? l.start;
-      const isBoss = def.superUnique === 'mother' || def.superUnique === 'corvin';
+      const isBoss = def.superUnique === 'mother' || def.superUnique === 'corvin' || def.superUnique === 'unlit';
       const boss = this.spawnMonster(a, sd.id, spot.x + 0.5, spot.y + 0.5, 'boss', {
         packId, superId: sd.id, level: this.mlvl(def) + (isBoss ? 1 : 2), mods: isBoss || def.superUnique === 'glutton' ? [] : ['extraLife'],
       });
       boss.name = sd.name;
-      const escort = { glutton: 'ghoul', bishop: 'skeleton', warden: 'skeleton', mother: 'imp', skarn: 'scorpion', karrik: 'kite', embalmer: 'mummy' }[sd.id] ?? 'imp';
-      // Corvin is waiting alone.
-      for (let i = 0; i < (sd.id === 'corvin' ? 0 : 4); i++) {
+      const escort = { glutton: 'ghoul', bishop: 'skeleton', warden: 'skeleton', mother: 'imp', skarn: 'scorpion', karrik: 'kite', embalmer: 'mummy', frostwright: 'rime_thrall', unlit: 'rime_thrall' }[sd.id] ?? 'imp';
+      for (let i = 0; i < (alone ? 0 : 4); i++) {
         const p = place(spot.x, spot.y);
         this.spawnMonster(a, escort, p.x, p.y, 'minion', { packId, name: `${MONSTERS[escort].name}` });
       }
       if (sd.id === 'mother') for (let i = 0; i < 2; i++) {
         const p = place(spot.x, spot.y);
         this.spawnMonster(a, 'hexer', p.x, p.y, 'minion', { packId });
+      }
+      if (sd.id === 'unlit') for (let i = 0; i < 2; i++) {
+        const p = place(spot.x, spot.y);
+        this.spawnMonster(a, 'hearth_eater', p.x, p.y, 'minion', { packId });
       }
       packId++;
     }
@@ -659,7 +731,7 @@ export class World {
           this.spawnMonster(a, MONSTERS[type].pack!, q.x, q.y, 'normal', { packId });
         }
       } else {
-        const n = type === 'brute' || type === 'colossus' ? rng.int(1, 3) : rng.int(3, 6);
+        const n = ['brute', 'colossus', 'bellwarden', 'slag_golem', 'hearth_eater'].includes(type) ? rng.int(1, 3) : rng.int(3, 6);
         for (let k = 0; k < n; k++) {
           const q = place(s.x, s.y);
           this.spawnMonster(a, type, q.x, q.y, 'normal', { packId });
@@ -705,6 +777,8 @@ export class World {
     p.action = null;
     p.invuln = 1.2;
     if (a.def.town) this.endSpree(true);
+    // The ember is fed at every town fire, and anywhere the cold is not loose.
+    if (!a.def.cold) (this.ember = 1), (this.frost = 0);
     this.minions = this.minions.filter((mi) => !mi.dead);
     for (const mi of this.minions) this.placeMinion(mi);
     a.flow.update(p.x, p.y);
@@ -740,7 +814,7 @@ export class World {
   restockVendors() {
     const clvl = this.char.level;
     const rng = this.rng;
-    const ilvl = Math.max(1, Math.min(clvl + 2, this.mlvl(AREA_BY_ID.noon_vault) + 3));
+    const ilvl = Math.max(1, Math.min(clvl + 2, this.mlvl(AREA_BY_ID.hellforge_heart) + 3));
     const healer: Item[] = [];
     for (const t of ['hp', 'mp'] as const) {
       const top = potionFor(t, clvl);
@@ -905,7 +979,7 @@ export class World {
       }
       case 'object': {
         const o = a.objects.find((x) => x.id === t.id);
-        return o ? (o.kind === 'shrine' ? SHRINE_NAMES[o.shrine!] : o.kind === 'chest' ? 'Chest' : 'Barrel') : '';
+        return o ? (o.kind === 'shrine' ? SHRINE_NAMES[o.shrine!] : o.kind === 'chest' ? 'Chest' : o.kind === 'brazier' ? 'Unlit Brazier' : 'Barrel') : '';
       }
       case 'npc': {
         const n = a.npcs.find((x) => x.id === t.id);
@@ -1012,19 +1086,30 @@ export class World {
   }
 
   waypointList() {
-    return WAYPOINT_AREAS.filter((id) => areaAct(AREA_BY_ID[id]) === 1 || this.roadSouthOpen).map((id) => ({
+    const open = (act: number) => act === 1 || (act === 2 && this.roadSouthOpen) || (act === 3 && this.roadNorthOpen);
+    return WAYPOINT_AREAS.filter((id) => open(areaAct(AREA_BY_ID[id]))).map((id) => ({
       id, name: AREA_BY_ID[id].name, act: areaAct(AREA_BY_ID[id]), active: this.char.waypoints.includes(this.wpKey(id)),
     }));
   }
 
-  /** The caravan runs between the two towns once the road south is open. */
-  travelCaravan() {
-    const dest = this.act === 1 ? 'tel_maresh' : 'town';
+  /** Where the caravan will go from here: the other towns the story has opened. */
+  caravanStops(): string[] {
+    const stops = ['town'];
+    if (this.roadSouthOpen) stops.push('tel_maresh');
+    if (this.roadNorthOpen) stops.push('emberwatch_ruins');
+    return stops.filter((id) => id !== this.area.def.id);
+  }
+
+  /** The caravan runs between the towns once the roads are open. With no destination it goes south, or back north. */
+  travelCaravan(to?: string) {
+    const dest = to ?? (this.act === 1 ? 'tel_maresh' : 'town');
+    if (!this.caravanStops().includes(dest)) return;
     const k = this.wpKey(dest);
     if (!this.char.waypoints.includes(k)) this.char.waypoints.push(k);
     this.sound('portal');
     this.enterArea(dest, 'start');
     if (dest === 'tel_maresh') this.tellOnce('arrive');
+    if (dest === 'emberwatch_ruins') this.tellOnce('north');
   }
 
   useWaypoint(id: string): boolean {
@@ -1350,15 +1435,15 @@ export class World {
       this.sound('quest');
     }
     if (this.questState('forge') === 'done') this.setQuest('forge', 'rewarded');
-    if (this.act === 2) {
-      for (const [id, skill, stat] of [['cistern', 1, 0], ['mesa', 0, 5], ['embalmer', 1, 0], ['hollow_sun', 0, 0]] as const) {
-        if (this.questState(id) !== 'done') continue;
-        c.skillPoints += skill;
-        c.statPoints += stat;
-        this.setQuest(id, 'rewarded');
-        this.msg(`Quest complete: ${QUEST_BY_ID[id].name} (${QUEST_BY_ID[id].reward})`, '#e8c860');
-        this.sound('quest');
-      }
+    // Each town's sage pays out that act's quests, by what the reward says.
+    for (const q of QUESTS) {
+      if ((q.act ?? 1) !== this.act || this.act === 1 || this.questState(q.id) !== 'done') continue;
+      if (q.reward.includes('Skill Point')) c.skillPoints++;
+      if (q.reward.includes('Stat Points')) c.statPoints += 5;
+      this.setQuest(q.id, 'rewarded');
+      this.msg(`Quest complete: ${q.name} (${q.reward})`, '#e8c860');
+      this.sound('quest');
+      if (q.id === 'hollow_sun') this.tellOnce('ember_dims');
     }
   }
 
@@ -1382,7 +1467,9 @@ export class World {
     this.updateMinions(dt);
     this.updateProjectiles(dt);
     this.updateHazards(dt);
+    this.updateRings(dt);
     this.updateStorm(dt);
+    this.updateWarmth(dt);
     this.exploreT -= dt;
     if (this.exploreT <= 0) {
       this.exploreT = 0.2;
@@ -1393,7 +1480,7 @@ export class World {
   private markExplored(force: boolean) {
     const a = this.area;
     const l = a.level;
-    const r = Math.ceil(a.def.light + 2);
+    const r = Math.ceil(this.sight + 2);
     const px = Math.floor(this.player.x);
     const py = Math.floor(this.player.y);
     if (!force && a.def.town) return;
@@ -1463,7 +1550,7 @@ export class World {
       return;
     }
 
-    const speed = st.moveSpeed * (p.chill > 0 ? 0.6 : 1) * (this.inQuicksand(p) ? 0.6 : 1);
+    const speed = st.moveSpeed * (p.chill > 0 ? 0.6 : 1) * (this.inQuicksand(p) ? 0.6 : 1) * (this.frost > 0.5 ? 0.78 : 1);
     p.moving = false;
     if (p.moveDir) {
       const len = Math.hypot(p.moveDir.x, p.moveDir.y);
@@ -1499,6 +1586,8 @@ export class World {
       }
     }
     if (a.level.waypoint && Math.hypot(a.level.waypoint.x + 0.5 - p.x, a.level.waypoint.y + 0.5 - p.y) < 1.4) this.activateWaypoint();
+    // The ember lights any brazier the hero brushes past.
+    if (a.def.cold) for (const o of a.objects) if (o.kind === 'brazier' && !o.used && Math.hypot(o.x - p.x, o.y - p.y) < 1.1) this.lightBrazier(o);
   }
 
   private checkExits() {
@@ -1778,6 +1867,7 @@ export class World {
     const syn = synergyBonus(def, this.char.skills);
     const el = def.element ?? 'phys';
     const spellDmg = (): Damage => elemDamage(el, roll(this.rng, pr.min ?? 0, pr.max ?? 0) * syn);
+    if (el === 'fire') this.feedEmber(0.07);
     switch (def.kind) {
       case 'projectile': {
         const kind = def.id === 'fire_bolt' ? 'firebolt' : def.id === 'ice_bolt' ? 'icebolt' : def.id === 'bone_lance' ? 'bonelance' : 'fireball';
@@ -1918,6 +2008,7 @@ export class World {
     const d = this.weaponDamage(def, pr);
     let chains: Projectile['chains'];
     if (def.id === 'storm_arrow') chains = { n: pr.chains!, dmg: elemDamage('light', roll(this.rng, pr.min!, pr.max!)) };
+    if (def.id === 'exploding_arrow') this.feedEmber(0.07);
     this.spawnProjectile({
       x: p.x, y: p.y, ang, speed: 15, ttl: 0.8, owner: 'player', dmg: d.dmg, kind: def.id === 'frost_arrow' ? 'frostarrow' : def.id === 'exploding_arrow' ? 'firearrow' : 'arrow',
       radius: 0.3, ar: st.ar * (1 + (pr.arPct ?? 0) / 100), pierce: def.id === 'power_shot', explode: def.id === 'exploding_arrow' ? pr.radius : undefined,
@@ -1953,6 +2044,8 @@ export class World {
     });
     if (hit) {
       this.sound('hit');
+      // A burning blade keeps its wielder a little warmer.
+      if (dmg.fire > 0) this.feedEmber(0.025);
       if (def.id === 'frenzy') {
         p.frenzy.stacks = Math.min(4, p.frenzy.stacks + 1);
         p.frenzy.t = pr.duration!;
@@ -1972,12 +2065,12 @@ export class World {
   spawnProjectile(o: {
     x: number; y: number; ang: number; speed: number; ttl: number; owner: 'player' | 'monster'; dmg: Damage; kind: string;
     radius: number; ar?: number; pierce?: boolean; explode?: number; chill?: number; chains?: Projectile['chains']; wobble?: boolean;
-    srcLevel: number; srcId?: number;
+    srcLevel: number; srcId?: number; sap?: number;
   }) {
     this.area.projectiles.push({
       id: this.id(), x: o.x + Math.cos(o.ang) * 0.3, y: o.y + Math.sin(o.ang) * 0.3, vx: Math.cos(o.ang) * o.speed, vy: Math.sin(o.ang) * o.speed,
       ttl: o.ttl, owner: o.owner, dmg: o.dmg, radius: o.radius, kind: o.kind, ar: o.ar, pierce: o.pierce, explode: o.explode,
-      chill: o.chill, chains: o.chains, wobble: o.wobble, hit: new Set(), srcLevel: o.srcLevel, srcId: o.srcId,
+      chill: o.chill, chains: o.chains, wobble: o.wobble, hit: new Set(), srcLevel: o.srcLevel, srcId: o.srcId, sap: o.sap,
     });
   }
 
@@ -1985,6 +2078,13 @@ export class World {
 
   damageMonster(m: Monster, d: Damage, o: { ar?: number; chill?: number; stun?: number; knock?: { x: number; y: number; f: number }; crit?: boolean; leech?: boolean; minion?: Monster } = {}): boolean {
     if (m.dead || m.sub || m.invulnT) return false;
+    if (m.wardId !== undefined) {
+      if (this.area.monsters.some((o) => o.id === m.wardId && !o.dead)) {
+        if (!o.minion) this.floatText(m.x, m.y, 'Warded', '#8ac8ff');
+        return false;
+      }
+      m.wardId = undefined;
+    }
     this.alertPack(m);
     if (o.ar !== undefined && !this.rng.chance(hitChance(o.ar, m.def_, o.minion?.level ?? this.char.level, m.level))) {
       if (!o.minion) this.floatText(m.x, m.y, 'Miss', '#9a9a9a');
@@ -1993,11 +2093,22 @@ export class World {
     if (m.curse && m.curse.t > 0 && d.phys > 0) d = { ...d, phys: d.phys * (1 + m.curse.pct / 100) };
     // Struck by a servant: turn on it some of the time.
     if (o.minion && (m.foe === undefined || this.rng.chance(0.3))) m.foe = o.minion.id;
-    const { total, poison } = applyResists(d, m.res);
+    let { total, poison } = applyResists(d, m.res);
+    if (d.fire > 0 && m.res.fire < 100) m.burnT = 3;
+    if (m.def.slag) {
+      // Fire stokes a Slag Golem, cold tempers it. The blow lands on whatever it was a moment ago.
+      const heat = m.heat ?? 0;
+      if (heat >= SLAG_MOLTEN) total *= 0.85;
+      if (heat <= SLAG_BRITTLE) total *= 1.6;
+      if (d.fire > 0) m.heat = Math.min(1, heat + 0.4);
+      else if (d.cold > 0) m.heat = Math.max(-1, heat - 0.55);
+      if (heat < SLAG_MOLTEN && m.heat! >= SLAG_MOLTEN) this.floatText(m.x, m.y, 'Molten', '#ff9040', 16);
+      if (heat > SLAG_BRITTLE && m.heat! <= SLAG_BRITTLE) this.floatText(m.x, m.y, 'Brittle', '#a8e0ff', 16);
+    }
     if (poison > 0 && poison / 3 >= m.poison.dps * 0.9) m.poison = { dps: poison / 3, t: 3 };
     if (d.cold > 0 && m.res.cold < 100) m.chill = Math.max(m.chill, o.chill ?? 1.5);
     if (o.stun && m.rarity !== 'boss') m.stun = Math.max(m.stun, o.stun);
-    if (o.knock && m.rarity !== 'boss') {
+    if (o.knock && m.rarity !== 'boss' && m.def.ai !== 'totem') {
       const len = Math.hypot(o.knock.x, o.knock.y) || 1;
       m.knock = { x: (o.knock.x / len) * o.knock.f * 8, y: (o.knock.y / len) * o.knock.f * 8 };
     }
@@ -2084,12 +2195,28 @@ export class World {
       this.sound('boom');
       if (Math.hypot(p.x - m.x, p.y - m.y) < 2.2) this.damagePlayer(elemDamage('fire', (m.dmgMin + m.dmgMax) * 0.8), { level: m.level });
     }
-    if (m.def.burst) {
+    if (m.def.burst && !(m.def.rime && how === 'burn')) {
+      // A Rime-Thrall bursts into ice that chills and saps the ember, unless fire killed it: then it only melts.
+      const rime = !!m.def.rime;
       const dmg = (m.dmgMin + m.dmgMax) * 0.35;
       for (let i = 0; i < m.def.burst; i++) {
-        this.spawnProjectile({ x: m.x, y: m.y, ang: (i / m.def.burst) * TAU + m.facing, speed: 7, ttl: 0.8, owner: 'monster', dmg: elemDamage('phys', dmg), kind: 'm_glass', radius: 0.22, srcLevel: m.level, srcId: m.id });
+        this.spawnProjectile({
+          x: m.x, y: m.y, ang: (i / m.def.burst) * TAU + m.facing, speed: 7, ttl: 0.8, owner: 'monster', dmg: elemDamage(rime ? 'cold' : 'phys', dmg),
+          kind: rime ? 'm_ice' : 'm_glass', radius: 0.22, srcLevel: m.level, srcId: m.id, sap: rime ? 0.08 : undefined,
+        });
       }
       this.sound('cold');
+    }
+    // The dead give up a little heat, and the burning dead a good deal more.
+    if (a.def.cold && !m.illusion) this.feedEmber(how === 'burn' || (m.burnT ?? 0) > 0 ? 0.09 : 0.02);
+    if (m.def.id === 'phylactery') {
+      for (const o of a.monsters) {
+        if (o.wardId !== m.id || o.dead) continue;
+        o.wardId = undefined;
+        o.stun = 2.5;
+        this.msg('The phylactery shatters. The echo falters!', '#8ac8ff');
+      }
+      a.rings.length = 0;
     }
     if (m.def.rises && !m.rose && !m.summoned && m.deathKind !== 'burn') {
       this.addTimer(3.5, () => {
@@ -2104,14 +2231,20 @@ export class World {
       // Imps lose their nerve when a packmate falls.
       for (const o of a.monsters) if (!o.dead && o.def.flees && Math.hypot(o.x - m.x, o.y - m.y) < 6 && this.rng.chance(0.7)) o.fleeT = this.rng.range(1.5, 3);
     }
-    if (m.superId && a.def.quest && ['bishop', 'mother', 'skarn', 'karrik', 'embalmer', 'corvin'].includes(m.superId)) {
+    if (m.superId && a.def.quest && ['bishop', 'mother', 'skarn', 'karrik', 'embalmer', 'corvin', 'frostwright', 'echo', 'unlit'].includes(m.superId)) {
       if (this.questState(a.def.quest) !== 'rewarded' && this.questState(a.def.quest) !== 'done') {
         this.setQuest(a.def.quest, 'done');
         this.msg(`${m.name} has been slain!`, '#e8c860');
         this.sound('quest');
         if (m.superId === 'mother') this.tellOnce('forge_end');
         if (m.superId === 'embalmer') this.tellOnce('vizier');
-        if (m.superId === 'corvin') {
+        if (m.superId === 'corvin') this.tellOnce('finale');
+        if (m.superId === 'frostwright') this.tellOnce('frostwright');
+        if (m.superId === 'unlit') {
+          // The ember is home: the Heart is warm again, and the next difficulty opens.
+          this.ember = 1;
+          this.frost = 0;
+          for (const o of a.objects) if (o.kind === 'brazier') o.used = true;
           this.char.maxDifficulty = Math.max(this.char.maxDifficulty, Math.min(2, this.char.difficulty + 1));
           this.emit({ type: 'victory' });
         }
@@ -2164,19 +2297,20 @@ export class World {
     this.msg(`You have reached level ${this.char.level}!`, '#e8c860');
   }
 
-  damagePlayer(d: Damage, o: { ar?: number; level: number; melee?: boolean; source?: Monster; missile?: boolean }) {
+  /** Returns whether the blow landed (it was not dodged, missed, evaded or blocked). */
+  damagePlayer(d: Damage, o: { ar?: number; level: number; melee?: boolean; source?: Monster; missile?: boolean }): boolean {
     const p = this.player;
-    if (p.dead || p.invuln > 0) return;
+    if (p.dead || p.invuln > 0) return false;
     const st = this.stats;
-    if (o.ar !== undefined && !this.rng.chance(hitChance(o.ar, st.def, o.level, this.char.level))) return;
+    if (o.ar !== undefined && !this.rng.chance(hitChance(o.ar, st.def, o.level, this.char.level))) return false;
     if ((o.melee || o.missile) && st.evade > 0 && this.rng.chance(st.evade / 100)) {
       this.floatText(p.x, p.y, 'Evade', '#9bd39b');
-      return;
+      return false;
     }
     if (o.ar !== undefined && st.block > 0 && this.rng.chance(st.block / 100)) {
       this.floatText(p.x, p.y, 'Block', '#d8d8d8');
       this.sound('block');
-      return;
+      return false;
     }
     const res: Resists = { phys: 0, fire: st.res.fire, cold: st.res.cold, light: st.res.light, poison: st.res.poison };
     const dd = { ...d, phys: d.phys > 0 ? reducePhysical(d.phys, st.dmgReduce) : 0 };
@@ -2208,6 +2342,7 @@ export class World {
       if (src.mods.includes('coldEnch')) p.chill = 2;
     }
     if (p.life <= 0) this.die();
+    return true;
   }
 
   private die() {
@@ -2237,6 +2372,8 @@ export class World {
     }
     p.dead = false;
     p.buffs = {};
+    this.ember = 1;
+    this.frost = 0;
     p.frenzy = { stacks: 0, t: 0 };
     p.poison.t = 0;
     p.heal = [];
@@ -2250,6 +2387,7 @@ export class World {
   // ---------------------------------------------------------------- objects
 
   private useObject(o: WorldObject) {
+    if (o.kind === 'brazier') return this.lightBrazier(o);
     o.used = true;
     const p = this.player;
     const mlvl = this.mlvl(this.area.def);
@@ -2298,6 +2436,8 @@ export class World {
       if (m.curse && m.curse.t > 0) m.curse.t -= dt;
       if (m.shieldT && (m.shieldT -= dt) <= 0) m.shield = m.shieldT = 0;
       if (m.invulnT && (m.invulnT -= dt) <= 0) m.invulnT = 0;
+      if (m.burnT && (m.burnT -= dt) <= 0) m.burnT = 0;
+      if (m.drainT && (m.drainT -= dt) <= 0) m.drainT = 0;
       if (Math.abs(m.x - p.x) > 32 || Math.abs(m.y - p.y) > 32) continue;
       if (m.poison.t > 0) {
         m.poison.t -= dt;
@@ -2314,6 +2454,7 @@ export class World {
         if (Math.hypot(m.knock.x, m.knock.y) < 0.3) m.knock = { x: 0, y: 0 };
       }
       if (m.chill > 0) m.chill -= dt;
+      if (m.def.slag) this.temper(m, dt);
       if (m.stun > 0) {
         m.stun -= dt;
         continue;
@@ -2338,6 +2479,12 @@ export class World {
         }
       }
       if (m.superId === 'corvin' && m.alert) this.tellOnce('corvin');
+      if (m.superId === 'echo' && m.alert) this.tellOnce('echo');
+      if (m.superId === 'unlit' && m.alert) {
+        this.tellOnce('unlit');
+        // The winter feeds while the ember is out.
+        if (this.cold && this.ember <= 0 && !safe && m.life < m.maxLife) m.life = Math.min(m.maxLife, m.life + m.maxLife * 0.012 * dt);
+      }
       if (m.invulnT) continue;
       if (m.thief) {
         if (m.alert && !safe) this.updateThief(m, dt);
@@ -2345,6 +2492,12 @@ export class World {
         continue;
       }
       if (m.def.phases && !m.illusion && this.advancePhase(m)) continue;
+      if (m.def.ai === 'totem') {
+        // A phylactery cannot move or strike. It rings.
+        if (m.action) this.updateMonsterAction(m, dt * slow);
+        else if (m.alert && !safe && m.abilityCd <= 0 && dp < 13) this.startToll(m);
+        continue;
+      }
       if (m.sub) {
         this.updateBurrow(m, dt, tgt);
         continue;
@@ -2361,7 +2514,8 @@ export class World {
         this.wander(m, dt);
         continue;
       }
-      const speed = m.speed * slow * (m.def.ai !== 'bat' && this.inQuicksand(m) ? 0.6 : 1);
+      const temper = m.def.slag ? ((m.heat ?? 0) >= SLAG_MOLTEN ? 1.35 : (m.heat ?? 0) <= SLAG_BRITTLE ? 0.7 : 1) : 1;
+      const speed = m.speed * slow * temper * (m.def.ai !== 'bat' && this.inQuicksand(m) ? 0.6 : 1);
       if (m.def.mirage && !m.split && !m.illusion) {
         m.split = true;
         this.spawnIllusions(m, 2);
@@ -2378,6 +2532,11 @@ export class World {
         this.slam(m, tgt);
         continue;
       }
+      if (m.def.tolls && m.abilityCd <= 0 && dp < 6 && !m.illusion && lineOfSight(l, m, p)) {
+        this.startToll(m);
+        continue;
+      }
+      if (m.def.ai === 'eater' && this.drinkEmber(m, dt, speed, dp)) continue;
       if (m.fleeT > 0) {
         this.moveEntity(m, (-dx / d) * speed * dt, (-dy / d) * speed * dt, m.def.radius);
         m.facing = Math.atan2(-dy, -dx);
@@ -2388,7 +2547,7 @@ export class World {
         this.bossAbility(m, dp);
         continue;
       }
-      const reach = m.def.radius + 0.3 + m.def.range;
+      const reach = m.def.radius + 0.3 + meleeRange(m);
       const ranged = m.def.ai === 'ranged' || m.def.ai === 'caster' || m.def.ai === 'hexer' || (m.def.ai === 'boss' && !!m.def.missile && d > 2.5);
       const los = d < 14 && lineOfSight(l, m, tgt);
       if (m.def.ai === 'hexer' && m.abilityCd <= 0 && this.tryRevive(m)) continue;
@@ -2510,18 +2669,27 @@ export class World {
     const act = m.action!;
     const p = this.player;
     act.t += dt;
+    if (act.kind === 'toll') {
+      if (!act.done && act.t >= act.hitAt) {
+        act.done = true;
+        this.ringBell(m);
+      }
+      if (act.t >= act.dur) m.action = null;
+      return;
+    }
     if (!act.done && act.t >= act.hitAt && m.illusion) act.done = true;
     if (!act.done && act.t >= act.hitAt) {
       act.done = true;
       const foe = m.foe !== undefined ? this.minions.find((mi) => mi.id === m.foe && !mi.dead) : undefined;
-      const reach = m.def.radius + 0.3 + m.def.range + 0.5;
+      const reach = m.def.radius + 0.3 + meleeRange(m) + 0.5;
       if (act.kind === 'melee' && foe && Math.hypot(foe.x - m.x, foe.y - m.y) <= reach + foe.def.radius) {
         const dmg = elemDamage(m.def.element ?? 'phys', roll(this.rng, m.dmgMin, m.dmgMax));
         if (m.mods.includes('fireEnch')) dmg.fire += (m.dmgMin + m.dmgMax) * 0.4;
         this.damageMinion(foe, dmg, { ar: m.ar, level: m.level });
       } else if (act.kind === 'melee') {
         if (Math.hypot(p.x - m.x, p.y - m.y) <= reach) {
-          const dmg = elemDamage(m.def.element ?? 'phys', roll(this.rng, m.dmgMin, m.dmgMax));
+          const molten = m.def.slag && (m.heat ?? 0) >= SLAG_MOLTEN ? 1.5 : 1;
+          const dmg = elemDamage(m.def.element ?? 'phys', roll(this.rng, m.dmgMin, m.dmgMax) * molten);
           if (m.def.element && m.def.element !== 'phys') {
             dmg.phys = dmg[m.def.element] * 0.5;
             dmg[m.def.element] *= 0.5;
@@ -2571,6 +2739,7 @@ export class World {
       nova_fire: '#ff6020', nova_cold: '#60b0ff', fire_spread: '#ff8030', meteor_rain: '#ff3010', summon_imps: '#b040ff', summon_skeletons: '#b040ff', charge: '',
       poison_spray: '#70c030', summon_scarabs: '#40b0a0', burrow_strike: '', summon_kites: '#806050', corpse_feast: '#a02020', sun_lance: '#ffc040',
       summon_mummies: '#d8c890', raise_dead: '#d8c890', mirage_split: '#ffe0a0', summon_acolytes: '#ffc040', noon_burst: '#fff0c0',
+      ice_lance: '#80c8ff', summon_thralls: '#80c8ff', summon_eaters: '#6040a0', cold_snap: '#d8f0ff', snuff: '#101828', frost_rain: '#80c8ff', toll: '#c8a860',
     } satisfies Record<BossAbility, string>)[pick];
     if (flash) this.emit({ type: 'flash', color: flash, a: 0.22 });
     switch (pick) {
@@ -2602,14 +2771,19 @@ export class World {
       case 'summon_scarabs':
       case 'summon_kites':
       case 'summon_mummies':
-      case 'summon_acolytes': {
-        const kind = { summon_imps: 'imp', summon_skeletons: 'skeleton', summon_scarabs: 'scarab', summon_kites: 'kite', summon_mummies: 'mummy', summon_acolytes: 'acolyte' }[pick];
+      case 'summon_acolytes':
+      case 'summon_thralls':
+      case 'summon_eaters': {
+        const kind = {
+          summon_imps: 'imp', summon_skeletons: 'skeleton', summon_scarabs: 'scarab', summon_kites: 'kite', summon_mummies: 'mummy', summon_acolytes: 'acolyte',
+          summon_thralls: 'rime_thrall', summon_eaters: 'hearth_eater',
+        }[pick];
         const alive = this.area.monsters.filter((o) => !o.dead && o.summoned && !o.def.abilities).length;
         if (alive >= 8) {
           m.abilityCd = 1;
           break;
         }
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < (pick === 'summon_eaters' ? 2 : 3); i++) {
           const s = nearestFloor(this.area.level, { x: m.x + this.rng.range(-2, 2), y: m.y + this.rng.range(-2, 2) });
           const sm = this.spawnMonster(this.area, kind, s.x + 0.5, s.y + 0.5, 'normal', { packId: m.packId, level: m.level - 1 });
           sm.alert = true;
@@ -2669,6 +2843,45 @@ export class World {
         this.sound('fire');
         break;
       }
+      case 'ice_lance': {
+        const ang = Math.atan2(p.y - m.y, p.x - m.x);
+        for (let i = 1; i <= 9; i++) {
+          const x = m.x + Math.cos(ang) * i * 1.2;
+          const y = m.y + Math.sin(ang) * i * 1.2;
+          if (!isWalkable(this.area.level, x, y)) break;
+          const delay = 0.75 + i * 0.05;
+          this.area.hazards.push({ x, y, t: 0, delay, dur: 0.05, radius: 1, dmg: dmg('cold', 0.55), owner: 'monster', burnDps: 0, srcLevel: m.level, fired: false, quiet: true, cold: true });
+          this.fx({ kind: 'frost_mark', x, y, dur: delay, r: 1 });
+        }
+        this.sound('cold');
+        break;
+      }
+      case 'frost_rain': {
+        for (let i = 0; i < 4; i++) {
+          const x = p.x + this.rng.range(-3, 3);
+          const y = p.y + this.rng.range(-3, 3);
+          const delay = 1.1 + i * 0.25;
+          this.area.hazards.push({ x, y, t: 0, delay, dur: 3, radius: 1.7, dmg: dmg('cold', 0.9), owner: 'monster', burnDps: m.dmgMax * 0.25, srcLevel: m.level, fired: false, cold: true });
+          this.fx({ kind: 'frost_mark', x, y, dur: delay, r: 1.7 });
+        }
+        this.sound('cold');
+        break;
+      }
+      case 'toll': {
+        // Two tolls, a breath apart: roll through the first and be ready for the second.
+        const a = this.area;
+        this.startToll(m);
+        this.addTimer(1.55, () => {
+          if (!m.dead && this.area === a && !m.invulnT) this.ringBell(m);
+        });
+        break;
+      }
+      case 'cold_snap':
+        this.coldSnap(m);
+        break;
+      case 'snuff':
+        this.snuff(m);
+        break;
       case 'raise_dead': {
         const dead = this.area.monsters.filter((o) => o.dead && !o.used && o.def.id === 'mummy' && Math.hypot(o.x - m.x, o.y - m.y) < 10).slice(0, 5);
         if (!dead.length) {
@@ -2714,6 +2927,7 @@ export class World {
     m.charge = undefined;
     m.invulnT = 1.6;
     m.abilityCd = 2;
+    if (next.phylactery) this.spawnPhylactery(m);
     this.msg(next.line, '#ffd870');
     this.fx({ kind: 'revive', x: m.x, y: m.y, dur: 1.2 });
     this.emit({ type: 'flash', color: m.color ?? m.def.color, a: 0.35 });
@@ -2858,6 +3072,234 @@ export class World {
     });
   }
 
+  // ---------------------------------------------------------------- warmth
+
+  /** How warm it is at a spot: 1 beside a fire, less beside something that is merely burning, 0 in the open cold. */
+  warmthAt(x: number, y: number): number {
+    const a = this.area;
+    for (const o of a.objects) if (o.kind === 'brazier' && o.used && Math.hypot(o.x - x, o.y - y) <= BRAZIER_RADIUS) return 1;
+    for (const h of a.hazards) if (h.fired && !h.cold && h.burnDps > 0 && Math.hypot(h.x - x, h.y - y) <= h.radius + 1) return 1;
+    for (const m of a.monsters) {
+      if (m.dead || m.sub) continue;
+      const hot = (m.burnT ?? 0) > 0 || (m.heat ?? 0) >= SLAG_MOLTEN || m.mods.includes('fireEnch');
+      if (hot && Math.hypot(m.x - x, m.y - y) <= 2.6 + m.def.radius) return 0.5;
+    }
+    return 0;
+  }
+
+  /** Fire of the hero's own making (spells, burning blades, the burning dead) puts a little heat back in the ember. */
+  feedEmber(amount: number) {
+    if (this.cold) this.ember = Math.min(1, this.ember + amount);
+  }
+
+  /**
+   * The ember burns down in the cold, faster in a whiteout, and is fed by standing near fire. While it has any heat
+   * the hero is warm. Once it is out, frostbite builds: past half it slows, and when full it wounds until a fire is found.
+   */
+  private updateWarmth(dt: number) {
+    const p = this.player;
+    if (!this.cold || p.dead) {
+      this.nearFire = false;
+      if (!this.cold) (this.ember = Math.min(1, this.ember + dt)), (this.frost = Math.max(0, this.frost - dt));
+      return;
+    }
+    const fire = this.warmthAt(p.x, p.y);
+    this.nearFire = fire > 0;
+    const was = this.ember;
+    if (fire > 0) this.ember = Math.min(1, this.ember + 0.45 * fire * dt);
+    else this.ember = Math.max(0, this.ember - (dt / EMBER_TIME) * (1 + 2.5 * this.storm));
+    if (was > 0 && this.ember <= 0) {
+      this.msg('The ember gutters. Find a fire!', '#a8e0ff', 'ember');
+      this.sound('snuff');
+    }
+    if (this.ember > 0 || fire > 0) {
+      this.frost = Math.max(0, this.frost - dt / 3);
+      return;
+    }
+    const before = this.frost;
+    this.frost = Math.min(1, this.frost + dt / FROST_TIME);
+    if (before <= 0.5 && this.frost > 0.5) this.msg('Frostbite is setting in', '#a8e0ff', 'frost');
+    if (this.frost >= 1) {
+      if (before < 1) this.msg('You are freezing. Get to a fire!', '#ff8a6a', 'freeze');
+      p.life -= this.stats.maxLife * 0.04 * dt;
+      p.hurt = Math.max(p.hurt, 0.08);
+      if (p.life <= 0) this.die();
+    }
+  }
+
+  private lightBrazier(o: WorldObject) {
+    if (o.used) return;
+    o.used = true;
+    this.ember = Math.max(this.ember, 0.5);
+    this.fx({ kind: 'kindle', x: o.x, y: o.y, dur: 0.8, r: BRAZIER_RADIUS });
+    this.sound('kindle');
+    const a = this.area;
+    if (a.def.quest === 'beacons' && this.questState('beacons') === 'active') {
+      const left = a.objects.filter((b) => b.kind === 'brazier' && !b.used).length;
+      if (left) return this.msg(`${left} ${left === 1 ? 'beacon' : 'beacons'} still dark`, '#ffb060');
+      this.setQuest('beacons', 'done');
+      this.emit({ type: 'announce', text: 'The Ember Road is lit', sub: 'Return to Wren', color: '#ffb060' });
+      this.sound('quest');
+    }
+  }
+
+  private snuffBrazier(o: WorldObject) {
+    if (!o.used) return;
+    o.used = false;
+    this.fx({ kind: 'snuff', x: o.x, y: o.y, dur: 0.6, r: 1.5 });
+  }
+
+  /** Braziers still dark in Rimefall Pass while the quest to light them is open. */
+  unlitBeacons(): WorldObject[] {
+    const a = this.area;
+    if (a.def.quest !== 'beacons' || this.questState('beacons') !== 'active') return [];
+    return a.objects.filter((o) => o.kind === 'brazier' && !o.used);
+  }
+
+  /** Stokes or cools a Slag Golem: firelight makes it molten, and otherwise it drifts back to plain slag. */
+  private temper(m: Monster, dt: number) {
+    let h = m.heat ?? 0;
+    const a = this.area;
+    const fire = a.objects.some((o) => o.kind === 'brazier' && o.used && Math.hypot(o.x - m.x, o.y - m.y) <= BRAZIER_RADIUS - 1)
+      || a.hazards.some((z) => z.fired && !z.cold && z.burnDps > 0 && Math.hypot(z.x - m.x, z.y - m.y) <= z.radius);
+    if (fire) h = Math.min(1, h + 0.35 * dt);
+    else if (a.def.blizzard && this.storm > 0.5) h = Math.max(-1, h - 0.3 * dt);
+    else if (h > 0) h = Math.max(0, h - 0.1 * dt);
+    else if (h < 0) h = Math.min(0, h + 0.09 * dt);
+    m.heat = h;
+  }
+
+  /**
+   * A Hearth-Eater in sight of the hero stands off and drinks the ember, and once it is dry, the hero. It cannot
+   * drink from anyone standing in firelight: then it has to come in close and claw like anything else.
+   */
+  private drinkEmber(m: Monster, dt: number, _speed: number, dp: number): boolean {
+    const p = this.player;
+    if (this.nearFire || dp > m.def.range || !lineOfSight(this.area.level, m, p)) return false;
+    m.facing = Math.atan2(p.y - m.y, p.x - m.x);
+    m.drainT = 0.25;
+    const dry = !this.cold || this.ember <= 0;
+    if (this.cold) this.ember = Math.max(0, this.ember - 0.11 * dt);
+    if (m.atkCd <= 0) {
+      m.atkCd = 1 / m.def.attackRate;
+      m.life = Math.min(m.maxLife, m.life + m.maxLife * 0.05);
+      if (dry) this.damagePlayer(elemDamage('cold', roll(this.rng, m.dmgMin, m.dmgMax) * 0.7), { level: m.level });
+    }
+    return true;
+  }
+
+  /** Raises the bell. The toll itself comes at the end of the wind-up. */
+  private startToll(m: Monster) {
+    const windup = 0.85;
+    m.action = { t: 0, hitAt: windup, dur: windup + 0.3, done: false, kind: 'toll' };
+    if (m.def.ai !== 'boss') m.abilityCd = m.def.ai === 'totem' ? this.rng.range(3.6, 4.6) : this.rng.range(5, 7.5);
+    this.fx({ kind: 'toll_mark', x: m.x, y: m.y, dur: windup, r: 1.8 });
+  }
+
+  private ringBell(m: Monster) {
+    const far = m.def.ai !== 'melee';
+    this.area.rings.push({
+      x: m.x, y: m.y, r: 0.4, speed: 6.5, max: far ? 11 : 7.5, dmg: elemDamage('phys', roll(this.rng, m.dmgMin, m.dmgMax) * 1.3),
+      srcLevel: m.level, passed: false, hit: new Set(),
+    });
+    this.emit({ type: 'shake', amount: 3 });
+    this.sound('bell');
+  }
+
+  /** The rings spread, and strike whoever they pass over once. Nothing can be hit mid-roll, so they can be rolled through. */
+  private updateRings(dt: number) {
+    const a = this.area;
+    if (!a.rings.length) return;
+    const p = this.player;
+    for (const g of a.rings) {
+      const prev = g.r;
+      g.r += g.speed * dt;
+      const d = Math.hypot(p.x - g.x, p.y - g.y);
+      if (!g.passed && d <= g.r + 0.2) {
+        g.passed = true;
+        if (!p.dead && !this.inTown && d >= prev - 0.6 && lineOfSight(a.level, g, p)) {
+          if (p.action?.kind === 'dodge') this.floatText(p.x, p.y, 'Rolled through', '#9bd39b');
+          else if (this.damagePlayer(g.dmg, { level: g.srcLevel })) this.emit({ type: 'shake', amount: 6 });
+        }
+      }
+      for (const mi of this.minions) {
+        if (mi.dead || g.hit.has(mi.id) || Math.hypot(mi.x - g.x, mi.y - g.y) > g.r) continue;
+        g.hit.add(mi.id);
+        this.damageMinion(mi, { ...g.dmg, phys: g.dmg.phys * 0.5 }, { level: g.srcLevel });
+      }
+    }
+    a.rings = a.rings.filter((g) => g.r < g.max);
+  }
+
+  /** Corvane hides behind his phylactery: across the room, ringing, and he cannot be hurt until it is broken. */
+  private spawnPhylactery(m: Monster) {
+    const a = this.area;
+    const p = this.player;
+    const c = a.level.spots.boss ? { x: a.level.spots.boss.x + 0.5, y: a.level.spots.boss.y + 0.5 } : m;
+    // Opposite the hero across the chamber, so getting to it means crossing its tolls.
+    const ang = Math.atan2(c.y - p.y, c.x - p.x) || 0;
+    const s = nearestFloor(a.level, { x: c.x + Math.cos(ang) * 4.5, y: c.y + Math.sin(ang) * 4.5 });
+    const ph = this.spawnMonster(a, 'phylactery', s.x + 0.5, s.y + 0.5, 'normal', { packId: m.packId, level: m.level });
+    ph.alert = true;
+    ph.summoned = true;
+    ph.abilityCd = 2.2;
+    m.wardId = ph.id;
+    this.fx({ kind: 'teleport', x: ph.x, y: ph.y, dur: 0.6 });
+    this.msg('Break the phylactery!', '#8ac8ff');
+  }
+
+  /** Every lit brazier is marked. A moment later the cold strikes anyone not standing by one, and puts out the ones that sheltered them. */
+  private coldSnap(m: Monster) {
+    const a = this.area;
+    const p = this.player;
+    const DELAY = 2.8;
+    const near = a.objects.filter((o) => o.kind === 'brazier' && Math.hypot(o.x - m.x, o.y - m.y) < 18);
+    if (!near.length) {
+      m.abilityCd = 1;
+      return;
+    }
+    m.abilityCd = 8;
+    for (const o of near) this.fx({ kind: 'warm_mark', x: o.x, y: o.y, dur: DELAY, r: BRAZIER_RADIUS });
+    this.msg('The cold draws breath. Get to a lit brazier!', '#a8e0ff', 'snap');
+    this.sound('roar');
+    this.addTimer(DELAY, () => {
+      if (m.dead || this.area !== a || p.dead) return;
+      this.emit({ type: 'flash', color: '#d8f0ff', a: 0.7 });
+      this.emit({ type: 'shake', amount: 12 });
+      this.sound('nova');
+      const shelter = a.objects.filter((o) => o.kind === 'brazier' && o.used && Math.hypot(o.x - p.x, o.y - p.y) <= BRAZIER_RADIUS + 0.3);
+      if (shelter.length) {
+        for (const o of shelter) this.snuffBrazier(o);
+        this.floatText(p.x, p.y, 'Sheltered', '#ffb060', 16);
+        return;
+      }
+      if (this.damagePlayer(elemDamage('cold', this.stats.maxLife * 0.6), { level: m.level })) {
+        this.ember = 0;
+        this.frost = Math.max(this.frost, 0.6);
+      }
+    });
+  }
+
+  /** The Unlit reaches for every flame around it: braziers go dark, and a hero caught in the reach loses half the ember. */
+  private snuff(m: Monster) {
+    const a = this.area;
+    const p = this.player;
+    const R = 6.5;
+    const DELAY = 1.5;
+    const at = { x: m.x, y: m.y };
+    m.action = { t: 0, hitAt: DELAY, dur: DELAY + 0.15, done: true, kind: 'cast' };
+    this.fx({ kind: 'snuff_mark', ...at, dur: DELAY, r: R });
+    this.msg('It reaches for your fire. Get clear!', '#a8a0d8', 'snuff');
+    this.addTimer(DELAY, () => {
+      if (m.dead || this.area !== a) return;
+      this.fx({ kind: 'snuff', ...at, dur: 0.6, r: R });
+      this.sound('snuff');
+      for (const o of a.objects) if (o.kind === 'brazier' && Math.hypot(o.x - at.x, o.y - at.y) <= R + 1.5) this.snuffBrazier(o);
+      if (p.dead || Math.hypot(p.x - at.x, p.y - at.y) > R) return;
+      if (this.damagePlayer(elemDamage('cold', roll(this.rng, m.dmgMin, m.dmgMax) * 0.7), { level: m.level })) this.ember = Math.max(0, this.ember - 0.5);
+    });
+  }
+
   private inQuicksand(e: { x: number; y: number }) {
     const l = this.area.level;
     return l.slow.size > 0 && l.slow.has(idx(l, Math.floor(e.x), Math.floor(e.y)));
@@ -2865,7 +3307,8 @@ export class World {
 
   private updateStorm(dt: number) {
     let target = 0;
-    if (this.area.def.storm) {
+    const blizzard = !!this.area.def.blizzard;
+    if (this.area.def.storm || blizzard) {
       if (this.stormLeft > 0) {
         this.stormLeft -= dt;
         if (this.stormLeft <= 0) this.stormIn = this.rng.range(35, 70);
@@ -2874,7 +3317,7 @@ export class World {
         this.stormIn -= dt;
         if (this.stormIn <= 0) {
           this.stormLeft = this.rng.range(12, 20);
-          this.msg('A sandstorm rolls in', '#e0c080', 'storm');
+          this.msg(blizzard ? 'A whiteout comes down the pass' : 'A sandstorm rolls in', blizzard ? '#d8f0ff' : '#e0c080', 'storm');
           target = 1;
         }
       }
@@ -2942,7 +3385,7 @@ export class World {
         pr.ttl = 0;
       } else if (!p.dead && Math.hypot(p.x - pr.x, p.y - pr.y) < 0.3 + pr.radius) {
         if (pr.explode) this.explode(pr);
-        else this.damagePlayer(pr.dmg, { ar: pr.ar, level: pr.srcLevel, missile: true });
+        else if (this.damagePlayer(pr.dmg, { ar: pr.ar, level: pr.srcLevel, missile: true }) && pr.sap && this.cold) this.ember = Math.max(0, this.ember - pr.sap);
         pr.ttl = 0;
       }
     }
@@ -3151,7 +3594,7 @@ export class World {
       h.t += dt;
       if (!h.fired && h.t >= h.delay) {
         h.fired = true;
-        this.fx({ kind: 'explosion', x: h.x, y: h.y, dur: 0.6, r: h.radius });
+        this.fx(h.cold ? { kind: 'nova', x: h.x, y: h.y, dur: 0.45, r: h.radius, color: '#a8e8ff' } : { kind: 'explosion', x: h.x, y: h.y, dur: 0.6, r: h.radius });
         if (!h.quiet) {
           this.emit({ type: 'shake', amount: 7 });
           this.sound('boom');
@@ -3161,10 +3604,10 @@ export class World {
       }
       if (h.fired && h.t < h.delay + h.dur) {
         if (Math.floor((h.t - dt) * 4) !== Math.floor(h.t * 4)) {
-          this.fx({ kind: 'burn', x: h.x + this.rng.range(-h.radius, h.radius) * 0.6, y: h.y + this.rng.range(-h.radius, h.radius) * 0.6, dur: 0.6 });
-          const burn = elemDamage('fire', h.burnDps / 4);
+          this.fx({ kind: h.cold ? 'frost' : 'burn', x: h.x + this.rng.range(-h.radius, h.radius) * 0.6, y: h.y + this.rng.range(-h.radius, h.radius) * 0.6, dur: 0.6 });
+          const burn = elemDamage(h.cold ? 'cold' : 'fire', h.burnDps / 4);
           if (h.owner === 'player') for (const m of this.monstersNear(h.x, h.y, h.radius * 0.8)) this.damageMonster(m, burn, {});
-          else if (Math.hypot(p.x - h.x, p.y - h.y) < h.radius * 0.8) this.damagePlayer(burn, { level: h.srcLevel });
+          else if (Math.hypot(p.x - h.x, p.y - h.y) < h.radius * 0.8 && this.damagePlayer(burn, { level: h.srcLevel }) && h.cold && this.cold) this.ember = Math.max(0, this.ember - 0.04);
         }
       }
     }
@@ -3577,6 +4020,11 @@ export class World {
   classDef() {
     return CLASSES[this.char.classId];
   }
+}
+
+/** How far a monster's claws reach. A Hearth-Eater's long range is for drinking, not striking. */
+function meleeRange(m: Monster) {
+  return m.def.ai === 'eater' ? 0.5 : m.def.range;
 }
 
 function setTimeoutSim(w: World, t: number, fn: () => void) {

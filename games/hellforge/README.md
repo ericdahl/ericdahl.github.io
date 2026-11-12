@@ -1,6 +1,6 @@
 # Hellforge
 
-A dark-fantasy action RPG in the classic isometric hack-and-slash mold. Pick a hero, clear demon-infested fields, caves and catacombs, and hunt ever better loot on the way down to the Hellforge. It runs in any modern browser, phones included, and needs no downloads: all the art and sound are generated in code.
+A dark-fantasy action RPG in the classic isometric hack-and-slash mold. Pick a hero, clear demon-infested fields, caves and catacombs, and hunt ever better loot on the way down to the Hellforge, south across a desert melted to glass, and back north through the snow with the last ember of its fire. It runs in any modern browser, phones included, and needs no downloads: all the art and sound are generated in code.
 
 ## Play
 
@@ -36,9 +36,10 @@ Panels pause the game.
 - **Monsters.** Imps that flee when a packmate dies and Hexers that raise them again, ghouls, skeletons, archers, bats, hounds, brutes, wraiths and cultists. Champion packs (blue) and uniques with modifiers like Fire Enchanted, Stone Skin, Extra Fast, Lightning Enchanted, Teleporter and Bombardier (gold). Bosses: Gorvath the Glutton, the Drowned Bishop, Ossuary Warden Krell, and Vhorza, Mother of Cinders.
 - **The world.** Emberwatch Camp (healer, blacksmith, sage, gambler, stash) and seven randomly generated areas: Cinder Fields, Hollow Cave, Gloomwood, Sunken Chapel, Catacombs 1-2 and the Hellforge. Activate waypoints to fast-travel, and cast Town Portal to restock and come back. Shrines, chests and (occasionally explosive) barrels are scattered around.
 - **Act 2: The Glass Sea.** Killing Vhorza opens a caravan to Tel Maresh and seven more areas: the Ashfall Road, Cistern of Whispers, the Glass Sea, Carrion Mesa, Buried Imhara (the Bazaar and the Hall of Dials) and the Noon Vault. Sandstorms and quicksand change how the desert plays, the new monsters each have a rule to learn (Embalmed Dead rise unless burned, Mirage Dancers split into copies with no shadow, Noon Acolytes ward their allies, Dune Burrowers tunnel to you, Carrion Kites heal on corpses, Salt Colossi telegraph ground slams), and the four bosses change phase as they are wounded.
+- **Act 3: The Ember Road.** Killing Corvane opens the road back north. The ember Vhorza left is dying and the cold she held back is loose: Emberwatch lies in ruins under snow (a new town), and beyond it are Rimefall Pass, the frozen Drowned Mines, the Bellfounders' Halls, the Cold Furnace and the Hellforge's Heart. **Warmth:** in the cold the ember burns down (faster in a whiteout) and its light shrinks; once it is out, frostbite builds, slowing and then wounding. Touch a brazier to light it and stand in its glow to refill the ember; fire skills, burning weapons and burning monsters help too. Rime-Thralls shatter into ember-sapping ice unless burned, Bellwardens ring a shockwave to dodge-roll through, Slag Golems go molten in fire and brittle in cold, and Hearth-Eaters drink the ember from range unless you stand in firelight. Bosses: the Frostwright (shelter at a lit brazier from his cold snap), Corvane's Echo (break his phylactery) and the Unlit (it snuffs fires, and heals while your ember is out).
 - **Dodging and sprees.** A dodge roll (1.5 second cooldown) makes the hero untouchable for a moment and cancels a swing or cast. Kills made within four seconds of each other build a spree (Killing Spree at 5, then Rampage, Massacre, Slaughter, Annihilation, Hell Unleashed); each rank adds run speed and experience per kill, and restores some life and mana.
 - **Things to find.** Soul orbs restore life or mana when walked over. A Tithe Imp may hide in any area but the Hollow Cave: it flees, drops gold when struck, and escapes through a portal unless killed. Shrines grant Armor, Combat, Experience, Storm, Fortune or Fleet blessings, refill life and mana, or (Cursed) call a three-wave ambush with a hoard at the end. Killing everything in an area purges it for experience and loot.
-- **Quests.** Cleanse the Hollow Cave (+1 skill point), slay the Drowned Bishop (+5 stat points), destroy the Mother of Cinders to open the road south, then finish Act 2's four quests to unlock **Nightmare**, then **Hell**: tougher monsters, immunities and resistance penalties.
+- **Quests.** Cleanse the Hollow Cave (+1 skill point), slay the Drowned Bishop (+5 stat points), destroy the Mother of Cinders to open the road south, finish Act 2's four quests to open the road north, then Act 3's four (light the beacons of Rimefall Pass, the Frostwright, the Last Phylactery, Keep It Lit) to unlock **Nightmare**, then **Hell**: tougher monsters, immunities and resistance penalties.
 - **Hardcore** heroes die permanently. Softcore heroes respawn in town and lose some gold.
 
 Music, ambient sound and weather are all generated in code too; the menu has switches for each.
@@ -51,6 +52,7 @@ The version is shown at the bottom of the title screen; tap it for the player-fa
 
 | Version | Commit | Notes |
 |---|---|---|
+| 0.12.0 | | Act 3: The Ember Road (warmth and braziers, five areas, a new town, three bosses, new gear); the next difficulty now unlocks at the end of Act 3 |
 | 0.11.2 | | Holding a skill button no longer opens the skills panel |
 | 0.11.1 | | Performance: settled corpses are drawn once and stamped, the automap redraws only on exploration, displays over 100 Hz draw every other frame |
 | 0.11.0 | | Dodge roll, killing sprees, soul orbs, the Tithe Imp, four new shrines, three new elite modifiers, area purges |
@@ -77,7 +79,7 @@ The version is shown at the bottom of the title screen; tap it for the player-fa
 ## Development
 
 ```sh
-npm test           # Vitest: engine unit tests, world simulation, and a bot that plays the whole act with every class
+npm test           # Vitest: engine unit tests, world simulation, and a bot that plays all three acts with every class
 npm run e2e        # Playwright on phone-landscape, phone-portrait and desktop (screenshots land in test-results/)
 npm run typecheck
 ```

@@ -288,6 +288,7 @@ export class Game implements PanelHost {
     dodge.addEventListener('contextmenu', (e) => e.preventDefault());
     const spree = h('div', { class: 'spree hidden' }, h('div', { class: 'spree-n' }), h('div', { class: 'spree-t' }), h('div', { class: 'spree-bar' }, h('div', { class: 'spree-fill' })));
     const buffs = h('div', { class: 'buffs' });
+    const ember = h('div', { class: 'ember hidden', title: "Vhorza's ember" }, h('span', { class: 'ember-icon' }), h('div', { class: 'ember-bar' }, h('div', { class: 'ember-fill' }), h('div', { class: 'frost-fill' })), h('span', { class: 'ember-t' }));
     const ctxBtn = h('button', { class: 'ctxbtn hidden', onpointerdown: (e: Event) => e.stopPropagation(), onclick: (e: Event) => { e.stopPropagation(); this.useContext(); } });
     const target = h('div', { class: 'target hidden' }, h('div', { class: 'tname' }), h('div', { class: 'tbar' }, h('div', { class: 'tfill' })), h('div', { class: 'tmods' }));
     const msgs = h('div', { class: 'msgs' });
@@ -316,6 +317,7 @@ export class Game implements PanelHost {
       dodge,
       spree,
       buffs,
+      ember,
       ctxBtn,
     );
     this.panelEl = h('div', {
@@ -339,6 +341,7 @@ export class Game implements PanelHost {
       life: q('.orb.life'), mana: q('.orb.mana'), belt, skills, ctx: ctxBtn, area: q('.area-name'), joy: q('.joy'), knob: q('.joy-knob'),
       tp: q('.hb-tp'), skillsBtn: q('.hb-skills'), charBtn: q('.hb-char'),
       dodge, spree, spreeN: q('.spree-n'), spreeT: q('.spree-t'), spreeFill: q('.spree-fill'), buffs,
+      ember, emberFill: q('.ember-fill'), frostFill: q('.frost-fill'), emberT: q('.ember-t'),
     };
   }
 
@@ -475,8 +478,27 @@ export class Game implements PanelHost {
       this.hudCache.buffs = bk;
       H.buffs.replaceChildren(...chips.map((c) => h('span', { class: `buff b-${c.slice(7, c.indexOf(':'))}` }, c.slice(c.indexOf(':') + 1))));
     }
+    // The ember: how much heat it has left, and the frostbite that follows once it is out.
+    const showEmber = w.cold && !p.dead;
+    if (this.hudCache.emberOn !== String(showEmber)) {
+      this.hudCache.emberOn = String(showEmber);
+      H.ember.classList.toggle('hidden', !showEmber);
+      H.root.classList.toggle('has-ember', showEmber);
+    }
+    if (showEmber) {
+      const state = w.frost >= 1 ? 'freezing' : w.ember <= 0 ? 'out' : w.nearFire ? 'warm' : w.ember < 0.3 ? 'low' : 'lit';
+      const ek = `${Math.round(w.ember * 50)}:${Math.round(w.frost * 50)}:${state}`;
+      if (this.hudCache.ember !== ek) {
+        this.hudCache.ember = ek;
+        H.emberFill.style.transform = `scaleX(${w.ember})`;
+        H.frostFill.style.transform = `scaleX(${w.frost})`;
+        H.ember.dataset.state = state;
+        this.setText('embt', H.emberT, { freezing: 'Freezing!', out: 'Ember out: find a fire', warm: 'By the fire', low: 'Ember low', lit: '' }[state]);
+      }
+    }
     const strays = w.stragglers().length;
-    this.setText('area', H.area, `${AREA_BY_ID[w.area.def.id].name}${strays ? ` · ${strays} left` : ''}`);
+    const beacons = w.unlitBeacons().length;
+    this.setText('area', H.area, `${AREA_BY_ID[w.area.def.id].name}${beacons ? ` · ${beacons} ${beacons === 1 ? 'beacon' : 'beacons'} dark` : strays ? ` · ${strays} left` : ''}`);
     // Context button: nearest interactable.
     const near = w.interactablesNear(p.x, p.y, 2.6)[0];
     if (near && !p.dead) {
@@ -652,8 +674,8 @@ export class Game implements PanelHost {
       h(
         'div',
         { class: 'ov-box victory story' },
-        h('div', { class: 'ov-title' }, STORIES.finale.title),
-        ...STORIES.finale.lines.map((line) => h('div', { class: 'ov-sub' }, line)),
+        h('div', { class: 'ov-title' }, STORIES.rekindle.title),
+        ...STORIES.rekindle.lines.map((line) => h('div', { class: 'ov-sub' }, line)),
         h('div', { class: 'ov-sub' }, `${next ? `${next} difficulty is now unlocked from the character screen.` : 'You have conquered every difficulty. Legends will be sung of you.'}`),
         h('button', { class: 'btn primary', onclick: () => this.overlayEl.classList.add('hidden') }, 'Continue'),
       ),

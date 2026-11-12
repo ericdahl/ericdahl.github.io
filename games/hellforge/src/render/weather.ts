@@ -8,7 +8,7 @@ import type { Camera } from './camera';
  * space around the player so they move with the ground, and fade outside the light radius.
  */
 
-type Kind = 'ash' | 'ember' | 'fog' | 'leaf' | 'drip' | 'dust' | 'splash' | 'sand' | 'glint';
+type Kind = 'ash' | 'ember' | 'fog' | 'leaf' | 'drip' | 'dust' | 'splash' | 'sand' | 'glint' | 'snow' | 'frost';
 
 interface Particle {
   kind: Kind;
@@ -41,6 +41,12 @@ const RATES: Record<string, Partial<Record<Kind, number>>> = {
   cistern: { drip: 2, fog: 0.6, dust: 2 },
   ruins: { dust: 8, sand: 1.5 },
   vault: { ember: 9, glint: 5, dust: 3 },
+  snowtown: { snow: 16, ember: 2, fog: 0.3 },
+  snow: { snow: 24, fog: 0.9, glint: 2 },
+  icemine: { drip: 1.2, frost: 5, fog: 0.5, glint: 3 },
+  foundry: { dust: 5, frost: 3, snow: 2 },
+  furnace: { frost: 7, snow: 4, fog: 0.5 },
+  heart: { snow: 12, frost: 6, ember: 1.5 },
 };
 
 const MAX = 220;
@@ -91,6 +97,8 @@ export class Weather {
         q.t = q.life;
         if (isWalkable(l, q.x, q.y)) this.ps.push({ kind: 'splash', x: q.x, y: q.y, z: 0, vx: 0, vy: 0, vz: 0, t: 0, life: 0.45, size: 1, rot: 0 });
       }
+      if (q.kind === 'snow') q.vx += Math.sin(this.time * 1.7 + q.rot) * dt * 0.5;
+      if (q.kind === 'snow' && q.z <= 0) q.t = q.life;
       if ((q.kind === 'ash' || q.kind === 'leaf') && q.z <= 0) {
         q.z = 0;
         q.vx = q.vy = q.vz = 0;
@@ -105,7 +113,7 @@ export class Weather {
     const rates = RATES[this.theme];
     if (!rates) return;
     for (const [kind, rate] of Object.entries(rates) as [Kind, number][]) {
-      const stormy = kind === 'sand' ? 1 + w.storm * 9 : 1;
+      const stormy = kind === 'sand' ? 1 + w.storm * 9 : kind === 'snow' ? 1 + w.storm * 5 : 1;
       this.acc[kind] = (this.acc[kind] ?? 0) + rate * stormy * dt;
       while (this.acc[kind]! >= 1) {
         this.acc[kind]! -= 1;
@@ -150,6 +158,16 @@ export class Weather {
       case 'glint':
         Object.assign(q, { z: r(0, 16), life: r(0.5, 1.2), size: r(1.5, 3.5) });
         break;
+      case 'snow': {
+        // Flakes fall slantwise; a whiteout drives them nearly flat.
+        const gust = 1 + w.storm * 4;
+        Object.assign(q, { z: r(60, 230), vx: r(0.3, 1) * gust, vy: r(-0.3, 0.2) * gust, vz: -r(26, 48), life: r(5, 8), size: r(1.2, 2.8) });
+        break;
+      }
+      case 'frost':
+        // Motes of ice hanging in still air.
+        Object.assign(q, { z: r(6, 80), vx: r(-0.06, 0.06), vy: r(-0.06, 0.06), vz: r(-3, 1), life: r(4, 8), size: r(0.8, 1.7) });
+        break;
       case 'dust':
         Object.assign(q, { z: r(10, 70), vx: r(-0.08, 0.08), vy: r(-0.08, 0.08), vz: r(-2, 2), life: r(6, 10), size: r(0.8, 1.6) });
         break;
@@ -177,6 +195,18 @@ export class Weather {
         case 'ash':
           ctx.globalCompositeOperation = 'source-over';
           ctx.fillStyle = `rgba(190,180,170,${0.55 * a})`;
+          ctx.fillRect(s.x, sy, q.size * z, q.size * z);
+          break;
+        case 'snow':
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillStyle = `rgba(240,246,255,${0.85 * a})`;
+          ctx.beginPath();
+          ctx.arc(s.x, sy, q.size * 0.6 * z, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        case 'frost':
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.fillStyle = `rgba(190,225,255,${0.5 * a * (0.5 + 0.5 * Math.sin(this.time * 3 + q.rot * 4))})`;
           ctx.fillRect(s.x, sy, q.size * z, q.size * z);
           break;
         case 'sand':
@@ -269,7 +299,9 @@ export class Weather {
     const p = w.player;
     const lifeK = p.life / Math.max(1, w.stats.maxLife);
     const layers: { rgb: string; a: number }[] = [];
-    if (p.chill > 0) layers.push({ rgb: '150,210,255', a: Math.min(1, p.chill) * 0.5 });
+    // Frostbite whitens the edges of the screen as it builds; a chill from a blow does the same for a moment.
+    const cold = Math.max(p.chill > 0 ? Math.min(1, p.chill) : 0, p.dead ? 0 : w.frost);
+    if (cold > 0) layers.push({ rgb: '150,210,255', a: cold * 0.5 });
     if (p.poison.t > 0) layers.push({ rgb: '70,170,40', a: Math.min(1, p.poison.t / 2) * 0.4 });
     if (!p.dead && lifeK < 0.35) {
       // Pulse in time with the heartbeat in the score.
@@ -292,8 +324,8 @@ export class Weather {
       ctx.fillRect(0, 0, W, H);
     }
     // Frost crystals creeping in from the corners.
-    if (p.chill > 0) {
-      ctx.strokeStyle = `rgba(220,240,255,${Math.min(1, p.chill) * 0.35})`;
+    if (cold > 0) {
+      ctx.strokeStyle = `rgba(220,240,255,${cold * 0.35})`;
       ctx.lineWidth = 1.2;
       for (const [cx, cy, sx, sy] of [[0, 0, 1, 1], [W, 0, -1, 1], [0, H, 1, -1], [W, H, -1, -1]] as const) {
         for (let i = 0; i < 6; i++) {

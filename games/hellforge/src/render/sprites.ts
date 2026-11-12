@@ -29,6 +29,13 @@ export const THEMES: Record<ThemeId, Palette> = {
   cistern: { floor: ['#2e3a3c', '#2a3537', '#324042', '#263032'], speck: ['#3f5052', '#1c2628', '#3a5a50'], wallTop: '#4c5a58', wallL: '#38443f', wallR: '#2a3330', grid: '#1e2826' },
   ruins: { floor: ['#6e5e42', '#66573d', '#766548', '#5e5038'], speck: ['#8a7858', '#463a28'], wallTop: '#a08a64', wallL: '#786648', wallR: '#584a34', grid: '#4a3e2c' },
   vault: { floor: ['#3a2c14', '#342710', '#402f16', '#2f230e'], speck: ['#5a4420', '#1e160a', '#8a6a20'], wallTop: '#6a5220', wallL: '#4a3816', wallR: '#33270f', grid: '#261c0c', cracks: '#ffc840' },
+  // Act 3: snow over the old camp, the pass, blue mine ice, the founders' bronze and soot, and the dead forge.
+  snowtown: { floor: ['#b4bcc6', '#aab3be', '#bcc4cd', '#a2abb7'], speck: ['#d8dee6', '#8a94a2', '#5a5448', '#e8eef4'], wallTop: '#c8d0da', wallL: '#6a707c', wallR: '#4c525e' },
+  snow: { floor: ['#c2cad4', '#b8c1cc', '#cad2db', '#b0bac6'], speck: ['#e6ecf2', '#98a4b4', '#f4f8fc'], wallTop: '#d0d8e2', wallL: '#74808e', wallR: '#566270' },
+  icemine: { floor: ['#2c3e4c', '#283947', '#304452', '#243442'], speck: ['#40586a', '#1a2732', '#6a98b4'], wallTop: '#4a6a80', wallL: '#324a5c', wallR: '#223544', cracks: '#a8e0ff' },
+  foundry: { floor: ['#3a3430', '#35302c', '#3f3934', '#302b28'], speck: ['#4c443c', '#221e1c', '#7a5a30'], wallTop: '#6a5638', wallL: '#4a3c28', wallR: '#34291c', grid: '#231f1c' },
+  furnace: { floor: ['#2a2a30', '#26262c', '#2e2e35', '#222228'], speck: ['#3a3a44', '#16161a', '#4a5a70'], wallTop: '#3e3e4a', wallL: '#2c2c36', wallR: '#1e1e26', grid: '#18181c', cracks: '#5a8ab8' },
+  heart: { floor: ['#2c2024', '#281c20', '#302328', '#24191c'], speck: ['#3c2a30', '#160e10', '#5a6a88'], wallTop: '#3a2a30', wallL: '#2a1c22', wallR: '#1c1216', cracks: '#7ab0e8' },
 };
 
 function canvas(w: number, h: number): HTMLCanvasElement {
@@ -97,6 +104,49 @@ export function floorTile(theme: ThemeId, v: number): HTMLCanvasElement {
       ctx.stroke();
     }
     ctx.globalAlpha = 1;
+  }
+  if (theme === 'snow' || theme === 'snowtown') {
+    // Wind-packed drifts, and a few glints where the crust catches the light.
+    ctx.strokeStyle = 'rgba(70,90,120,0.16)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 3; i++) {
+      const y = rng.range(6, TILE_H - 6);
+      ctx.beginPath();
+      ctx.moveTo(rng.range(4, 20), y);
+      ctx.quadraticCurveTo(TILE_W / 2, y + rng.range(2, 5), TILE_W - rng.range(4, 20), y + rng.range(-2, 2));
+      ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    for (let i = 0; i < 5; i++) ctx.fillRect(rng.range(6, TILE_W - 6), rng.range(4, TILE_H - 4), 1, 1);
+    if (theme === 'snowtown' && v % 2) {
+      // Trodden paths: the camp still walks here.
+      ctx.fillStyle = 'rgba(70,62,50,0.22)';
+      for (let i = 0; i < 4; i++) {
+        ctx.beginPath();
+        ctx.ellipse(rng.range(14, TILE_W - 14), rng.range(8, TILE_H - 8), rng.range(3, 6), rng.range(1.5, 3), 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+  if (theme === 'icemine') {
+    // A skin of ice over the stone.
+    const g = ctx.createLinearGradient(0, 0, TILE_W, TILE_H);
+    g.addColorStop(0, 'rgba(170,220,255,0.16)');
+    g.addColorStop(0.5, 'rgba(170,220,255,0)');
+    g.addColorStop(1, 'rgba(170,220,255,0.1)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, TILE_W, TILE_H);
+  }
+  if (theme === 'furnace' || theme === 'heart' || theme === 'foundry') {
+    // Hoarfrost creeping in from the tile edges.
+    ctx.fillStyle = theme === 'foundry' ? 'rgba(200,220,240,0.1)' : 'rgba(190,220,250,0.17)';
+    for (let i = 0; i < 9; i++) {
+      const a = rng.range(0, Math.PI * 2);
+      const d = rng.range(0.72, 1);
+      ctx.beginPath();
+      ctx.ellipse(TILE_W / 2 + Math.cos(a) * (TILE_W / 2) * d * 0.9, TILE_H / 2 + Math.sin(a) * (TILE_H / 2) * d * 0.9, rng.range(2, 6), rng.range(1, 3), 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   if (theme === 'desert' || theme === 'mesa' || theme === 'oasis') {
     // Wind ripples in the sand.
@@ -176,7 +226,7 @@ export function wallBlock(theme: ThemeId, v: number): HTMLCanvasElement {
       ctx.lineTo(x, yTop + H);
       ctx.stroke();
     }
-  } else if (theme === 'chapel' || theme === 'crypt' || theme === 'hell' || theme === 'cistern' || theme === 'ruins' || theme === 'vault') {
+  } else if (theme === 'chapel' || theme === 'crypt' || theme === 'hell' || theme === 'cistern' || theme === 'ruins' || theme === 'vault' || theme === 'foundry' || theme === 'furnace' || theme === 'heart') {
     for (let r = 1; r < 5; r++) {
       const dy = (r / 5) * H;
       ctx.beginPath();
@@ -219,6 +269,44 @@ export function wallBlock(theme: ThemeId, v: number): HTMLCanvasElement {
       ctx.fill();
     }
   }
+  if (theme === 'foundry') {
+    // A bronze band along the top of every course, gone green at the rivets.
+    ctx.strokeStyle = '#b08a48';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, T / 2 + 5);
+    ctx.lineTo(W / 2, T + 5);
+    ctx.lineTo(W, T / 2 + 5);
+    ctx.stroke();
+    ctx.fillStyle = '#5a8a6a';
+    for (let i = 0; i < 4; i++) ctx.fillRect(6 + i * 9, T / 2 + 4 + (i < 2 ? i * 4.5 : 0) + (i >= 2 ? 9 + (i - 2) * 4.5 : 0), 1.6, 1.6);
+  }
+  if (theme === 'icemine' || theme === 'furnace' || theme === 'heart' || theme === 'foundry') {
+    // Icicles hanging from the top edge, and frost on the stone below it.
+    ctx.fillStyle = theme === 'foundry' ? 'rgba(200,225,245,0.45)' : 'rgba(190,225,250,0.7)';
+    const n = theme === 'foundry' ? 3 : 6;
+    for (let i = 0; i < n; i++) {
+      const x = rng.range(3, W - 3);
+      const yTop = (x < W / 2 ? T / 2 + (x / (W / 2)) * (T / 2) : T - ((x - W / 2) / (W / 2)) * (T / 2)) + 0.5;
+      const len = rng.range(5, 15);
+      ctx.beginPath();
+      ctx.moveTo(x - 1.6, yTop);
+      ctx.lineTo(x, yTop + len);
+      ctx.lineTo(x + 1.6, yTop);
+      ctx.fill();
+    }
+  }
+  if ((theme === 'heart' || theme === 'furnace') && v % 3 === 0) {
+    // The forge's old fire-cracks, glowing cold now.
+    ctx.strokeStyle = '#7ab0e8';
+    ctx.globalAlpha = 0.55;
+    ctx.beginPath();
+    ctx.moveTo(W * 0.3, T / 2 + 12);
+    ctx.lineTo(W * 0.22, T / 2 + 24);
+    ctx.lineTo(W * 0.28, T / 2 + 36);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
   if ((theme === 'hell' || theme === 'vault') && v % 3 === 0) {
     ctx.strokeStyle = theme === 'vault' ? '#ffc840' : '#ff5a10';
     ctx.globalAlpha = 0.6;
@@ -250,6 +338,11 @@ export function treeSprite(theme: ThemeId, v: number): HTMLCanvasElement {
   const by = 112;
   if (theme === 'oasis' || theme === 'desert' || theme === 'glass' || theme === 'mesa') {
     drawDesertObstacle(ctx, theme, v, rng, bx, by);
+    treeCache.set(key, c);
+    return c;
+  }
+  if (theme === 'snow' || theme === 'snowtown') {
+    drawSnowObstacle(ctx, theme, v, rng, bx, by);
     treeCache.set(key, c);
     return c;
   }
@@ -327,6 +420,104 @@ export function treeSprite(theme: ThemeId, v: number): HTMLCanvasElement {
   }
   treeCache.set(key, c);
   return c;
+}
+
+/** Rimefall Pass and the ruined camp: pines bowed under snow, iced boulders, and what is left of the palisade. */
+function drawSnowObstacle(ctx: CanvasRenderingContext2D, theme: 'snow' | 'snowtown', v: number, rng: Rng, bx: number, by: number) {
+  ctx.fillStyle = 'rgba(40,56,80,0.28)';
+  ctx.beginPath();
+  ctx.ellipse(bx, by, 26, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (theme === 'snowtown' && v % 2 === 0) {
+    // Burnt palisade stakes: the camp fed its wall to the fire, one stake at a time.
+    for (let i = 0; i < 4; i++) {
+      const x = bx - 18 + i * 12 + rng.range(-2, 2);
+      const h = rng.range(8, 30);
+      const g = ctx.createLinearGradient(x - 4, 0, x + 4, 0);
+      g.addColorStop(0, '#3a2c22');
+      g.addColorStop(1, '#14100c');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(x - 4, by + 2);
+      ctx.lineTo(x - 4, by - h);
+      ctx.lineTo(x - 1 + rng.range(-1, 1), by - h - rng.range(3, 8));
+      ctx.lineTo(x + 2, by - h + 1);
+      ctx.lineTo(x + 4, by - h - rng.range(0, 4));
+      ctx.lineTo(x + 4, by + 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#e4eaf2';
+      ctx.beginPath();
+      ctx.ellipse(x, by + 2, 7, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    return;
+  }
+  if (v % 3 === 0) {
+    // A boulder with a cap of snow and a beard of ice.
+    const g = ctx.createLinearGradient(bx - 22, by - 40, bx + 22, by);
+    g.addColorStop(0, '#8a94a2');
+    g.addColorStop(1, '#3c4450');
+    ctx.fillStyle = g;
+    const top = 30 + rng.range(0, 12);
+    ctx.beginPath();
+    ctx.moveTo(bx - 25, by + 2);
+    ctx.lineTo(bx - 20, by - top * 0.7);
+    ctx.lineTo(bx - 5, by - top);
+    ctx.lineTo(bx + 14, by - top * 0.8);
+    ctx.lineTo(bx + 25, by - 5);
+    ctx.lineTo(bx + 13, by + 5);
+    ctx.lineTo(bx - 14, by + 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#eef3f8';
+    ctx.beginPath();
+    ctx.moveTo(bx - 21, by - top * 0.62);
+    ctx.lineTo(bx - 5, by - top - 2);
+    ctx.lineTo(bx + 15, by - top * 0.8 - 1);
+    ctx.quadraticCurveTo(bx + 10, by - top * 0.6, bx + 2, by - top * 0.7);
+    ctx.quadraticCurveTo(bx - 8, by - top * 0.5, bx - 21, by - top * 0.62);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(180,220,250,0.8)';
+    for (let i = 0; i < 4; i++) {
+      const x = bx - 12 + i * 8;
+      ctx.beginPath();
+      ctx.moveTo(x - 1.5, by - top * 0.5);
+      ctx.lineTo(x, by - top * 0.5 + rng.range(6, 14));
+      ctx.lineTo(x + 1.5, by - top * 0.5);
+      ctx.fill();
+    }
+    return;
+  }
+  // A pine, each tier weighed down with snow.
+  ctx.fillStyle = '#2a2018';
+  ctx.fillRect(bx - 3, by - 26, 6, 26);
+  for (let i = 0; i < 4; i++) {
+    const y = by - 22 - i * 18;
+    const w = 29 - i * 6 + rng.range(-3, 3);
+    ctx.fillStyle = i % 2 ? '#1e3028' : '#243a30';
+    ctx.beginPath();
+    ctx.moveTo(bx - w, y + 3);
+    ctx.lineTo(bx, y - 28);
+    ctx.lineTo(bx + w, y + 3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#e8eef5';
+    ctx.beginPath();
+    ctx.moveTo(bx, y - 29);
+    ctx.lineTo(bx + w * 0.72, y - 3);
+    ctx.quadraticCurveTo(bx + w * 0.3, y - 9, bx + 2, y - 4);
+    ctx.quadraticCurveTo(bx - w * 0.3, y - 10, bx - w * 0.66, y - 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(140,170,210,0.35)';
+    ctx.beginPath();
+    ctx.moveTo(bx, y - 29);
+    ctx.lineTo(bx - w * 0.66, y - 4);
+    ctx.quadraticCurveTo(bx - w * 0.3, y - 10, bx - 1, y - 8);
+    ctx.closePath();
+    ctx.fill();
+  }
 }
 
 function drawDesertObstacle(ctx: CanvasRenderingContext2D, theme: 'oasis' | 'desert' | 'glass' | 'mesa', v: number, rng: Rng, bx: number, by: number) {

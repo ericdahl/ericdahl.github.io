@@ -123,6 +123,9 @@ export class Audio {
       case 'spree': this.hiss(0.3, 0.2, 240, 0.7, 'lowpass'); [196, 294, 392].forEach((f, i) => this.tone('sawtooth', f, f * 1.01, 0.42, 0.09, i * 0.07)); return;
       case 'cackle': [900, 1150, 820, 1250, 760].forEach((f, i) => this.tone('square', f, f * 0.8, 0.09, 0.06, i * 0.085)); return;
       case 'jackpot': [1047, 1319, 1568, 2093, 1568, 2093, 2637].forEach((f, i) => this.tone('triangle', f, f, 0.22, 0.1, i * 0.07)); this.hiss(0.6, 0.1, 7000, 2); return;
+      case 'bell': [196, 392, 587, 988].forEach((f, i) => this.tone(i ? 'sine' : 'triangle', f, f * 0.995, 1.4 - i * 0.25, 0.16 - i * 0.03)); return this.hiss(0.06, 0.3, 2400, 1.5);
+      case 'kindle': this.hiss(0.5, 0.3, 900, 0.5, 'lowpass'); this.tone('sawtooth', 90, 180, 0.35, 0.07); return [660, 880].forEach((f, i) => this.tone('sine', f, f, 0.3, 0.06, 0.12 + i * 0.08));
+      case 'snuff': this.hiss(0.45, 0.3, 3000, 0.8, 'highpass'); return this.tone('sine', 300, 60, 0.5, 0.12);
       case 'curse': this.tone('sawtooth', 220, 55, 0.9, 0.16); this.tone('sawtooth', 233, 58, 0.9, 0.12); return this.hiss(0.8, 0.25, 220, 0.6, 'lowpass');
     }
   }
@@ -144,7 +147,7 @@ export class Audio {
     s.loop = true;
     const f = c.createBiquadFilter();
     f.type = 'lowpass';
-    f.frequency.value = AREA_BY_ID[areaId]?.town ? 500 : areaId === 'hellforge' || areaId === 'noon_vault' ? 160 : 260;
+    f.frequency.value = AREA_BY_ID[areaId]?.town ? 500 : areaId === 'hellforge' || areaId === 'noon_vault' || areaId === 'hellforge_heart' ? 160 : AREA_BY_ID[areaId]?.blizzard ? 700 : 260;
     const g = c.createGain();
     g.gain.value = 0;
     g.gain.setTargetAtTime(AREA_BY_ID[areaId]?.town ? 0.03 : 0.06, c.currentTime, 1);

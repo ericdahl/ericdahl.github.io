@@ -1,6 +1,6 @@
 // Monster bodies. Figure space as in figures.ts: feet at (0,0), facing +x.
 import {
-  alpha, art, circle, drawHumanoid, slitEyes, swingPose, ellipse, mix, eyes, fillInk, glow, ink, INK, lin, limb, poly, rad, roundRect, shade,
+  alpha, art, circle, drawHumanoid, rgbOf, slitEyes, swingPose, ellipse, mix, eyes, fillInk, glow, ink, INK, lin, limb, poly, rad, roundRect, shade,
   type HumanoidLook, type Pose,
 } from './figures';
 
@@ -64,6 +64,13 @@ export function drawMonsterShape(ctx: CanvasRenderingContext2D, shape: string, c
       case 'colossus': colossus(ctx, color, s); break;
       case 'noon': noon(ctx, color, s); break;
       case 'mother': mother(ctx, color, s); break;
+      case 'unlit': mother(ctx, color, s, true); break;
+      case 'thrall': thrall(ctx, color, s); break;
+      case 'bellwarden': bellwarden(ctx, color, s); break;
+      case 'slag': slag(ctx, color, s); break;
+      case 'eater': eater(ctx, color, s); break;
+      case 'phylactery': phylactery(ctx, color, s); break;
+      case 'frostwright': frostwright(ctx, color, s); break;
     }
   } finally {
     ctx.restore();
@@ -1109,6 +1116,15 @@ function robed(ctx: CanvasRenderingContext2D, shape: string, c: string, s: S) {
     ctx.stroke();
   }
   if (shape === 'corvin') glow(ctx, 0, -30, 26, '#a0d8ff', 0.15);
+  if (s.id === 'echo') {
+    // What is left of him: the same old man, seen through blue glass.
+    const prev = ctx.globalAlpha;
+    glow(ctx, 0, -30, 34, '#6aa8e8', 0.4 + 0.1 * Math.sin(t * 3));
+    ctx.globalAlpha = prev * 0.72;
+    drawHumanoid(ctx, { ...ROBED.corvin(c), body: '#3a5a88', cape: '#22385a', skin: '#b8d0e8', headColor: '#d8ecff', beard: '#d8ecff', trim: '#a8d0ff', accent: '#a8d0ff', eyeGlow: '#e8f6ff' }, { ...s.pose, dir: 1 }, t);
+    ctx.globalAlpha = prev;
+    return;
+  }
   drawHumanoid(ctx, ROBED[shape](c), { ...s.pose, dir: 1 }, t);
   if (shape === 'bishop' && !art.dead) {
     // Water still running off him; weed tangled in the hem.
@@ -1752,7 +1768,354 @@ function noon(ctx: CanvasRenderingContext2D, c: string, s: S) {
   arm(1);
 }
 
-function mother(ctx: CanvasRenderingContext2D, c: string, s: S) {
+
+// ------------------------------------------------------------------ act 3
+
+/** A Rime-Thrall: an imp frozen through, sheathed in ice that will fly apart when it dies. */
+function thrall(ctx: CanvasRenderingContext2D, c: string, s: S) {
+  imp(ctx, c, s, false);
+  const { t } = s;
+  // Ice plates over the shoulders and spikes down the back.
+  for (const [x, y, h, lean] of [[-6, -27, 9, -3], [-2, -30, 12, -1], [3, -29, 8, 2], [-9, -20, 7, -4]] as const) {
+    poly(ctx, [x - 2.2, y, x + lean, y - h, x + 2.2, y]);
+    fillInk(ctx, lin(ctx, x - 2, y - h, x + 2, y, '#e8f6ff', 0.2, -0.35), 0.6);
+  }
+  ctx.fillStyle = alpha('#d8f0ff', 0.45);
+  ellipse(ctx, 0, -17, 6.5, 8);
+  ctx.fill();
+  ctx.strokeStyle = alpha('#ffffff', 0.7);
+  ctx.lineWidth = 0.6;
+  ctx.beginPath();
+  ctx.moveTo(-3, -22);
+  ctx.lineTo(0, -16);
+  ctx.lineTo(-2, -11);
+  ctx.moveTo(0, -16);
+  ctx.lineTo(4, -14);
+  ctx.stroke();
+  glow(ctx, 0, -18, 13, '#8ad0ff', 0.22 + 0.08 * Math.sin(t * 4));
+}
+
+/** A Bellwarden: a founders' automaton of bronze plate with a bell for a head and a striker for a hand. */
+function bellwarden(ctx: CanvasRenderingContext2D, c: string, s: S) {
+  const { sw, atk, t } = s;
+  const tolling = s.pose.cast > 0 || atk > 0;
+  const dark = shade(c, -0.4);
+  const verdigris = '#5a8a6a';
+  // Legs: riveted greaves
+  for (const [x, k] of [[-6, 1], [5, -1]] as const) {
+    poly(ctx, [x - 3.5 + sw * 2 * k, -17, x + 3.5 + sw * 2 * k, -17, x + 4 + sw * 3 * k, -1, x - 4 + sw * 3 * k, -1]);
+    fillInk(ctx, lin(ctx, x - 4, -17, x + 4, -1, k > 0 ? dark : shade(c, -0.2)), 1);
+  }
+  // Far arm
+  limb(ctx, [-10, -36, -15, -27, -14, -18 + sw], 4.6, dark, 1.3);
+  // Barrel torso, banded
+  ctx.beginPath();
+  ctx.moveTo(-11, -38);
+  ctx.quadraticCurveTo(-14, -26, -9, -15);
+  ctx.lineTo(9, -15);
+  ctx.quadraticCurveTo(14, -26, 11, -38);
+  ctx.closePath();
+  fillInk(ctx, lin(ctx, -12, -38, 12, -15, c, 0.3, -0.45), 1.1);
+  ctx.strokeStyle = alpha('#000000', 0.4);
+  ctx.lineWidth = 0.9;
+  for (const y of [-32, -25, -19]) {
+    ctx.beginPath();
+    ctx.moveTo(-12, y);
+    ctx.quadraticCurveTo(0, y + 2, 12, y);
+    ctx.stroke();
+  }
+  ctx.fillStyle = verdigris;
+  for (const [x, y] of [[-8, -30], [8, -30], [-9, -23], [9, -23], [0, -17]]) {
+    circle(ctx, x, y, 0.9);
+    ctx.fill();
+  }
+  // Frost in the joints
+  ctx.fillStyle = alpha('#e8f4ff', 0.6);
+  ellipse(ctx, -9, -38, 3.5, 1.4);
+  ellipse(ctx, 9, -38, 3.5, 1.4);
+  ctx.fill();
+  // Bell head: swings as it tolls.
+  const swing = tolling ? Math.sin(t * 22) * 0.22 : Math.sin(t * 1.5) * 0.04;
+  ctx.save();
+  ctx.translate(0, -39);
+  ctx.rotate(swing);
+  ctx.beginPath();
+  ctx.moveTo(-9, 0);
+  ctx.quadraticCurveTo(-8, -10, -4, -15);
+  ctx.quadraticCurveTo(0, -18, 4, -15);
+  ctx.quadraticCurveTo(8, -10, 9, 0);
+  ctx.closePath();
+  fillInk(ctx, lin(ctx, -9, -16, 9, 0, shade(c, 0.12), 0.35, -0.4), 1.1);
+  ctx.fillStyle = verdigris;
+  ctx.fillRect(-9, -2, 18, 1.8);
+  circle(ctx, 0, -17, 1.8);
+  fillInk(ctx, dark, 0.7);
+  // The dark of the bell's mouth, with one cold light in it.
+  ctx.fillStyle = '#0c0a08';
+  ellipse(ctx, 1, 0.5, 7.5, 2.2);
+  ctx.fill();
+  eyes(ctx, 2.5, 0.2, 3.4, '#ffd070', 0.9);
+  ctx.restore();
+  if (tolling && !art.dead) glow(ctx, 0, -46, 22, '#ffd070', 0.45);
+  // Striker arm: raised high for the toll.
+  const up = Math.max(atk, s.pose.cast > 0 ? Math.sin(s.pose.cast * Math.PI) : 0);
+  const hx = 16 + up * 2;
+  const hy = -20 - up * 30;
+  limb(ctx, [10, -36, 15, -29 - up * 8, hx, hy], 5, shade(c, -0.08), 1.3);
+  limb(ctx, [hx, hy, hx + 3, hy - 9], 1.8, '#3a2c20', 1);
+  circle(ctx, hx + 3.5, hy - 11, 3.4);
+  fillInk(ctx, rad(ctx, hx + 3.5, hy - 11, 3.4, shade(c, 0.2)), 0.9);
+}
+
+/** A Slag Golem: clinker and cooled iron. The seams show what temper it is in. */
+function slag(ctx: CanvasRenderingContext2D, c: string, s: S) {
+  const { sw, atk, t } = s;
+  // The renderer recolours it: orange when molten, pale when brittle.
+  const [r, , b] = rgbOf(c);
+  const molten = r > 150 && r > b * 2;
+  const brittle = b > r && b > 150;
+  const seam = molten ? '#ffd060' : brittle ? '#e8f8ff' : '#c85a20';
+  const body = molten ? '#5a2a14' : brittle ? '#8aa4b8' : c;
+  const lump = (pts: number[], k: number) => {
+    poly(ctx, pts);
+    const xs = pts.filter((_, i) => i % 2 === 0);
+    const ys = pts.filter((_, i) => i % 2 === 1);
+    fillInk(ctx, lin(ctx, Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), shade(body, k), 0.28, -0.5), 1);
+  };
+  lump([-9 + sw * 2, -16, -2 + sw * 2, -17, -2 + sw * 3, -1, -10 + sw * 3, -1], -0.2);
+  lump([2 - sw * 2, -17, 9 - sw * 2, -16, 10 - sw * 3, -1, 3 - sw * 3, -1], -0.05);
+  lump([-13, -38, -18, -33, -19, -21, -14 + sw, -15, -10, -24], -0.25);
+  lump([-13, -40, -5, -47, 8, -46, 14, -38, 13, -24, 8, -14, -8, -14, -14, -25], 0);
+  lump([-1, -45, 8, -50, 12, -44, 4, -40], 0.1);
+  // Seams
+  const p = 0.55 + 0.3 * Math.sin(t * (molten ? 6 : 2));
+  ctx.strokeStyle = art.dead ? alpha('#000000', 0.5) : alpha(seam, brittle ? 0.9 : 0.5 + p * 0.4);
+  ctx.lineWidth = molten ? 1.4 : 0.9;
+  ctx.beginPath();
+  ctx.moveTo(-5, -47);
+  ctx.lineTo(-3, -36);
+  ctx.lineTo(-11, -30);
+  ctx.moveTo(-3, -36);
+  ctx.lineTo(6, -30);
+  ctx.lineTo(12, -32);
+  ctx.moveTo(6, -30);
+  ctx.lineTo(3, -20);
+  ctx.lineTo(7, -14);
+  ctx.moveTo(3, -20);
+  ctx.lineTo(-6, -17);
+  ctx.stroke();
+  if (molten) glow(ctx, 0, -30, 24, '#ff7a20', 0.5 + p * 0.3);
+  else if (!brittle) glow(ctx, 1, -30, 10, '#ff6a20', p * 0.25);
+  if (brittle) {
+    // Hoarfrost and hairline cracks: one good blow from breaking.
+    ctx.fillStyle = alpha('#ffffff', 0.5);
+    ellipse(ctx, -6, -43, 5, 1.8, -0.4);
+    ellipse(ctx, 9, -40, 4, 1.5, 0.5);
+    ctx.fill();
+  }
+  eyes(ctx, 7, -45.5, 3.4, molten ? '#fff0a0' : brittle ? '#c8ecff' : '#ff9040', 1);
+  const hx = 17 + atk * 4;
+  const hy2 = -19 - atk * 19;
+  lump([11, -40, 15, -39, hx + 3, hy2 - 2, hx - 3, hy2 + 1], -0.08);
+  lump([hx - 5, hy2 - 4, hx + 5, hy2 - 5, hx + 6, hy2 + 5, hx - 4, hy2 + 6], 0.08);
+  if (molten && atk > 0.3) glow(ctx, hx, hy2, 12, '#ffb040', atk * 0.6);
+}
+
+/** A Hearth-Eater: a stooped thing of soot and cold with a lamprey mouth where the face should be, and warmth caught in its belly. */
+function eater(ctx: CanvasRenderingContext2D, c: string, s: S) {
+  const { sw, atk, t } = s;
+  const feeding = s.pose.cast > 0 || atk > 0;
+  const bob = Math.sin(t * 2.4) * 1.5;
+  ctx.translate(0, bob - 3);
+  // Smoke tatters
+  if (!art.dead) {
+    for (let i = 0; i < 5; i++) {
+      const k = (t * 0.6 + i * 0.2) % 1;
+      ctx.fillStyle = alpha('#1a1624', 0.4 * (1 - k));
+      ellipse(ctx, -8 - k * 10 + i * 1.5, -8 - i * 6 - k * 6, 4 - k * 2.5, 2.4 - k);
+      ctx.fill();
+    }
+  }
+  // Long arms hanging to the ground
+  limb(ctx, [-6, -32, -12, -20, -11 + sw * 2, -6], 2.6, shade(c, -0.3), 1.2);
+  claws(ctx, -11 + sw * 2, -6, 1.5, 4, '#b8c8e0');
+  // Hunched body, tapering to nothing
+  ctx.beginPath();
+  ctx.moveTo(-7, -36);
+  ctx.quadraticCurveTo(-13, -22, -8, -6);
+  ctx.quadraticCurveTo(-4, 4 + Math.sin(t * 5) * 1.5, 0, -2);
+  ctx.quadraticCurveTo(4, 5 + Math.cos(t * 4) * 1.5, 8, -7);
+  ctx.quadraticCurveTo(13, -24, 8, -37);
+  ctx.quadraticCurveTo(0, -42, -7, -36);
+  ctx.closePath();
+  fillInk(ctx, lin(ctx, -10, -40, 10, 0, c, 0.22, -0.55), 1.1);
+  // The stolen warmth, glowing through the ribs.
+  const fed = 0.35 + 0.25 * Math.sin(t * 3) + (feeding ? 0.3 : 0);
+  if (!art.dead) {
+    const g = ctx.createRadialGradient(0, -20, 0, 0, -20, 7);
+    g.addColorStop(0, alpha('#ffd890', fed));
+    g.addColorStop(0.6, alpha('#ff7a20', fed * 0.6));
+    g.addColorStop(1, 'rgba(255,60,0,0)');
+    ctx.fillStyle = g;
+    circle(ctx, 0, -20, 7);
+    ctx.fill();
+  }
+  ctx.strokeStyle = alpha('#0c0a12', 0.85);
+  ctx.lineWidth = 1.1;
+  for (const y of [-25, -21, -17]) {
+    ctx.beginPath();
+    ctx.moveTo(-6, y);
+    ctx.quadraticCurveTo(0, y + 2.5, 6, y);
+    ctx.stroke();
+  }
+  // Head: no eyes, a ring of teeth.
+  const hy = -42;
+  ellipse(ctx, 2, hy, 6.5, 6);
+  fillInk(ctx, rad(ctx, 2, hy, 7, shade(c, 0.08), 0.25, -0.5), 1);
+  const open = 2.6 + (feeding ? 1.4 : 0) + Math.sin(t * 3) * 0.3;
+  ctx.fillStyle = '#050308';
+  circle(ctx, 4, hy + 0.5, open);
+  ctx.fill();
+  ctx.fillStyle = '#d8e4f4';
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2 + t * 0.6;
+    poly(ctx, [4 + Math.cos(a - 0.2) * open, hy + 0.5 + Math.sin(a - 0.2) * open, 4 + Math.cos(a) * (open - 1.5), hy + 0.5 + Math.sin(a) * (open - 1.5), 4 + Math.cos(a + 0.2) * open, hy + 0.5 + Math.sin(a + 0.2) * open]);
+    ctx.fill();
+  }
+  if (feeding) glow(ctx, 4, hy + 0.5, 10, '#ffb060', 0.5);
+  // Near arm, reaching
+  const hx = 14 + atk * 6;
+  const hy2 = -22 - atk * 10;
+  limb(ctx, [7, -33, 12, -27, hx, hy2], 2.8, shade(c, -0.1), 1.2);
+  claws(ctx, hx, hy2, 0.2, 4.4, '#b8c8e0');
+}
+
+/** Corvane's phylactery: a bell of blue glass that nobody cast, hung in an iron cradle, with something moving inside it. */
+function phylactery(ctx: CanvasRenderingContext2D, c: string, s: S) {
+  const { t } = s;
+  const ringing = s.pose.cast > 0 || s.pose.attack > 0;
+  // Cradle
+  limb(ctx, [-11, 0, -8, -44, 0, -50, 8, -44, 11, 0], 2, '#2a2c34', 1.2);
+  limb(ctx, [-12, 0, 12, 0], 3, '#2a2c34', 1.2);
+  const swing = ringing ? Math.sin(t * 24) * 0.2 : Math.sin(t * 1.3) * 0.05;
+  ctx.save();
+  ctx.translate(0, -46);
+  ctx.rotate(swing);
+  limb(ctx, [0, 0, 0, 5], 1.4, '#3a3c44', 0.8);
+  ctx.beginPath();
+  ctx.moveTo(-10, 34);
+  ctx.quadraticCurveTo(-10, 16, -5, 8);
+  ctx.quadraticCurveTo(0, 3, 5, 8);
+  ctx.quadraticCurveTo(10, 16, 10, 34);
+  ctx.closePath();
+  const g = ctx.createLinearGradient(-10, 5, 10, 34);
+  g.addColorStop(0, alpha(shade(c, 0.45), 0.9));
+  g.addColorStop(0.5, alpha(c, 0.8));
+  g.addColorStop(1, alpha(shade(c, -0.5), 0.9));
+  fillInk(ctx, g, 1);
+  // The shape inside: a small robed figure, turning.
+  if (!art.dead) {
+    const a = Math.sin(t * 1.2);
+    ctx.fillStyle = alpha('#0a1024', 0.6);
+    poly(ctx, [-3 * a - 3, 30, 0, 14, 3 * a + 3, 30]);
+    ctx.fill();
+    circle(ctx, 0, 13, 2.4);
+    ctx.fill();
+    eyes(ctx, 0.4, 13, 2, '#e8f4ff', 0.6);
+  }
+  ctx.strokeStyle = alpha('#ffffff', 0.55);
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(-6, 12);
+  ctx.quadraticCurveTo(-8, 20, -8, 30);
+  ctx.stroke();
+  // Cracks
+  ctx.strokeStyle = alpha('#e8f4ff', art.dead ? 0.3 : 0.8);
+  ctx.beginPath();
+  ctx.moveTo(4, 10);
+  ctx.lineTo(2, 18);
+  ctx.lineTo(6, 24);
+  ctx.lineTo(4, 32);
+  ctx.stroke();
+  ctx.restore();
+  glow(ctx, 0, -24, 26, c, 0.3 + (ringing ? 0.35 : 0.1 * Math.sin(t * 3)));
+}
+
+/** The Frostwright: Founder Odrun, cased in ice at his own forge, hammer frozen to his hand. */
+function frostwright(ctx: CanvasRenderingContext2D, c: string, s: S) {
+  const { sw, atk, t } = s;
+  const ice = (pts: number[], k: number) => {
+    poly(ctx, pts);
+    const xs = pts.filter((_, i) => i % 2 === 0);
+    const ys = pts.filter((_, i) => i % 2 === 1);
+    fillInk(ctx, lin(ctx, Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), shade(c, k), 0.4, -0.4), 0.9);
+  };
+  const apron = '#4a3424';
+  // Legs
+  limb(ctx, [-5, -17, -6 + sw * 3, -9, -6 + sw * 4, -1], 6, '#2e2a30', 1.4);
+  limb(ctx, [5, -17, 5 - sw * 3, -9, 6 - sw * 4, -1], 6.4, '#3a3640', 1.4);
+  // Far arm with tongs
+  limb(ctx, [-9, -36, -15, -28, -16, -19], 4.6, shade(c, -0.3), 1.3);
+  limb(ctx, [-16, -19, -22, -12], 1.2, '#2a2c34', 0.9);
+  limb(ctx, [-16, -19, -20, -10], 1.2, '#2a2c34', 0.9);
+  // Broad smith's body in a leather apron
+  ctx.beginPath();
+  ctx.moveTo(-11, -39);
+  ctx.quadraticCurveTo(-13, -26, -8, -15);
+  ctx.lineTo(8, -15);
+  ctx.quadraticCurveTo(13, -26, 11, -39);
+  ctx.quadraticCurveTo(0, -43, -11, -39);
+  ctx.closePath();
+  fillInk(ctx, lin(ctx, -12, -40, 12, -15, '#5a5460', 0.2, -0.45), 1.1);
+  poly(ctx, [-6, -36, 6, -36, 8, -12, -8, -12]);
+  fillInk(ctx, lin(ctx, -8, -36, 8, -12, apron, 0.2, -0.4), 0.9);
+  // The ice that took him: plates over shoulder and chest, a mane of spikes.
+  ice([-14, -40, -8, -44, -3, -38, -9, -33], 0.1);
+  ice([4, -38, 11, -44, 15, -38, 10, -32], -0.05);
+  ice([-4, -30, 3, -33, 6, -24, -1, -20], 0.2);
+  for (const [x, h, lean] of [[-12, 14, -4], [-8, 20, -2], [12, 16, 4], [8, 11, 2]] as const) {
+    poly(ctx, [x - 2.6, -42, x + lean, -42 - h, x + 2.6, -42]);
+    fillInk(ctx, lin(ctx, x - 3, -42 - h, x + 3, -42, '#eef8ff', 0.2, -0.35), 0.8);
+  }
+  const p = 0.5 + 0.3 * Math.sin(t * 2.2);
+  glow(ctx, 1, -27, 16, '#60c0ff', p * 0.5);
+  // Head: bearded, eyes burning blue through the rime.
+  const hy = -47;
+  ellipse(ctx, 1.5, hy, 6, 6.4);
+  fillInk(ctx, rad(ctx, 1.5, hy, 6.6, '#a8b8c8', 0.3, -0.45), 1);
+  ctx.beginPath();
+  ctx.moveTo(-3, hy + 2);
+  ctx.quadraticCurveTo(-2, hy + 14, 3, hy + 16);
+  ctx.quadraticCurveTo(8, hy + 12, 7.5, hy + 2);
+  ctx.quadraticCurveTo(3, hy + 5, -3, hy + 2);
+  ctx.closePath();
+  fillInk(ctx, lin(ctx, -3, hy + 2, 7, hy + 16, '#e4eef8', 0.1, -0.3), 0.9);
+  ctx.fillStyle = alpha('#b8dcf8', 0.9);
+  for (const x of [-1, 2, 5]) {
+    poly(ctx, [x - 1, hy + 13, x, hy + 19, x + 1, hy + 13]);
+    ctx.fill();
+  }
+  slitEyes(ctx, 3.6, hy - 0.5, 4.2, '#8ad8ff', 2.6);
+  // Hammer arm
+  const hx = 17 + atk * 5;
+  const hy2 = -22 - atk * 22;
+  limb(ctx, [10, -37, 15 + atk * 2, -30 - atk * 8, hx, hy2], 5, shade(c, -0.1), 1.3);
+  ctx.save();
+  ctx.translate(hx, hy2);
+  ctx.rotate(-0.5 - atk * 1.1);
+  limb(ctx, [0, 4, 0, -16], 2, '#3a2c20', 1);
+  roundRect(ctx, -6.5, -23, 13, 8, 1.5);
+  fillInk(ctx, lin(ctx, -6, -23, 6, -15, '#6a7482', 0.3, -0.4), 1);
+  ctx.fillStyle = alpha('#e8f6ff', 0.75);
+  ctx.fillRect(-6.5, -23, 13, 1.6);
+  ctx.restore();
+  glow(ctx, hx, hy2 - 14, 11, '#8ad8ff', 0.3 + atk * 0.5);
+}
+
+/** Vhorza, and the Unlit: the same shape with the fire gone out of it. */
+function mother(ctx: CanvasRenderingContext2D, c: string, s: S, unlit = false) {
+  // Where Vhorza burns, the Unlit is the hole a fire leaves: cold light at the edges, nothing in the cracks.
+  const F = unlit ? { glow: '#5a90e0', crack: '#0a0c14', heart0: '#000000', heart1: '#0a1020', hair0: '#a8d0ff', hair1: '#e8f4ff', eye: '#cfe8ff' } : { glow: '#ff6a20', crack: '#ffd060', heart0: '#fff2a0', heart1: '#ff8a20', hair0: '#ff8a20', hair1: '#ffd050', eye: '#ffee60' };
   const { sw, atk, t } = s;
   const dark = shade(c, -0.45);
   const fl = Math.sin(t * 2.5) * 4;
@@ -1773,7 +2136,7 @@ function mother(ctx: CanvasRenderingContext2D, c: string, s: S) {
     limb(ctx, [side * 6, -36, side * 18, -50 - fl * 0.6, tip[0], tip[1]], 1.6, shade(c, -0.2), 1);
     for (const [x, y] of [[28, -30], [22, -26], [15, -25]]) limb(ctx, [side * 18, -50 - fl * 0.6, side * x, y], 0.9, shade(c, -0.25), 0.8);
     // Embers glowing through the membrane
-    glow(ctx, side * 20, -40, 10, '#ff6a20', 0.25 + 0.1 * Math.sin(t * 5 + side));
+    glow(ctx, side * 20, -40, 10, F.glow, 0.25 + 0.1 * Math.sin(t * 5 + side));
   };
   wing(-1);
   wing(1);
@@ -1801,7 +2164,7 @@ function mother(ctx: CanvasRenderingContext2D, c: string, s: S) {
   ctx.closePath();
   fillInk(ctx, rad(ctx, 0, -28, 15, c, 0.25, -0.55), 1.2);
   const p = 0.6 + 0.3 * Math.sin(t * 3);
-  ctx.strokeStyle = art.dead ? '#1a0a06' : alpha('#ffd060', 0.65 + p * 0.3);
+  ctx.strokeStyle = art.dead ? '#1a0a06' : alpha(F.crack, unlit ? 0.95 : 0.65 + p * 0.3);
   ctx.lineWidth = 0.9;
   ctx.beginPath();
   ctx.moveTo(0, -24);
@@ -1816,13 +2179,13 @@ function mother(ctx: CanvasRenderingContext2D, c: string, s: S) {
   ctx.lineTo(4, -16);
   ctx.stroke();
   const hg = ctx.createRadialGradient(0, -24, 0, 0, -24, 8);
-  hg.addColorStop(0, art.dead ? '#2a1008' : '#fff2a0');
-  hg.addColorStop(0.5, art.dead ? '#1a0806' : '#ff8a20');
-  hg.addColorStop(1, 'rgba(255,60,0,0)');
+  hg.addColorStop(0, art.dead ? '#2a1008' : F.heart0);
+  hg.addColorStop(0.5, art.dead ? '#1a0806' : F.heart1);
+  hg.addColorStop(1, unlit ? 'rgba(10,20,60,0)' : 'rgba(255,60,0,0)');
   ctx.fillStyle = hg;
   circle(ctx, 0, -24, 8);
   ctx.fill();
-  glow(ctx, 0, -24, 20, '#ff7020', p * 0.5);
+  glow(ctx, 0, -24, unlit ? 30 : 20, unlit ? '#4a80e0' : '#ff7020', p * (unlit ? 0.35 : 0.5));
   // Far arm
   limb(ctx, [-9, -35, -15, -27, -16, -19], 4, dark, 1.3);
   claws(ctx, -16, -19, 1.6, 4, '#2a1a10');
@@ -1837,10 +2200,10 @@ function mother(ctx: CanvasRenderingContext2D, c: string, s: S) {
       ctx.quadraticCurveTo(x - 2 + Math.sin(t * 6 + i), hy - 3 - h * 0.6, x + Math.sin(t * 5 + i) * 1.5 - 2, hy - 3 - h);
       ctx.quadraticCurveTo(x + 1.5, hy - 3 - h * 0.5, x + 2.4, hy - 3);
       ctx.closePath();
-      ctx.fillStyle = i % 2 ? alpha('#ff8a20', 0.85) : alpha('#ffd050', 0.85);
+      ctx.fillStyle = i % 2 ? alpha(F.hair0, unlit ? 0.55 : 0.85) : alpha(F.hair1, unlit ? 0.55 : 0.85);
       ctx.fill();
     }
-    glow(ctx, 0, hy - 8, 14, '#ff9030', 0.5);
+    glow(ctx, 0, hy - 8, 14, unlit ? '#8ab8ff' : '#ff9030', 0.5);
   }
   ellipse(ctx, 2, hy, 6.2, 6.6);
   fillInk(ctx, rad(ctx, 2, hy, 6.8, shade(c, 0.05), 0.3, -0.45), 1);
@@ -1858,11 +2221,11 @@ function mother(ctx: CanvasRenderingContext2D, c: string, s: S) {
   ctx.fill();
   teeth(ctx, 3.2, 8, hy + 2.7, 4, 1.4);
   teeth(ctx, 3.8, 7.6, hy + 4.4 + atk * 2, 3, 1, true);
-  slitEyes(ctx, 4.2, hy + 0.2, 4.2, '#ffee60', 2.6);
+  slitEyes(ctx, 4.2, hy + 0.2, 4.2, F.eye, 2.6);
   // Near arm
   const hx = 18 + atk * 6;
   const hy2 = -20 - atk * 14;
   limb(ctx, [9, -35, 15 + atk * 3, -29 - atk * 6, hx, hy2], 4.4, shade(c, -0.05), 1.3);
   claws(ctx, hx, hy2, -0.6 - atk, 4.6, '#2a1a10');
-  glow(ctx, hx, hy2, 9, '#ff7020', 0.3 + atk * 0.5);
+  glow(ctx, hx, hy2, 9, F.glow, 0.3 + atk * 0.5);
 }

@@ -392,8 +392,10 @@ describe('bosses', () => {
     expect(w.char.maxDifficulty).toBe(0);
     w.damageMonster(b, elemDamage('cold', 1e8));
     expect(w.questState('hollow_sun')).toBe('done');
-    expect(w.char.maxDifficulty).toBe(1);
-    expect(w.events.some((e) => e.type === 'victory')).toBe(true);
+    // The next difficulty is earned at the end of Act 3 now; Corvin's death tells the finale and opens the road north.
+    expect(w.char.maxDifficulty).toBe(0);
+    expect(stories(w, 'finale')).toBe(1);
+    expect(w.roadNorthOpen).toBe(true);
   });
 
   function noon(inShade: boolean) {

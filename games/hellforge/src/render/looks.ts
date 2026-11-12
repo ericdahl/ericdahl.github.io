@@ -22,6 +22,8 @@ const ARMOR_KIND: Record<string, HumanoidLook['armor']> = {
   lamellar: 'scale',
   plate_mail: 'plate',
   sun_plate: 'plate',
+  fur_mantle: 'leather',
+  founders_plate: 'plate',
 };
 
 const ARMOR_COLOR: Record<string, string> = {
@@ -35,6 +37,8 @@ const ARMOR_COLOR: Record<string, string> = {
   lamellar: '#8a6a3a',
   plate_mail: '#9ca2ac',
   sun_plate: '#c8a050',
+  fur_mantle: '#a89a88',
+  founders_plate: '#8a7a5a',
 };
 
 const HELM_KIND: Record<string, HumanoidLook['head']> = {
@@ -44,6 +48,7 @@ const HELM_KIND: Record<string, HumanoidLook['head']> = {
   full_helm: 'fullhelm',
   great_helm: 'greathelm',
   wrapped_helm: 'wrapped',
+  watch_helm: 'greathelm',
   circlet: 'circlet',
 };
 
@@ -54,6 +59,7 @@ const HELM_COLOR: Record<string, string> = {
   full_helm: '#9aa0aa',
   great_helm: '#a6acb6',
   wrapped_helm: '#c8b488',
+  watch_helm: '#8a94a8',
   circlet: '#e0c060',
 };
 
@@ -64,6 +70,7 @@ const SHIELD_KIND: Record<string, HumanoidLook['shieldShape']> = {
   large_shield: 'heater',
   kite_shield: 'kite',
   tower_shield: 'tower',
+  bell_shield: 'round',
 };
 
 const SHIELD_COLOR: Record<string, string> = {
@@ -73,6 +80,7 @@ const SHIELD_COLOR: Record<string, string> = {
   large_shield: '#6a2a22',
   kite_shield: '#2a3a6a',
   tower_shield: '#4a4e58',
+  bell_shield: '#a8834a',
 };
 
 const CLASS_BASE: Record<ClassId, HumanoidLook> = {
@@ -183,6 +191,26 @@ const NPC_ACT2: Partial<Record<NpcKind, HumanoidLook>> = {
   },
 };
 
+/** Emberwatch under snow: the same people, a year older, wearing everything they own. */
+const NPC_ACT3: Partial<Record<NpcKind, HumanoidLook>> = {
+  healer: {
+    body: '#b8b0a4', trim: '#a02020', skin: '#d8b8a0', legs: '#333', head: 'hood', headColor: '#d8d0c4', robe: true, weapon: 'staff', weaponColor: '#ff9040',
+    weaponGlow: '#ffb060', hairUnder: '#c8a060', accent: '#a02020', openHood: true, cape: '#8a7a68', gloves: '#5a4a3a',
+  },
+  smith: {
+    body: '#5a4a3a', trim: '#2a1a10', skin: '#b88868', legs: '#2a2018', boots: '#3a3028', head: 'cap', headColor: '#6a5a48', beard: '#4a4038',
+    weapon: 'mace', weaponId: 'hammer', weaponColor: '#888', apron: '#3a2416', build: 1.25, gloves: '#2a1c12', cape: '#7a6a58',
+  },
+  sage: {
+    body: '#4a5068', trim: '#c8b060', skin: '#d8b090', legs: '#222', head: 'hood', headColor: '#3a4058', robe: true, weapon: 'staff', weaponColor: '#ffb060',
+    weaponGlow: '#ffb060', hairUnder: '#6a3a1a', openHood: true, accent: '#c8b060', cape: '#6a5a4a', build: 0.92, gloves: '#3a3040',
+  },
+  fence: {
+    body: '#6a6258', trim: '#a8c0d0', skin: '#c8a888', legs: '#3a342c', boots: '#2a2620', head: 'hood', headColor: '#8a8478', cape: '#9a9488',
+    weapon: 'dagger', weaponColor: '#c8d8e0', armor: 'leather', accent: '#a8c0d0', gloves: '#4a4038',
+  },
+};
+
 export function npcLook(kind: NpcKind, act: number): HumanoidLook {
-  return (act === 2 ? NPC_ACT2[kind] : undefined) ?? NPC_ACT1[kind];
+  return (act === 3 ? NPC_ACT3[kind] : act === 2 ? NPC_ACT2[kind] : undefined) ?? NPC_ACT1[kind];
 }

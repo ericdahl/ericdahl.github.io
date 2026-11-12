@@ -5,8 +5,9 @@ export type MonsterShape =
   | 'imp' | 'hexer' | 'ghoul' | 'skeleton' | 'archer' | 'bat' | 'hound' | 'brute' | 'wraith' | 'cultist'
   | 'glutton' | 'bishop' | 'warden' | 'mother'
   | 'scarab' | 'scorpion' | 'burrower' | 'kite' | 'mummy' | 'raider' | 'acolyte' | 'mirage' | 'colossus'
-  | 'corvin' | 'noon';
-export type MonsterAI = 'melee' | 'ranged' | 'caster' | 'bat' | 'hexer' | 'boss' | 'burrow';
+  | 'corvin' | 'noon'
+  | 'thrall' | 'bellwarden' | 'slag' | 'eater' | 'phylactery' | 'frostwright' | 'unlit';
+export type MonsterAI = 'melee' | 'ranged' | 'caster' | 'bat' | 'hexer' | 'boss' | 'burrow' | 'eater' | 'totem';
 
 export interface Resists {
   phys: number;
@@ -19,7 +20,8 @@ export interface Resists {
 export type BossAbility =
   | 'nova_fire' | 'nova_cold' | 'fire_spread' | 'summon_imps' | 'summon_skeletons' | 'charge' | 'meteor_rain'
   | 'poison_spray' | 'summon_scarabs' | 'burrow_strike' | 'summon_kites' | 'corpse_feast' | 'sun_lance'
-  | 'summon_mummies' | 'raise_dead' | 'mirage_split' | 'summon_acolytes' | 'noon_burst';
+  | 'summon_mummies' | 'raise_dead' | 'mirage_split' | 'summon_acolytes' | 'noon_burst'
+  | 'ice_lance' | 'summon_thralls' | 'summon_eaters' | 'cold_snap' | 'snuff' | 'frost_rain' | 'toll';
 
 /** A boss stage, entered once life falls to `at` (0..1 of maximum). */
 export interface BossPhase {
@@ -29,6 +31,8 @@ export interface BossPhase {
   name?: string;
   shape?: MonsterShape;
   color?: string;
+  /** The boss hides behind a phylactery on entering this phase, and cannot be hurt until it is broken. */
+  phylactery?: boolean;
 }
 
 export interface MonsterDef {
@@ -69,6 +73,14 @@ export interface MonsterDef {
   pack?: string;
   /** Carries a hoard, never fights, and runs for a portal once it is seen. */
   thief?: boolean;
+  /** The shards it bursts into are ice: they chill and sap the ember. Burning it to death melts it instead. */
+  rime?: boolean;
+  /** Rings a bell: a shockwave that spreads outward and has to be rolled through. */
+  tolls?: boolean;
+  /** Fire and firelight make it molten (stronger, faster); cold makes it brittle. */
+  slag?: boolean;
+  /** Drinks the hero's ember from a distance. */
+  drains?: boolean;
 }
 
 const D = (d: Omit<MonsterDef, 'res' | 'scale'> & { res?: Partial<Resists>; scale?: number }): MonsterDef => ({ res: {}, scale: 1, ...d });
@@ -122,6 +134,34 @@ export const MONSTERS: Record<string, MonsterDef> = {
     phases: [
       { at: 0.62, name: 'Corvane, Noon-Risen', shape: 'noon', color: '#e8a838', abilities: ['sun_lance', 'nova_fire', 'meteor_rain', 'summon_acolytes'], line: '"Enough of the old man. Look upon a Dialist of Imhara."' },
       { at: 0.28, name: 'Corvane, the Hollow Sun', shape: 'noon', color: '#fff0b0', abilities: ['noon_burst', 'sun_lance', 'meteor_rain', 'noon_burst'], line: '"It is noon. It is always noon. Find what shade you can."' },
+    ] }),
+
+  // ------------------------------------------------------------ Act 3: The Ember Road
+  rime_thrall: D({ id: 'rime_thrall', name: 'Rime-Thrall', shape: 'thrall', ai: 'melee', lifeMul: 0.6, dmgMul: 0.7, speed: 3.4, radius: 0.3, range: 0.45, attackRate: 1.35, xpMul: 0.75, element: 'cold', burst: 6, rime: true, res: { cold: 60, fire: -40 }, scale: 0.85, color: '#8ec8e8' }),
+  rime_hound: D({ id: 'rime_hound', name: 'Rime Hound', shape: 'hound', ai: 'melee', lifeMul: 0.9, dmgMul: 0.9, speed: 4.3, radius: 0.36, range: 0.45, attackRate: 1.55, xpMul: 1.0, element: 'cold', res: { cold: 45, fire: -15 }, color: '#b8c8d8' }),
+  snow_shade: D({ id: 'snow_shade', name: 'Snowblind Shade', shape: 'wraith', ai: 'melee', lifeMul: 1.0, dmgMul: 1.0, speed: 2.9, radius: 0.34, range: 0.55, attackRate: 1.05, xpMul: 1.4, element: 'cold', undead: true, res: { phys: 40, cold: 45, poison: 100, fire: -10 }, color: '#d8e8f8' }),
+  frozen_miner: D({ id: 'frozen_miner', name: 'Drowned Miner', shape: 'skeleton', ai: 'melee', lifeMul: 1.2, dmgMul: 1.05, speed: 2.3, radius: 0.33, range: 0.55, attackRate: 1.05, xpMul: 1.1, undead: true, res: { poison: 75, cold: 40 }, color: '#9fc0d0' }),
+  frozen_bowman: D({ id: 'frozen_bowman', name: 'Frostbitten Bowman', shape: 'archer', ai: 'ranged', lifeMul: 0.8, dmgMul: 0.9, speed: 2.3, radius: 0.33, range: 8, attackRate: 0.75, xpMul: 1.25, undead: true, missile: { element: 'cold', speed: 11, kind: 'm_ice' }, res: { poison: 75, cold: 40 }, color: '#a8c4d4' }),
+  bellwarden: D({ id: 'bellwarden', name: 'Bellwarden', shape: 'bellwarden', ai: 'melee', lifeMul: 2.3, dmgMul: 1.5, speed: 1.7, radius: 0.5, range: 0.7, attackRate: 0.7, xpMul: 2.2, tolls: true, res: { phys: 25, light: -20, poison: 100 }, scale: 1.3, color: '#a8834a' }),
+  slag_golem: D({ id: 'slag_golem', name: 'Slag Golem', shape: 'slag', ai: 'melee', lifeMul: 2.5, dmgMul: 1.6, speed: 1.8, radius: 0.55, range: 0.7, attackRate: 0.7, xpMul: 2.2, slag: true, res: { phys: 20, poison: 100, fire: 25 }, scale: 1.3, color: '#4a4648' }),
+  hearth_eater: D({ id: 'hearth_eater', name: 'Hearth-Eater', shape: 'eater', ai: 'eater', lifeMul: 0.75, dmgMul: 0.8, speed: 2.6, radius: 0.34, range: 6.5, attackRate: 0.5, xpMul: 1.7, drains: true, element: 'cold', res: { cold: 45, fire: -25 }, color: '#3a3448' }),
+  // Corvane's last jar. It does not move; it rings.
+  phylactery: D({ id: 'phylactery', name: "Corvane's Phylactery", shape: 'phylactery', ai: 'totem', lifeMul: 5, dmgMul: 1.2, speed: 0, radius: 0.6, range: 0, attackRate: 1, xpMul: 4, tolls: true, res: { cold: 45, poison: 100 }, scale: 1.4, color: '#6aa8e8' }),
+
+  frostwright: D({ id: 'frostwright', name: 'The Frostwright', shape: 'frostwright', ai: 'boss', lifeMul: 19, dmgMul: 1.85, speed: 2.2, radius: 0.7, range: 0.85, attackRate: 0.85, xpMul: 24, element: 'cold', res: { cold: 45, poison: 40, phys: 15, fire: -15 }, scale: 1.8, color: '#7ab0d8',
+    abilities: ['ice_lance', 'summon_thralls', 'nova_cold'],
+    phases: [{ at: 0.5, abilities: ['ice_lance', 'cold_snap', 'summon_thralls', 'cold_snap', 'charge'], line: '"The forge is out. Stand by a fire, if you can find one."' }] }),
+  echo: D({ id: 'echo', name: 'Echo of Old Corvin', shape: 'corvin', ai: 'boss', lifeMul: 22, dmgMul: 1.85, speed: 2.5, radius: 0.5, range: 7, attackRate: 0.85, xpMul: 32, element: 'cold', missile: { element: 'cold', speed: 9, kind: 'm_cold' }, res: { fire: 30, cold: 40, light: 30, poison: 30 }, scale: 1.35, color: '#6aa8e8',
+    abilities: ['ice_lance', 'mirage_split', 'nova_cold'],
+    phases: [
+      { at: 0.66, phylactery: true, abilities: ['ice_lance', 'toll', 'mirage_split', 'nova_cold'], line: '"You cannot kill a thing that is kept somewhere else."' },
+      { at: 0.33, phylactery: true, name: 'Corvane, the Last Echo', shape: 'noon', color: '#8ac8ff', abilities: ['toll', 'ice_lance', 'frost_rain', 'toll'], line: '"Again, then. I have rung this bell for four hundred years."' },
+    ] }),
+  unlit: D({ id: 'unlit', name: 'The Unlit', shape: 'unlit', ai: 'boss', lifeMul: 34, dmgMul: 2.3, speed: 2.4, radius: 0.9, range: 1.0, attackRate: 0.85, xpMul: 70, element: 'cold', missile: { element: 'cold', speed: 8.5, kind: 'm_cold' }, res: { cold: 45, poison: 30, light: 20, fire: -20 }, scale: 2.2, color: '#2a3448',
+    abilities: ['ice_lance', 'snuff', 'summon_eaters', 'nova_cold'],
+    phases: [
+      { at: 0.62, name: 'The Unlit, Hungering', color: '#39507a', abilities: ['cold_snap', 'frost_rain', 'snuff', 'ice_lance', 'summon_thralls'], line: 'The Unlit breathes in, and every flame in the Heart leans towards it.' },
+      { at: 0.27, name: 'The Unlit, Winter Entire', color: '#b8d8f8', abilities: ['cold_snap', 'frost_rain', 'charge', 'snuff', 'frost_rain'], line: '"Keep it lit," the ember whispers. The winter screams.' },
     ] }),
 };
 
