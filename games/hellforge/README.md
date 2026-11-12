@@ -51,6 +51,7 @@ The version is shown at the bottom of the title screen; tap it for the player-fa
 
 | Version | Commit | Notes |
 |---|---|---|
+| 0.11.2 | | Holding a skill button no longer opens the skills panel |
 | 0.11.1 | | Performance: settled corpses are drawn once and stamped, the automap redraws only on exploration, displays over 100 Hz draw every other frame |
 | 0.11.0 | | Dodge roll, killing sprees, soul orbs, the Tithe Imp, four new shrines, three new elite modifiers, area purges |
 | 0.10.0 | | Redrawn character art: hero gear shows on the model, new monster and NPC models, keyframed weapon swings |
