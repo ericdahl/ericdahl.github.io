@@ -29,7 +29,7 @@ export interface Exit extends Point {
 export type PropKind =
   | 'torch' | 'bones' | 'pillar' | 'tent' | 'campfire' | 'grave' | 'brazier' | 'banner' | 'lava'
   | 'scrub' | 'shards' | 'urn' | 'quicksand' | 'well'
-  | 'icicle' | 'anvil' | 'bell' | 'drift' | 'rubble' | 'ruin' | 'hearth';
+  | 'icicle' | 'anvil' | 'bell' | 'drift' | 'rubble' | 'ruin' | 'hearth' | 'forge';
 export interface Prop extends Point {
   kind: PropKind;
 }
@@ -460,6 +460,8 @@ function genTown(spec: LevelSpec): Level {
   block(cx + 6, cy - 7, snow ? 'ruin' : 'tent');
   block(cx - 8, cy + 5, snow ? 'ruin' : 'tent');
   block(cx + 5, cy + 7, snow ? 'ruin' : 'tent');
+  // The smith's forge stands beside him; it is worked from the tile in front of it.
+  block(cx + 8, cy - 5, 'forge');
   if (snow) {
     for (const [x, y] of [[cx - 11, cy - 1], [cx + 9, cy - 3], [cx - 4, cy + 8], [cx + 11, cy + 6], [cx - 12, cy + 9], [cx + 1, cy - 9], [cx - 3, cy - 7], [cx + 12, cy - 9]]) l.props.push({ x, y, kind: 'drift' });
     for (const [x, y] of [[cx - 10, cy + 2], [cx + 8, cy + 3], [cx + 3, cy + 10]]) l.props.push({ x, y, kind: 'rubble' });
@@ -472,6 +474,7 @@ function genTown(spec: LevelSpec): Level {
     sage: { x: cx - 3, y: cy + 3 },
     fence: { x: cx + 5, y: cy + 5 },
     stash: { x: cx + 2, y: cy - 2 },
+    forge: { x: cx + 8, y: cy - 5 },
     caravan: { x: cx + 10, y: cy + 2 },
   };
   l.waypoint = { x: cx - 2, y: cy - 2 };

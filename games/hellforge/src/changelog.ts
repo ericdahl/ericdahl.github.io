@@ -1,6 +1,21 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.14.0',
+    date: '2026-11-12',
+    notes: [
+      'The Forge. A forge now stands beside the blacksmith in every town. Walk up to it (or ask the smith) to improve the gear you want to keep with the loot you do not.',
+      'Salvage breaks an item into Cinders. Magic and better items also give Essences of Fire, Cold, Lightning or Poison, matching the element they carried. One button salvages every plain item in your backpack.',
+      'Heat spends Cinders to add a forge level, up to +10. Each level adds 4% to a weapon\'s base damage or an armor\'s defense, and the item is shown as "+7 War Axe"; from +7 it throws sparks. Heating cannot fail up to +5. From +6 it can, and a failure cracks the item back one level. For Hardcore heroes a failed heat to +8 or beyond can shatter the item for good, and the forge asks twice first.',
+      'Strike by hand, if you like: a hammer-timing game that adds up to 10% to the chance when you strike while the metal glows white. It never costs anything to miss or skip, it waits as long as you need, and it works by tap, click or the Space bar.',
+      'Temper re-rolls one affix of your choice for gold and Cinders. Quench spends an Essence to add elemental damage to a weapon or a resistance to armor and jewelry, or to convert the one already there. Ember-Seal locks one affix so tempering cannot touch it; it is expensive.',
+      'Smelt three items of the same type and rarity into one of the next rarity: plain to magic, magic to rare, and, for a master, rare to a unique or set piece.',
+      'Forge mastery grows with every job. Each rank makes work a little cheaper and heats a little likelier, and ranks teach socket punching, Ember-Seal and smelting legends. Forgewrights pay less and fail less at the forge.',
+      'Once you carry Vhorza\'s ember, the forge burns white, heats succeed more often, sealing costs half, and she has a few words for your best work.',
+      'With a mouse, hover an item at the forge and press H heat, J strike by hand, T temper, Q quench, L ember-seal, P punch socket, M crucible or S salvage.',
+    ],
+  },
+  {
     version: '0.13.0',
     date: '2026-11-12',
     notes: [
