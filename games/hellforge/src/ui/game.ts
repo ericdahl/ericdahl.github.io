@@ -8,6 +8,7 @@ import { baseIconUrl, skillIconUrl } from '../render/icons';
 import { Renderer } from '../render/renderer';
 import { Audio } from './audio';
 import { h, isTouch } from './dom';
+import { forgeKey, resetForgeUi } from './forge';
 import { itemActions, panelItemContext, renderPanel, type PanelHost, type PanelKind, type Selection } from './panels';
 import { loadSettings, saveCharacter, saveSettings, type Settings } from './save';
 
@@ -590,7 +591,10 @@ export class Game implements PanelHost {
 
   open(p: PanelKind) {
     this.audio.unlock();
-    if (this.panel !== p) this.sel = null;
+    if (this.panel !== p) {
+      this.sel = null;
+      if (p === 'forge') resetForgeUi();
+    }
     this.panel = p;
     this.world.cmdMoveDir(null);
     this.world.stop();
@@ -898,6 +902,8 @@ export class Game implements PanelHost {
     const code = e.code;
     const repeat = this.keysDown.has(code);
     this.keysDown.add(code);
+    // The forge's sub-menus and its hammer-timing game take their keys first.
+    if (this.panel === 'forge' && forgeKey(this, e)) return;
     if (code === 'Escape') {
       if (this.panel) this.close();
       else this.open('menu');

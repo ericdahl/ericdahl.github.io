@@ -1,3 +1,4 @@
+import { hasEmber } from '../game/forge';
 import { baseOf, type Item } from '../game/items';
 import { FLOOR, WALL, type Level, type Prop } from '../game/map';
 import { tileHash } from '../game/rng';
@@ -31,7 +32,7 @@ export interface LabelRect {
 }
 
 const OUTDOOR = new Set(['fields', 'forest', 'town', 'oasis', 'desert', 'glass', 'mesa', 'snow', 'snowtown']);
-const BLOCK_PROPS = new Set(['pillar', 'tent', 'campfire', 'well', 'hearth', 'ruin']);
+const BLOCK_PROPS = new Set(['pillar', 'tent', 'campfire', 'well', 'hearth', 'ruin', 'forge']);
 
 export class Renderer {
   readonly cam = new Camera();
@@ -43,6 +44,8 @@ export class Renderer {
   showLabels = true;
   automap: 'off' | 'mini' | 'full' = 'mini';
   hoverId = -1;
+  /** Whether Vhorza's ember burns in the town forge. */
+  private ember = false;
   private propIndex = new WeakMap<Level, Map<number, Prop>>();
   private mapCache = new WeakMap<AreaState, { canvas: HTMLCanvasElement; rev: number; ox: number; oy: number }>();
   /** Corpses that have settled, drawn once and stamped from then on. Rebaked if the zoom changes. */
@@ -90,6 +93,7 @@ export class Renderer {
 
   render(w: World, dt: number) {
     this.time += dt;
+    this.ember = hasEmber(w.char);
     const ctx = this.ctx;
     const cam = this.cam;
     const a = w.area;
@@ -305,6 +309,10 @@ export class Renderer {
     for (const n of a.npcs) {
       const s = cam.toScreen(n.x, n.y);
       this.text(n.name, s.x, s.y - 62 * z, '#e8c860', 12);
+    }
+    if (l.spots.forge) {
+      const s = cam.toScreen(l.spots.forge.x + 0.5, l.spots.forge.y + 0.5);
+      this.text('The Forge', s.x, s.y - 58 * z, '#ff9a4a', 12);
     }
     if (p.hurt > 0) {
       ctx.fillStyle = `rgba(160,0,0,${p.hurt * 0.6})`;
@@ -1175,6 +1183,69 @@ export class Renderer {
         ctx.fillStyle = 'rgba(232,200,96,0.7)';
         ctx.fillRect(s.x - 7 * z, s.y - 11 * z, 14 * z, 2 * z);
         break;
+      case 'forge': {
+        // A stone hearth with a bed of coals, and the anvil beside it. Vhorza's ember burns white in it.
+        const ember = this.ember;
+        const pulse = 0.75 + 0.25 * Math.sin(t * 3 + pr.x);
+        ctx.fillStyle = '#3e3832';
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y + 2 * z, 21 * z, 9 * z, 0, 0, Math.PI);
+        ctx.fill();
+        ctx.fillRect(s.x - 21 * z, s.y - 20 * z, 42 * z, 22 * z);
+        ctx.fillStyle = 'rgba(0,0,0,0.22)';
+        for (let i = 0; i < 3; i++) ctx.fillRect(s.x - 21 * z, s.y - (14 - i * 7) * z, 42 * z, 1.2 * z);
+        for (let i = 0; i < 5; i++) ctx.fillRect(s.x + (-16 + i * 8 + (i % 2) * 3) * z, s.y - 20 * z, 1.2 * z, 22 * z);
+        ctx.fillStyle = '#5a534a';
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y - 20 * z, 21 * z, 9 * z, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#1c1512';
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y - 20 * z, 15 * z, 6 * z, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = ember ? `rgba(255,238,200,${pulse})` : `rgba(255,${Math.round(100 + 50 * pulse)},30,${pulse})`;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y - 20 * z, 12 * z, 4.5 * z, 0, 0, Math.PI * 2);
+        ctx.fill();
+        flame(s.x, s.y - 24 * z, (ember ? 12 : 9) * z);
+        if (ember) {
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+          const g = ctx.createRadialGradient(s.x, s.y - 27 * z, 0, s.x, s.y - 27 * z, 9 * z);
+          g.addColorStop(0, 'rgba(255,255,255,0.95)');
+          g.addColorStop(0.4, 'rgba(255,230,170,0.5)');
+          g.addColorStop(1, 'rgba(255,200,120,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y - 27 * z, 9 * z, 0, Math.PI * 2);
+          ctx.fill();
+          // Sparks drift up from it and wink out.
+          for (let i = 0; i < 5; i++) {
+            const k = (t * 0.45 + i * 0.2) % 1;
+            ctx.fillStyle = `rgba(255,240,200,${(1 - k) * 0.9})`;
+            ctx.fillRect(s.x + Math.sin(i * 2.4 + k * 5) * 8 * z, s.y - (28 + k * 34) * z, 1.6 * z, 1.6 * z);
+          }
+          ctx.restore();
+        }
+        // Anvil.
+        const ax = s.x + 27 * z;
+        const ay = s.y + 5 * z;
+        ctx.fillStyle = '#3a2a1c';
+        ctx.fillRect(ax - 5 * z, ay - 8 * z, 10 * z, 8 * z);
+        ctx.fillStyle = '#2c2e34';
+        ctx.fillRect(ax - 3.5 * z, ay - 13 * z, 7 * z, 5 * z);
+        ctx.beginPath();
+        ctx.moveTo(ax - 12 * z, ay - 18 * z);
+        ctx.lineTo(ax + 8 * z, ay - 18 * z);
+        ctx.lineTo(ax + 8 * z, ay - 13 * z);
+        ctx.lineTo(ax - 6 * z, ay - 13 * z);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#6a6e78';
+        ctx.fillRect(ax - 11 * z, ay - 18.5 * z, 19 * z, 1.5 * z);
+        lights.push({ x: pr.x + 0.5, y: pr.y + 0.5, r: ember ? 7 : 5.5, a: 0.9 });
+        break;
+      }
       case 'campfire':
         ctx.strokeStyle = '#4a3020';
         ctx.lineWidth = 5 * z;
@@ -2173,6 +2244,8 @@ export class Renderer {
       ctx.fill();
     };
     for (const n of w.area.npcs) mark(n.x, n.y, '#e8c860', 2.5);
+    const fg = w.area.level.spots.forge;
+    if (fg) mark(fg.x + 0.5, fg.y + 0.5, '#ff8a3a', 3);
     const pp = w.portalPos();
     if (pp) mark(pp.x, pp.y, '#6aa8ff', 3);
     if (full) for (const m of w.area.monsters) if (!m.dead && Math.hypot(m.x - p.x, m.y - p.y) < w.sight + 1) mark(m.x, m.y, '#ff4030', 2);

@@ -9,9 +9,11 @@ import { GAMBLE_KINDS, type World } from '../game/world';
 import { itemIconUrl, skillIconUrl } from '../render/icons';
 import { h, isTouch } from './dom';
 import { compareEquip, defaultSlot } from './compare';
+import { forgeActions, forgeBadge, forgePanel } from './forge';
+import { forgeRank, MASTERY_RANKS } from '../game/forge';
 import { itemTooltip } from './tooltip';
 
-export type PanelKind = 'inventory' | 'character' | 'skills' | 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan' | 'menu' | 'help';
+export type PanelKind = 'inventory' | 'character' | 'skills' | 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan' | 'forge' | 'menu' | 'help';
 
 export interface Selection {
   uid: number;
@@ -45,7 +47,7 @@ const SLOT_LAYOUT: { slot: Slot; label: string; area: string }[] = [
   { slot: 'boots', label: 'Boots', area: 'boot' },
 ];
 
-function header(host: PanelHost, title: string, sub?: string) {
+export function header(host: PanelHost, title: string, sub?: string) {
   return h('div', { class: 'p-head' }, h('div', { class: 'p-title' }, title, sub ? h('span', { class: 'p-sub' }, sub) : null), h('button', { class: 'p-close', 'aria-label': 'Close', onclick: () => host.close() }, '✕'));
 }
 
@@ -59,7 +61,7 @@ function itemTile(host: PanelHost, it: Item, opts: { x?: number; y?: number; fro
   const el = h(
     'button',
     {
-      class: `itm ${rarityClass(it)}${selected ? ' sel' : ''}${opts.bad ? ' bad' : ''}${!it.identified ? ' unid' : ''}`,
+      class: `itm ${rarityClass(it)}${selected ? ' sel' : ''}${opts.bad ? ' bad' : ''}${!it.identified ? ' unid' : ''}${(it.forge ?? 0) >= 7 ? ' hot' : ''}`,
       title: displayName(it),
       'data-uid': it.uid,
       'data-from': opts.from,
@@ -72,11 +74,12 @@ function itemTile(host: PanelHost, it: Item, opts: { x?: number; y?: number; fro
     },
     h('img', { src: itemIconUrl(it), alt: '', draggable: 'false' }),
     it.sockets ? h('span', { class: 'socks' }, '◦'.repeat(it.gems.length) + '·'.repeat(it.sockets - it.gems.length)) : null,
+    forgeBadge(it),
   );
   return el;
 }
 
-function grid(host: PanelHost, entries: GridEntry[], cols: number, rows: number, from: Selection['from']) {
+export function grid(host: PanelHost, entries: GridEntry[], cols: number, rows: number, from: Selection['from']) {
   const c = host.world.char;
   const g = h('div', { class: 'grid', style: { width: `calc(var(--cell) * ${cols})`, height: `calc(var(--cell) * ${rows})` } });
   for (const e of entries) {
@@ -87,7 +90,7 @@ function grid(host: PanelHost, entries: GridEntry[], cols: number, rows: number,
   return g;
 }
 
-function paperDoll(host: PanelHost) {
+export function paperDoll(host: PanelHost) {
   const c = host.world.char;
   const doll = h('div', { class: 'doll' });
   for (const s of SLOT_LAYOUT) {
@@ -159,7 +162,7 @@ function compareView(host: PanelHost, item: Item, slot: Slot, tip: HTMLElement):
   return [sides, delta];
 }
 
-export type ItemContext = 'inventory' | 'vendor' | 'stash';
+export type ItemContext = 'inventory' | 'vendor' | 'stash' | 'forge';
 
 export interface ItemAction {
   label: string;
@@ -176,12 +179,14 @@ export function panelItemContext(kind: PanelKind | null): ItemContext | null {
   if (kind === 'inventory') return 'inventory';
   if (kind === 'healer' || kind === 'smith' || kind === 'fence') return 'vendor';
   if (kind === 'stash') return 'stash';
+  if (kind === 'forge') return 'forge';
   return null;
 }
 
 /** Everything that can be done with an item; shared by the buttons, the keyboard and right-click. */
 export function itemActions(host: PanelHost, sel: Selection, context: ItemContext): ItemAction[] {
   const w = host.world;
+  if (context === 'forge') return forgeActions(host, sel);
   const out: ItemAction[] = [];
   const act = (label: string, key: string | undefined, run: () => void, cls = '', primary = false) => out.push({ label, key, run, cls, primary });
   if (sel.from === 'vendor') {
@@ -240,6 +245,8 @@ export function renderPanel(host: PanelHost, kind: PanelKind): HTMLElement {
       return vendorPanel(host, kind);
     case 'stash':
       return stashPanel(host);
+    case 'forge':
+      return forgePanel(host);
     case 'waypoint':
       return waypointPanel(host);
     case 'caravan':
@@ -255,12 +262,12 @@ export function renderPanel(host: PanelHost, kind: PanelKind): HTMLElement {
   }
 }
 
-function goldRow(host: PanelHost) {
+export function goldRow(host: PanelHost) {
   const c = host.world.char;
   return h('div', { class: 'goldrow' }, h('span', { class: 'gold' }, `◉ ${c.gold.toLocaleString()} gold`), h('span', { class: 'dim' }, ` · Town Portal ×${c.tpCharges}`));
 }
 
-function gridHeading(host: PanelHost, title: string, entries: GridEntry[], cols: number, rows: number) {
+export function gridHeading(host: PanelHost, title: string, entries: GridEntry[], cols: number, rows: number) {
   const sort = () => {
     if (!sortGrid(entries, cols, rows)) host.toast("Couldn't sort these items", '#ff8a6a');
     host.refresh();
@@ -312,7 +319,7 @@ function vendorPanel(host: PanelHost, kind: 'healer' | 'smith') {
     { class: 'panel vend' },
     header(host, info.name, info.title),
     h('div', { class: 'npc-say' }, greet),
-    h('div', { class: 'p-body three' }, h('div', { class: 'col' }, h('div', { class: 'sub' }, 'For sale'), list), h('div', { class: 'col' }, h('div', { class: 'sub' }, 'Your inventory'), grid(host, c.inventory, INV_COLS, INV_ROWS, 'inv'), goldRow(host)), detail(host, 'vendor')),
+    h('div', { class: 'p-body three' }, h('div', { class: 'col' }, kind === 'smith' ? h('button', { class: 'btn forge-link', onclick: () => host.open('forge') }, 'Work the Forge') : null, h('div', { class: 'sub' }, 'For sale'), list), h('div', { class: 'col' }, h('div', { class: 'sub' }, 'Your inventory'), grid(host, c.inventory, INV_COLS, INV_ROWS, 'inv'), goldRow(host)), detail(host, 'vendor')),
   );
 }
 
@@ -389,6 +396,7 @@ function characterPanel(host: PanelHost) {
         s.crit ? kv('Deadly Strike', `${s.crit}%`) : null,
         s.lifeSteal ? kv('Life Steal', `${s.lifeSteal}%`) : null,
         s.skillBonus ? kv('+Skills', `+${s.skillBonus}`) : null,
+        c.forge.xp ? kv('Forge mastery', MASTERY_RANKS[forgeRank(c)].name, 'gold') : null,
         c.bestSpree || c.tithes || c.purges ? h('div', { class: 'sub' }, 'Feats') : null,
         c.bestSpree ? kv('Longest spree', `${c.bestSpree} kills`, 'gold') : null,
         c.tithes ? kv('Tithe Imps caught', String(c.tithes), 'gold') : null,
@@ -569,6 +577,7 @@ function helpPanel(host: PanelHost) {
     ['Town Portal', 'Portal button', 'T'],
     ['Panels', 'Bottom buttons', 'I inventory · C character · K skills · M/Tab map'],
     ['Items', 'Tap an item, then a button', 'Hover an item: E equip/unequip · U use · S sell · B buy · D drop · X stash/inventory · G socket. Right-click for the main action'],
+    ['The Forge', 'Tap an item, then a job', 'Hover an item: H heat · J strike by hand · T temper · Q quench · L ember-seal · P punch socket · M crucible · S salvage'],
   ];
   return h(
     'div',
@@ -582,6 +591,7 @@ function helpPanel(host: PanelHost) {
         'Each level grants 5 stat points and 1 skill point. Higher difficulties lower your resistances, so collect resist gear.',
         'Dodging makes you untouchable for a moment and cuts short a swing or a cast. Kill quickly to build a <span class="gold2">spree</span>: each rank makes you faster, kills worth more experience, and gives you a second wind.',
         'Red and blue soul orbs restore life and mana when you walk over them. A <span class="gold2">Tithe Imp</span> drops gold with every blow and a hoard if you kill it before it escapes. A purple Cursed Shrine calls an ambush and pays out if you survive it. Clearing an area completely earns a reward.',
+        'At <span class="gold2">the Forge</span> beside the blacksmith, salvage loot you do not need into Cinders and Essences, then spend them on the gear you keep: Heat it up to +10, Temper or Quench its affixes, Smelt three items into a better one. Heating past +5 can fail and crack the item back a level. Forge mastery grows with every job and teaches new ones.',
         'Necromancers raise skeletons from fresh corpses: cast Raise Skeleton near a body (or tap its button to use the nearest one). Servants follow you between areas.',
         'Forgewrights build <span class="gold2">Heat</span> with every hammer blow that lands (the gauge above the experience bar). Heat adds fire to your blows with Temper, and Slag Burst spends it all at once. Let it reach 100 and you overheat and burn until it cools or you vent it. Turrets and the Furnace stay where you build them and wind down after a while; the Brass Sentinel follows you between areas.',
       ].map((t) => `<p>${t}</p>`).join('') }),

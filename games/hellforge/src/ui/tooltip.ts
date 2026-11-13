@@ -1,6 +1,7 @@
 import { computeStats, equippedItems, requirementError, type Character } from '../game/character';
 import {
-  baseOf, describeMods, displayName, gemMods, itemColor, itemDefense, modTotal, SET_BY_ID, type Item, type Mod,
+  baseOf, describeMods, displayName, FORGE_STEP, forgeLevel, gemMods, itemColor, itemDefense, modTotal, SET_BY_ID, weaponBaseDamage,
+  type Item, type Mod,
 } from '../game/items';
 import { esc } from './dom';
 
@@ -9,20 +10,23 @@ export function itemTooltip(item: Item, c: Character, extra?: string): string {
   const b = baseOf(item);
   const lines: string[] = [];
   const col = itemColor(item);
-  lines.push(`<div class="tt-name" style="color:${col}">${esc(displayName(item))}</div>`);
+  const fl = forgeLevel(item);
+  lines.push(`<div class="tt-name${fl >= 7 ? ' forge-hot' : ''}" style="color:${col}">${esc(displayName(item))}</div>`);
   if (item.identified && (item.rarity === 'unique' || item.rarity === 'set' || item.rarity === 'rare'))
     lines.push(`<div style="color:${col}">${esc(b.name)}</div>`);
   if (b.kind === 'weapon') {
     const ed = item.identified ? modTotal(item, 'edPct') : 0;
-    const mn = Math.floor(b.minDmg! * (1 + ed / 100)) + (item.identified ? modTotal(item, 'minDmg') : 0);
-    const mx = Math.floor(b.maxDmg! * (1 + ed / 100)) + (item.identified ? modTotal(item, 'maxDmg') : 0);
-    lines.push(`<div>${b.twoHanded ? 'Two-Hand' : 'One-Hand'} Damage: <span class="${ed ? 'blue' : ''}">${mn} to ${mx}</span></div>`);
+    const wd = weaponBaseDamage(item);
+    const mn = Math.floor(wd.min * (1 + ed / 100)) + (item.identified ? modTotal(item, 'minDmg') : 0);
+    const mx = Math.floor(wd.max * (1 + ed / 100)) + (item.identified ? modTotal(item, 'maxDmg') : 0);
+    lines.push(`<div>${b.twoHanded ? 'Two-Hand' : 'One-Hand'} Damage: <span class="${ed || fl ? 'blue' : ''}">${mn} to ${mx}</span></div>`);
     lines.push(`<div class="dim">${speedName(b.speed!)} attack speed${b.cat === 'bow' ? ' · ranged' : ''}</div>`);
   }
   if (b.defMin !== undefined) {
     const d = itemDefense(item);
     lines.push(`<div>Defense: <span class="${d !== item.def ? 'blue' : ''}">${d}</span></div>`);
   }
+  if (fl) lines.push(`<div class="forge-line">Forged +${fl}: +${Math.round(fl * FORGE_STEP * 100)}% base ${b.kind === 'weapon' ? 'damage' : 'defense'}</div>`);
   if (b.block) lines.push(`<div>Chance to Block: ${b.block}%</div>`);
   if (b.potionCap) lines.push(`<div class="dim">Potions carried per type: ${b.potionCap}</div>`);
   if (b.potion) {
@@ -43,6 +47,8 @@ export function itemTooltip(item: Item, c: Character, extra?: string): string {
   if (!item.identified) lines.push('<div class="red">Unidentified</div>');
   else {
     for (const m of modLines(item.mods, c)) lines.push(`<div class="${m.wasted ? 'dim' : 'blue'}">${esc(m.text)}</div>`);
+    const sealed = item.mods.filter((md) => md.sealed);
+    if (sealed.length) lines.push(`<div class="forge-line">Ember-sealed: ${esc(describeMods(sealed).join(', '))}</div>`);
     for (const g of item.gems) lines.push(`<div class="blue">${esc(describeMods(gemMods(g, b.kind)).join(', '))} <span class="dim">(${esc(baseOf(g).name)})</span></div>`);
   }
   if (item.sockets) lines.push(`<div class="gray">Socketed (${item.gems.length}/${item.sockets})</div>`);

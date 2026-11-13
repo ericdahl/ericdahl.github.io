@@ -126,6 +126,10 @@ export class Audio {
       case 'bell': [196, 392, 587, 988].forEach((f, i) => this.tone(i ? 'sine' : 'triangle', f, f * 0.995, 1.4 - i * 0.25, 0.16 - i * 0.03)); return this.hiss(0.06, 0.3, 2400, 1.5);
       case 'kindle': this.hiss(0.5, 0.3, 900, 0.5, 'lowpass'); this.tone('sawtooth', 90, 180, 0.35, 0.07); return [660, 880].forEach((f, i) => this.tone('sine', f, f, 0.3, 0.06, 0.12 + i * 0.08));
       case 'snuff': this.hiss(0.45, 0.3, 3000, 0.8, 'highpass'); return this.tone('sine', 300, 60, 0.5, 0.12);
+      case 'anvil': this.hiss(0.05, 0.3, 4200, 1.5); this.tone('square', 1480, 1440, 0.07, 0.07); return this.tone('triangle', 2960, 2900, 0.5, 0.08);
+      case 'crack': this.hiss(0.18, 0.4, 1400, 0.8); return this.tone('sawtooth', 300, 70, 0.3, 0.14);
+      case 'shatter': this.hiss(0.5, 0.45, 5200, 0.6, 'highpass'); [1900, 1400, 2500, 1100].forEach((f, i) => this.tone('square', f, f * 0.5, 0.12, 0.06, i * 0.05)); return this.tone('sine', 120, 40, 0.5, 0.25);
+      case 'quench': this.hiss(0.9, 0.3, 3800, 0.5, 'highpass'); return this.tone('sine', 500, 180, 0.5, 0.05);
       case 'curse': this.tone('sawtooth', 220, 55, 0.9, 0.16); this.tone('sawtooth', 233, 58, 0.9, 0.12); return this.hiss(0.8, 0.25, 220, 0.6, 'lowpass');
     }
   }

@@ -1,5 +1,5 @@
 import {
-  BASES, baseOf, itemDefense, itemMods, makeItem, SET_BY_ID,
+  BASES, baseOf, itemDefense, itemMods, makeItem, SET_BY_ID, weaponBaseDamage,
   type BaseItem, type ClassId, type Item, type Mod, type PotionInfo, type Slot, type StatKey,
 } from './items';
 import { classSkills, SKILL_BY_ID, type SkillDef } from './skills';
@@ -58,7 +58,7 @@ export const CLASSES: Record<ClassId, ClassDef> = {
   },
 };
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 export const INV_COLS = 10;
 export const INV_ROWS = 4;
 export const STASH_COLS = 10;
@@ -70,6 +70,23 @@ export interface GridEntry {
   item: Item;
   x: number;
   y: number;
+}
+
+export type EssenceType = 'fire' | 'cold' | 'light' | 'poison';
+export const ESSENCE_TYPES: EssenceType[] = ['fire', 'cold', 'light', 'poison'];
+
+/** What a hero has gathered and learned at the Forge. */
+export interface ForgeState {
+  /** The common material, from salvaging anything. */
+  cinders: number;
+  /** Elemental essences, from salvaging magic and better items. */
+  essences: Record<EssenceType, number>;
+  /** Forge mastery experience: grows with every job done at the Forge. */
+  xp: number;
+}
+
+export function newForgeState(): ForgeState {
+  return { cinders: 0, essences: { fire: 0, cold: 0, light: 0, poison: 0 }, xp: 0 };
 }
 
 export type QuestState = 'none' | 'active' | 'done' | 'rewarded';
@@ -102,6 +119,7 @@ export interface Character {
   dead: boolean;
   created: number;
   playTime: number;
+  forge: ForgeState;
   /** Feats, for the character sheet. Absent on heroes from before they were counted. */
   bestSpree?: number;
   tithes?: number;
@@ -137,6 +155,7 @@ export function createCharacter(name: string, classId: ClassId, hardcore = false
     dead: false,
     created: Date.now(),
     playTime: 0,
+    forge: newForgeState(),
   };
   for (const b of cls.start) {
     const it = makeItem(b);
@@ -337,8 +356,9 @@ export function computeStats(c: Character, buffs: Buffs = {}): Stats {
   const arPct = g('arPct') + (meleeMastery?.pct2 ?? 0);
   const ar = Math.max(10, Math.floor((dex * 5 - 35 + cls.arBonus + (c.level - 1) * 6 + g('ar') + (buffs.ar ?? 0)) * (1 + arPct / 100)));
 
-  const bmin = wb?.minDmg ?? 1;
-  const bmax = wb?.maxDmg ?? 3;
+  const wdmg = weapon ? weaponBaseDamage(weapon) : null;
+  const bmin = wdmg?.min ?? 1;
+  const bmax = wdmg?.max ?? 3;
   const ed = g('edPct') + (meleeMastery?.pct ?? 0) + (buffs.edPct ?? 0);
   const attrBonus = isBow ? dex : str;
   const minDmg = Math.max(1, Math.floor((bmin * (1 + ed / 100) + g('minDmg')) * (1 + attrBonus / 100)));
@@ -511,16 +531,20 @@ export function potionSummary(c: Character, pool: PotionPool): string {
 /** Brings a saved hero up to SAVE_VERSION in place. Returns whether anything changed. */
 export function migrateCharacter(c: Character & { belt?: string[][] }): boolean {
   if (c.version >= SAVE_VERSION) return false;
-  // v1 kept potions in belt columns and the backpack. Counts may exceed the cap: migrating never destroys potions.
-  c.potions = {};
-  const keep = (id: string) => (c.potions[id] = (c.potions[id] ?? 0) + 1);
-  for (const id of (c.belt ?? []).flat()) keep(id);
-  delete c.belt;
-  c.inventory = c.inventory.filter((e) => {
-    if (baseOf(e.item).kind !== 'potion') return true;
-    keep(e.item.base);
-    return false;
-  });
+  if (c.version < 2) {
+    // v1 kept potions in belt columns and the backpack. Counts may exceed the cap: migrating never destroys potions.
+    c.potions = {};
+    const keep = (id: string) => (c.potions[id] = (c.potions[id] ?? 0) + 1);
+    for (const id of (c.belt ?? []).flat()) keep(id);
+    delete c.belt;
+    c.inventory = c.inventory.filter((e) => {
+      if (baseOf(e.item).kind !== 'potion') return true;
+      keep(e.item.base);
+      return false;
+    });
+  }
+  // v3 added the Forge: materials and mastery start empty.
+  if (c.version < 3) c.forge = { ...newForgeState(), ...c.forge };
   c.version = SAVE_VERSION;
   return true;
 }

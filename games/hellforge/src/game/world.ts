@@ -9,6 +9,7 @@ import {
   baseOf, buyPrice, displayName, gamble, gamblePrice, generateItem, itemColor, makeItem, potionFor, rollDrops,
   sellPrice, type DropTier, type Item, type ItemKind, type Slot,
 } from './items';
+import { forgeApply, type ForgeAction, type ForgeResult } from './forge';
 import { floodDistances, generateLevel, idx, isWalkable, nearestFloor, type Level, type Point } from './map';
 import {
   baseDamage, baseLife, MONSTERS, monsterStats, rollUniqueMods, uniqueName,
@@ -22,12 +23,12 @@ import type { StoryId } from './story';
 export type SoundId =
   | 'swing' | 'hit' | 'miss' | 'death' | 'hurt' | 'gold' | 'item' | 'unique' | 'potion' | 'levelup' | 'fire' | 'cold'
   | 'light' | 'bow' | 'portal' | 'nova' | 'block' | 'shrine' | 'chest' | 'boom' | 'nomana' | 'roar' | 'quest' | 'step' | 'thud' | 'rare'
-  | 'spree' | 'orb' | 'dodge' | 'jackpot' | 'cackle' | 'curse' | 'bell' | 'kindle' | 'snuff';
+  | 'spree' | 'orb' | 'dodge' | 'jackpot' | 'cackle' | 'curse' | 'bell' | 'kindle' | 'snuff' | 'anvil' | 'crack' | 'shatter' | 'quench';
 
 /** Seconds a ground item takes to bounce when it lands or refuses to be picked up. */
 export const LOOT_BOUNCE = 0.4;
 
-export type Panel = 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan';
+export type Panel = 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan' | 'forge';
 
 export type GameEvent =
   | { type: 'sound'; id: SoundId }
@@ -372,6 +373,7 @@ export type Interactable =
   | { kind: 'npc'; id: number }
   | { kind: 'waypoint' }
   | { kind: 'stash' }
+  | { kind: 'forge' }
   | { kind: 'portal' }
   | { kind: 'exit'; index: number };
 
@@ -478,12 +480,15 @@ export class World {
   frost = 0;
   /** Whether the hero is standing in something's warmth right now. */
   nearFire = false;
+  /** Rolls made at the Forge, kept apart for the same reason. */
+  private forgeRng: Rng;
 
   constructor(char: Character, seed = Date.now() >>> 0) {
     this.char = char;
     this.seed = seed;
     this.rng = new Rng(hashSeed(seed, 'world'));
     this.luck = new Rng(hashSeed(seed, 'luck'));
+    this.forgeRng = new Rng(hashSeed(seed, 'forge'));
     this.player = {
       x: 0, y: 0, life: 1, mana: 1, facing: Math.PI / 4, moving: false, walk: 0, path: [], pathT: 0, moveDir: null,
       intent: null, action: null, heal: [], buffs: {}, frenzy: { stacks: 0, t: 0 }, invuln: 0, dead: false, chill: 0,
@@ -989,6 +994,8 @@ export class World {
         return a.level.waypoint ? { x: a.level.waypoint.x + 0.5, y: a.level.waypoint.y + 0.5 } : null;
       case 'stash':
         return a.level.spots.stash ? { x: a.level.spots.stash.x + 0.5, y: a.level.spots.stash.y + 0.5 } : null;
+      case 'forge':
+        return a.level.spots.forge ? { x: a.level.spots.forge.x + 0.5, y: a.level.spots.forge.y + 0.5 } : null;
       case 'portal': {
         const pp = this.portalPos();
         return pp;
@@ -1030,6 +1037,8 @@ export class World {
         return 'Waypoint';
       case 'stash':
         return 'Stash';
+      case 'forge':
+        return 'The Forge';
       case 'portal':
         return this.inTown ? `Town Portal (${AREA_BY_ID[this.portal!.area].name})` : 'Town Portal';
       case 'exit':
@@ -1051,6 +1060,7 @@ export class World {
     for (const n of a.npcs) push({ kind: 'npc', id: n.id }, n, -0.3);
     if (a.level.waypoint) push({ kind: 'waypoint' }, this.interactPos({ kind: 'waypoint' }));
     if (a.level.spots.stash) push({ kind: 'stash' }, this.interactPos({ kind: 'stash' }));
+    if (a.level.spots.forge) push({ kind: 'forge' }, this.interactPos({ kind: 'forge' }));
     push({ kind: 'portal' }, this.portalPos(), -0.2);
     a.level.exits.forEach((_, i) => push({ kind: 'exit', index: i }, this.interactPos({ kind: 'exit', index: i }), 0.3));
     return out.sort((p, q) => p.d - q.d);
@@ -1105,6 +1115,10 @@ export class World {
         break;
       case 'stash':
         this.emit({ type: 'open', panel: 'stash' });
+        break;
+      case 'forge':
+        p.facing = -Math.PI / 2;
+        this.emit({ type: 'open', panel: 'forge' });
         break;
       case 'portal':
         this.takePortal();
@@ -1450,6 +1464,26 @@ export class World {
     return it;
   }
 
+  /** Does one job at the Forge (see forge.ts) and plays what it sounds and looks like. */
+  forge(action: ForgeAction): ForgeResult {
+    const r = forgeApply(this.char, this.forgeRng, action);
+    if (!r.ok) return r;
+    this.refreshStats();
+    this.sound(r.outcome === 'shatter' ? 'shatter' : r.outcome === 'crack' ? 'crack' : r.type === 'quench' ? 'quench' : r.type === 'salvage' || r.type === 'salvageJunk' ? 'thud' : 'anvil');
+    if (r.tone === 'great') this.sound(r.item && (r.item.rarity === 'unique' || r.item.rarity === 'set') && r.type === 'smelt' ? 'unique' : 'rare');
+    const at = this.interactPos({ kind: 'forge' });
+    // Panels pause the world, so effects wait for it to resume: one burst is enough, however many jobs were done.
+    if (at && this.inTown && !this.area.fx.some((f) => f.t === 0 && f.x === at.x && f.y === at.y + 0.6)) {
+      this.fx({ kind: r.type === 'quench' ? 'dust' : 'spark', x: at.x, y: at.y + 0.6, dur: 0.5, color: r.tone === 'bad' ? '#ff5030' : '#ffd070' });
+      if (r.tone === 'great') this.fx({ kind: 'cinders', x: at.x, y: at.y + 0.6, dur: 0.9 });
+    }
+    if (r.rankUp) {
+      this.msg(`Forge mastery: ${r.rankUp.name}${r.rankUp.unlock ? ` (${r.rankUp.unlock} unlocked)` : ''}`, '#e8c860');
+      this.sound('quest');
+    }
+    return r;
+  }
+
   identifyAll(): number {
     let n = 0;
     const all = [...this.char.inventory.map((e) => e.item), ...this.char.stash.map((e) => e.item), ...Object.values(this.char.equipment)];
@@ -1684,15 +1718,17 @@ export class World {
     if (it.kind === 'interact') {
       const pos = this.interactPos(it.target);
       if (!pos) return void (p.intent = null);
-      const reach = it.target.kind === 'npc' ? 1.6 : it.target.kind === 'exit' ? 0.7 : 1.1;
+      const reach = it.target.kind === 'npc' ? 1.6 : it.target.kind === 'exit' ? 0.7 : it.target.kind === 'forge' ? 1.3 : 1.1;
       if (Math.hypot(pos.x - p.x, pos.y - p.y) <= reach) {
         p.intent = null;
         p.path = [];
         this.doInteract(it.target);
         return;
       }
-      if (!this.followPath(dt, speed, pos)) {
-        if (p.pathT <= 0) this.repath(pos.x, pos.y);
+      // The forge is solid: walk to the tile in front of it.
+      const dest = it.target.kind === 'forge' ? { x: pos.x, y: pos.y + 1 } : pos;
+      if (!this.followPath(dt, speed, dest)) {
+        if (p.pathT <= 0) this.repath(dest.x, dest.y);
         if (!p.path.length) p.intent = null;
       }
       return;

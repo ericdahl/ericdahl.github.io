@@ -14,6 +14,10 @@ export type StatKey =
 export interface Mod {
   stat: StatKey;
   value: number;
+  /** Ember-sealed at the Forge: tempering leaves it alone. */
+  sealed?: boolean;
+  /** Added by quenching at the Forge. An item holds one quenched affix. */
+  quenched?: boolean;
 }
 
 export type ItemKind =
@@ -75,6 +79,10 @@ export interface Item {
   uniqueId?: string;
   setId?: string;
   reqLvl: number;
+  /** Forge level from heating, 0 to MAX_FORGE_LEVEL. Shown as "+7 War Axe". */
+  forge?: number;
+  /** How many times an affix has been tempered; each makes the next dearer. */
+  tempers?: number;
 }
 
 const W = (
@@ -374,7 +382,7 @@ export const AFFIXES: Affix[] = [
   S('of_carnage', 'of Carnage', 12, ['weapon'], 'maxDmg', [m('maxDmg', 5, 10)]),
 ];
 
-function affixFits(a: Affix, b: BaseItem): boolean {
+export function affixFits(a: Affix, b: BaseItem): boolean {
   return a.kinds.some((k) => {
     if (k === b.kind) return true;
     if (k === 'jewelry') return b.kind === 'ring' || b.kind === 'amulet';
@@ -791,17 +799,38 @@ export function modTotal(item: Item, stat: StatKey): number {
   return v;
 }
 
-/** Item defense with its own +% defense applied (local mod, as in the classics). */
+export const MAX_FORGE_LEVEL = 10;
+/** Each forge level adds this share of a weapon's base damage or an armor's defense. */
+export const FORGE_STEP = 0.04;
+
+export function forgeLevel(item: Item): number {
+  return item.forge ?? 0;
+}
+
+/** Multiplier on an item's base damage or defense from its forge level. */
+export function forgeMult(item: Item): number {
+  return 1 + FORGE_STEP * forgeLevel(item);
+}
+
+/** A weapon's base damage with its forge level applied (fractions are kept; callers floor the total). */
+export function weaponBaseDamage(item: Item): { min: number; max: number } {
+  const b = baseOf(item);
+  const k = forgeMult(item);
+  return { min: (b.minDmg ?? 0) * k, max: (b.maxDmg ?? 0) * k };
+}
+
+/** Item defense with its forge level and its own +% defense applied (local mods, as in the classics). */
 export function itemDefense(item: Item): number {
   if (item.def === undefined) return 0;
-  return Math.floor(item.def * (1 + modTotal(item, 'defPct') / 100));
+  return Math.floor(item.def * forgeMult(item) * (1 + modTotal(item, 'defPct') / 100));
 }
 
 export function displayName(item: Item): string {
   const b = baseOf(item);
-  if (!item.identified) return b.name;
-  if (item.rarity === 'normal') return item.sockets ? `${b.name} [${item.sockets}]` : b.name;
-  return item.name ?? b.name;
+  const plus = item.forge ? `+${item.forge} ` : '';
+  if (!item.identified) return plus + b.name;
+  if (item.rarity === 'normal') return plus + (item.sockets ? `${b.name} [${item.sockets}]` : b.name);
+  return plus + (item.name ?? b.name);
 }
 
 export const RARITY_COLORS: Record<Rarity | 'socketed' | 'gold', string> = {
@@ -906,7 +935,7 @@ export function itemValue(item: Item): number {
   const b = baseOf(item);
   if (b.value) return b.value;
   const mult = { normal: 1, magic: 2.5, rare: 5, set: 6, unique: 8 }[item.rarity];
-  return Math.floor((20 + b.qlvl * 18) * mult + item.mods.length * 25 + item.sockets * 30 + item.ilvl * 4);
+  return Math.floor(((20 + b.qlvl * 18) * mult + item.mods.length * 25 + item.sockets * 30 + item.ilvl * 4) * (1 + 0.1 * forgeLevel(item)));
 }
 
 export function sellPrice(item: Item): number {

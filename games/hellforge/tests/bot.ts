@@ -1,5 +1,6 @@
 import { allocStat, computeStats, learnSkill, requirementError, slotsFor } from '../src/game/character';
 import { baseOf, type ClassId, type Item } from '../src/game/items';
+import { heatOdds } from '../src/game/forge';
 import { SKILL_BY_ID } from '../src/game/skills';
 import { SLAG_BRITTLE, type World } from '../src/game/world';
 import { makeWorld } from './helpers';
@@ -120,6 +121,8 @@ export interface AreaReport {
   total: number;
   bossDead: boolean;
   weapon: string;
+  /** Forge levels on worn gear when the hero left (only a bot that uses the forge has any). */
+  forged: number;
   /** Seconds spent with frostbite at full, taking damage from the cold. */
   frozen: number;
   /** Braziers alight when the hero left. */
@@ -127,14 +130,15 @@ export interface AreaReport {
 }
 
 /** Plays the act end to end without town trips; infinite potions are counted, not limited. */
-export function playAct(classId: ClassId, seed: number, maxPerArea = 900, route = ACT): AreaReport[] {
+/** With `forge`, loot is salvaged rather than sold and the Cinders go into heating worn gear as far as it is safe. */
+export function playAct(classId: ClassId, seed: number, maxPerArea = 900, route = ACT, opts: { forge?: boolean } = {}): AreaReport[] {
   const w = makeWorld(classId, seed);
   const c = w.char;
   const reports: AreaReport[] = [];
   let planIdx = 0;
   for (const area of route) {
     w.enterArea(area, 'start');
-    const rep: AreaReport = { area, enterLevel: c.level, time: 0, deaths: 0, potions: 0, killed: 0, total: w.area.monsters.length, bossDead: false, weapon: '', frozen: 0, braziers: 0 };
+    const rep: AreaReport = { area, enterLevel: c.level, time: 0, deaths: 0, potions: 0, killed: 0, total: w.area.monsters.length, bossDead: false, weapon: '', forged: 0, frozen: 0, braziers: 0 };
     let t = 0;
     let think = 0;
     let lastPos = { x: 0, y: 0, t: 0 };
@@ -175,7 +179,14 @@ export function playAct(classId: ClassId, seed: number, maxPerArea = 900, route 
           const b = baseOf(e.item);
           if (!slotsFor(e.item).length || requirementError(c, e.item)) continue;
           if (score(w, e.item) > 0) w.equip(e.item.uid);
+          else if (opts.forge && w.forge({ type: 'salvage', uid: e.item.uid }).ok) continue;
           else if (b.kind !== 'potion') w.sell(e.item.uid);
+        }
+        if (opts.forge) {
+          // Weapon first, then armor, and only while a heat cannot fail.
+          for (const it of [c.equipment.weapon, c.equipment.body, c.equipment.head, c.equipment.offhand]) {
+            while (it && heatOdds(c, it).success === 100 && w.forge({ type: 'heat', uid: it.uid }).ok);
+          }
         }
         if (c.skills.frost_shell && !p.buffs.frost_shell && p.mana > 20) w.cmdSkill('frost_shell', p.x, p.y);
         if (classId === 'necromancer' && !p.action) necroThink(w);
@@ -227,6 +238,7 @@ export function playAct(classId: ClassId, seed: number, maxPerArea = 900, route 
     }
     rep.time = Math.round(t);
     rep.bossDead = !w.area.monsters.some((m) => m.superId && !m.dead);
+    rep.forged = Object.values(c.equipment).reduce((n, it) => n + (it?.forge ?? 0), 0);
     rep.weapon = c.equipment.weapon ? `${c.equipment.weapon.base}/${c.equipment.weapon.rarity}` : '-';
     rep.killed = rep.total - w.area.monsters.filter((m) => !m.dead && !m.summoned).length;
     rep.braziers = w.area.objects.filter((o) => o.kind === 'brazier' && o.used).length;
