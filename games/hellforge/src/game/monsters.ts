@@ -8,7 +8,7 @@ export type MonsterShape =
   | 'corvin' | 'noon'
   | 'thrall' | 'bellwarden' | 'slag' | 'eater' | 'phylactery' | 'frostwright' | 'unlit'
   | 'ballista' | 'bellows' | 'sentinel' | 'furnace'
-  | 'hire_guard' | 'hire_archer' | 'hire_mage' | 'worker' | 'wyrm';
+  | 'hire_guard' | 'hire_archer' | 'hire_mage' | 'worker' | 'wyrm' | 'wyrm_man';
 export type MonsterAI = 'melee' | 'ranged' | 'caster' | 'bat' | 'hexer' | 'boss' | 'burrow' | 'eater' | 'totem';
 
 export interface Resists {

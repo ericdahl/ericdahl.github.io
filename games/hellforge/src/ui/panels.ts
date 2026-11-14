@@ -13,10 +13,10 @@ import { DEPTH_BASE_LEVEL } from '../game/depths';
 import { forgeRank, MASTERY_RANKS } from '../game/forge';
 import { hireCost, HIRE_KINDS, HIRELINGS, reviveCost } from '../game/hireling';
 import { itemTooltip } from './tooltip';
-import { WYRM_LINES, WYRM_NAME, WYRM_OFFERS } from '../game/wyrm';
+import { STRANGER_LINES, STRANGER_NAME, WYRM_LINES, WYRM_NAME, WYRM_OFFERS } from '../game/wyrm';
 import { skillsPanel } from './skilltree';
 
-export type PanelKind = 'inventory' | 'character' | 'skills' | 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan' | 'forge' | 'captain' | 'wyrm' | 'menu' | 'help';
+export type PanelKind = 'inventory' | 'character' | 'skills' | 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan' | 'forge' | 'captain' | 'wyrm' | 'stranger' | 'menu' | 'help';
 
 export interface Selection {
   uid: number;
@@ -263,6 +263,8 @@ export function renderPanel(host: PanelHost, kind: PanelKind): HTMLElement {
       return captainPanel(host);
     case 'wyrm':
       return wyrmPanel(host);
+    case 'stranger':
+      return strangerPanel(host);
     case 'sage':
       return sagePanel(host);
     case 'fence':
@@ -554,7 +556,17 @@ function wyrmPanel(host: PanelHost) {
     body.append(acts);
     if (choices.challenge) body.append(h('div', { class: 'dim small' }, `He is level ${w.wyrm()?.level ?? '?'}. You are level ${c.level}. He does not die: fight him until he has had enough.`));
   }
-  return h('div', { class: 'panel wyrm' }, header(host, WYRM_NAME, talk === 'greet' ? 'Not pleased to be woken' : undefined), body);
+  return h('div', { class: 'panel wyrm' }, header(host, WYRM_NAME, w.wyrm()?.shape === 'wyrm_man' ? 'In a shape he finds more convenient' : undefined), body);
+}
+
+/** The stranger in town: a few lines, and nothing to buy. */
+function strangerPanel(host: PanelHost) {
+  const lines = STRANGER_LINES[host.world.strangerTalk()];
+  return h('div', { class: 'panel wyrm' },
+    header(host, STRANGER_NAME),
+    h('div', { class: 'p-body wyrm-body' },
+      ...lines.map((l) => h('div', { class: 'wyrm-line' }, l)),
+      h('div', { class: 'acts' }, h('button', { class: 'btn', onclick: () => host.close() }, 'Leave him to it'))));
 }
 
 /** The captain: hire a companion, bring a fallen one back, or send one home. */

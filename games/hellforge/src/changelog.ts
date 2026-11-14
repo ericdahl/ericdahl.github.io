@@ -1,6 +1,16 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.23.0',
+    date: '2026-11-14',
+    notes: [
+      'The Brass Wyrm has another shape. Speak to him and the dragon is gone: a tall man in red and gold is standing on the hoard instead, because he finds it more convenient for talking. Challenge him or rob him and you get the dragon back.',
+      'A well-dressed stranger now stands in Emberwatch Camp and in Tel Maresh, looking the place over. He has something to say about a cave above Gloomwood, and rather more to say once you have been up there.',
+      'The dragon has been redrawn: a scaled hide with a pale plated underside, a neck and tail that taper, a horned and frilled head with a proper jaw and teeth, wings of membrane stretched over long fingers, and smoke from his nostrils. Fire shows in his throat before he breathes it.',
+      'In the air he now casts a dragon-shaped shadow, wings beating, that grows as he comes down.',
+    ],
+  },
+  {
     version: '0.22.0',
     date: '2026-11-14',
     notes: [

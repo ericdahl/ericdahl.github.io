@@ -123,7 +123,7 @@ describe('the road south', () => {
     expect(w.npcInfo('sage').name).toBe('Wren');
     w.travelCaravan();
     expect(w.npcInfo('sage').name).toBe('Keeper Imre');
-    expect(w.area.npcs.map((n) => n.kind).sort()).toEqual(['captain', 'caravan', 'fence', 'healer', 'sage', 'smith']);
+    expect(w.area.npcs.map((n) => n.kind).sort()).toEqual(['captain', 'caravan', 'fence', 'healer', 'sage', 'smith', 'stranger']);
   });
 
   it('sends town portals and respawns to the town of the current act', () => {

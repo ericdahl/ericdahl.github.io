@@ -6,6 +6,18 @@ test('the Brass Wyrm talks, fights when challenged, yields and pays from the hoa
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/?autostart&seed=17&class=reaver');
   await page.waitForFunction(() => !!(window as any).game);
+  // A stranger is looking the camp over. He has something to say about a cave.
+  await page.evaluate(() => {
+    const w = (window as any).game.world;
+    const n = w.area.npcs.find((x: any) => x.kind === 'stranger');
+    w.player.x = n.x - 1.5;
+    w.player.y = n.y + 1;
+    w.cmdInteract({ kind: 'npc', id: n.id });
+  });
+  await expect(page.locator('.panel.wyrm .p-title')).toHaveText('A Well-Dressed Stranger', { timeout: 15000 });
+  await expect(page.locator('.panel.wyrm')).toContainText('a ridge above Gloomwood');
+  await page.screenshot({ path: `test-results/${info.project.name}-wyrm-stranger.png` });
+  await page.evaluate(() => (window as any).game.close());
   await page.evaluate(() => {
     const g = (window as any).game;
     const w = g.world;
@@ -30,6 +42,9 @@ test('the Brass Wyrm talks, fights when challenged, yields and pays from the hoa
   await expect(page.locator('.panel.wyrm')).toBeVisible({ timeout: 15000 });
   await expect(page.locator('.panel.wyrm .p-title')).toContainText('Tyriach, the Brass Wyrm');
   await expect(page.locator('.wyrm-line')).toHaveCount(3);
+  // To talk, he takes a man's shape.
+  expect(await page.evaluate(() => (window as any).game.world.wyrm().shape)).toBe('wyrm_man');
+  await expect(page.locator('.panel.wyrm .p-sub')).toHaveText('In a shape he finds more convenient');
   await expect(page.locator('.wyrm-errand')).toBeVisible();
   await expect(page.locator('.wyrm-fight')).toBeVisible();
   await page.screenshot({ path: `test-results/${info.project.name}-wyrm-talk.png` });
@@ -42,6 +57,8 @@ test('the Brass Wyrm talks, fights when challenged, yields and pays from the hoa
   await expect(page.locator('.panel.wyrm')).toHaveCount(0);
   await expect(page.locator('.announce .an-t')).toHaveText('Tyriach, the Brass Wyrm');
   await expect.poll(() => page.evaluate(() => (window as any).game.world.wyrm().wyrm)).toBe('fight');
+  // And to fight, he is the dragon again.
+  expect(await page.evaluate(() => (window as any).game.world.wyrm().shape)).toBeUndefined();
   // Let him breathe once, with the hero in front of him, and look at it.
   await page.evaluate(() => {
     const w = (window as any).game.world;

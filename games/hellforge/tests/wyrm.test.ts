@@ -3,7 +3,7 @@ import { AREA_BY_ID, DIFFICULTY_LEVELS } from '../src/game/areas';
 import { floodDistances, generateLevel, idx } from '../src/game/map';
 import { MONSTERS } from '../src/game/monsters';
 import { hashSeed, Rng } from '../src/game/rng';
-import { ERRAND_TOWN, WYRM_AREA, WYRM_FROM, WYRM_LINES, YIELD_ANGRY, YIELD_AT } from '../src/game/wyrm';
+import { ERRAND_TOWN, STRANGER_LINES, STRANGER_NAME, WYRM_AREA, WYRM_FROM, WYRM_LINES, YIELD_ANGRY, YIELD_AT } from '../src/game/wyrm';
 import { elemDamage, World, type Interactable } from '../src/game/world';
 import { makeWorld, run } from './helpers';
 
@@ -114,6 +114,9 @@ describe('the Brass Wyrm asleep', () => {
     expect(opened(w, 'wyrm')).toBe(true);
     expect(m.wyrm).toBe('awake');
     expect(m.calm).toBe(true);
+    // To talk, he is a man.
+    expect(m.shape).toBe('wyrm_man');
+    expect(w.questState('wyrm_met')).toBe('done');
     expect(w.interactLabel({ kind: 'wyrm' })).toBe(m.name);
     expect(w.wyrmTalk()).toBe('greet');
     expect(w.wyrmChoices).toEqual({ errand: true, challenge: true });
@@ -370,7 +373,8 @@ describe('what he remembers', () => {
     const c = JSON.parse(JSON.stringify(w.char));
     const later = new World(c, 5);
     later.enterArea(WYRM_AREA, 'exit', WYRM_FROM);
-    expect(later.wyrm()!.wyrm).toBe('yielded');
+    expect(later.wyrm()!.wyrm).toBe('awake');
+    expect(later.wyrm()!.shape).toBe('wyrm_man');
     expect(later.wyrmChoices).toEqual({ errand: true, challenge: false });
     c.difficulty = 1;
     const harder = new World(c, 5);
@@ -395,5 +399,74 @@ describe('the cave itself', () => {
       for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) if (l.tiles[idx(l, Math.floor(m.x) + dx, Math.floor(m.y) + dy)] === 1) open++;
       expect(open, `seed ${seed}`).toBeGreaterThan(70);
     }
+  });
+});
+
+describe('his other shape', () => {
+  it('he is a dragon asleep and in a fight, and a man to talk to', () => {
+    const { w, m } = roost();
+    expect(m.shape).toBeUndefined();
+    talkTo(w);
+    expect(m.shape).toBe('wyrm_man');
+    w.wyrmChallenge();
+    expect(m.shape).toBeUndefined();
+    expect(w.events.some((e) => e.type === 'flash')).toBe(true);
+    w.damageMonster(m, elemDamage('phys', m.maxLife * 50));
+    // Beaten, he is still the dragon, until he is spoken to again.
+    expect(m.wyrm).toBe('yielded');
+    expect(m.shape).toBeUndefined();
+    talkTo(w);
+    expect(m.shape).toBe('wyrm_man');
+  });
+
+  it('robbing the man gets you the dragon', () => {
+    const { w, m } = roost();
+    talkTo(w);
+    w.cmdInteract({ kind: 'object', id: hoard(w)[0].id });
+    run(w, 8);
+    expect(m.wyrm).toBe('fight');
+    expect(m.shape).toBeUndefined();
+  });
+
+  it('a stranger stands in the first two towns, and what he says follows what the hero knows', () => {
+    const w = makeWorld();
+    const stranger = () => w.area.npcs.find((n) => n.kind === 'stranger');
+    expect(stranger()!.name).toBe(STRANGER_NAME);
+    // On walkable ground, clear of everyone else.
+    const l = w.area.level;
+    expect(l.tiles[idx(l, Math.floor(stranger()!.x), Math.floor(stranger()!.y))]).toBe(1);
+    for (const n of w.area.npcs) if (n.kind !== 'stranger') expect(Math.hypot(n.x - stranger()!.x, n.y - stranger()!.y)).toBeGreaterThan(3);
+    expect(w.strangerTalk()).toBe('unmet');
+    w.events.length = 0;
+    w.player.x = stranger()!.x + 1;
+    w.player.y = stranger()!.y;
+    w.cmdInteract({ kind: 'npc', id: stranger()!.id });
+    run(w, 0.5);
+    expect(opened(w, 'stranger')).toBe(true);
+    for (const lines of Object.values(STRANGER_LINES)) expect(lines.length).toBeGreaterThan(0);
+
+    w.setQuest('wyrm_met', 'done');
+    expect(w.strangerTalk()).toBe('met');
+    w.setQuest('wyrm_errand', 'active');
+    expect(w.strangerTalk()).toBe('met');
+    w.setQuest('forge', 'rewarded');
+    w.enterArea(ERRAND_TOWN, 'start');
+    expect(stranger()).toBeTruthy();
+    expect(w.strangerTalk()).toBe('errand');
+    w.setQuest('wyrm_errand', 'rewarded');
+    expect(w.strangerTalk()).toBe('paid');
+    // He does not come north.
+    w.setQuest('hollow_sun', 'rewarded');
+    w.enterArea('emberwatch_ruins', 'start');
+    expect(stranger()).toBeUndefined();
+  });
+
+  it('his being in town changes nothing about what is made after him', () => {
+    // The counter every monster and object is numbered from is where it was before he existed.
+    const w = makeWorld();
+    const ids = w.area.npcs.filter((n) => n.kind !== 'stranger').map((n) => n.id);
+    expect(Math.min(...w.area.npcs.map((n) => n.id))).toBeLessThan(0);
+    expect(ids.every((id) => id > 0)).toBe(true);
+    expect(new Set(w.area.npcs.map((n) => n.id)).size).toBe(w.area.npcs.length);
   });
 });

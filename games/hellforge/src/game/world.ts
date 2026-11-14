@@ -12,7 +12,7 @@ import {
 import { afflictionLabel, DEPTH_BOSSES, DEPTH_STRIDE, depthCinders, depthDef, depthFortune, depthId, depthOf, depthStarts, isDepthId } from './depths';
 import { forgeApply, type ForgeAction, type ForgeResult } from './forge';
 import { hireCost, hirelingName, HIRELINGS, reviveCost, type HireKind } from './hireling';
-import { ERRAND_TOWN, WYRM_AREA, WYRM_FROM, YIELD_ANGRY, YIELD_AT, type WyrmState, type WyrmTalk } from './wyrm';
+import { ERRAND_TOWN, STRANGER_NAME, WYRM_AREA, WYRM_FROM, YIELD_ANGRY, YIELD_AT, type StrangerTalk, type WyrmState, type WyrmTalk } from './wyrm';
 import { floodDistances, generateLevel, idx, isWalkable, nearestFloor, type Level, type Point } from './map';
 import {
   baseDamage, baseLife, MOD_LABEL, MONSTERS, monsterStats, rollUniqueMods, uniqueName,
@@ -31,7 +31,7 @@ export type SoundId =
 /** Seconds a ground item takes to bounce when it lands or refuses to be picked up. */
 export const LOOT_BOUNCE = 0.4;
 
-export type Panel = 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan' | 'forge' | 'captain' | 'wyrm';
+export type Panel = 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan' | 'forge' | 'captain' | 'wyrm' | 'stranger';
 
 export type GameEvent =
   | { type: 'sound'; id: SoundId }
@@ -299,7 +299,7 @@ const SHRINE_NAMES: Record<ShrineKind, string> = {
 };
 const SHRINE_TIME: Partial<Record<ShrineKind, number>> = { storm: 45, fortune: 120, haste: 60 };
 
-export type NpcKind = 'healer' | 'smith' | 'sage' | 'fence' | 'caravan' | 'captain';
+export type NpcKind = 'healer' | 'smith' | 'sage' | 'fence' | 'caravan' | 'captain' | 'stranger';
 export interface Npc {
   id: number;
   kind: NpcKind;
@@ -317,6 +317,7 @@ export const NPC_INFO: Record<NpcKind, { name: string; title: string }> = {
   fence: { name: 'Mirela', title: 'Gambler' },
   caravan: { name: 'Dov', title: 'Caravan Master' },
   captain: { name: 'Captain Hale', title: 'Captain of the Watch' },
+  stranger: { name: STRANGER_NAME, title: '' },
 };
 
 const NPC_ACT2: Record<NpcKind, { name: string; title: string }> = {
@@ -326,6 +327,7 @@ const NPC_ACT2: Record<NpcKind, { name: string; title: string }> = {
   fence: { name: 'Sefa', title: 'Bonecaster' },
   caravan: { name: 'Dov', title: 'Caravan Master' },
   captain: { name: 'Zarifa', title: 'Sellsword Broker' },
+  stranger: { name: STRANGER_NAME, title: '' },
 };
 
 const NPC_ACT3: Record<NpcKind, { name: string; title: string }> = {
@@ -335,6 +337,7 @@ const NPC_ACT3: Record<NpcKind, { name: string; title: string }> = {
   fence: { name: 'Ysolde', title: 'Scavenger' },
   caravan: { name: 'Dov', title: 'Caravan Master' },
   captain: { name: 'Captain Hale', title: 'What Is Left of the Watch' },
+  stranger: { name: STRANGER_NAME, title: '' },
 };
 
 export interface Hazard {
@@ -688,6 +691,10 @@ export class World {
     }
     if (def.town) {
       for (const k of ['healer', 'smith', 'sage', 'fence', 'captain'] as NpcKind[]) this.addNpc(a, k);
+      // The Brass Wyrm looks in on the first two towns, in a shape people will sell wine to. He is given an id of his own,
+      // off the counter everything else is numbered from, so his being there changes nothing about anything made after him.
+      const at = level.spots.stranger;
+      if (at && (id === 'town' || id === ERRAND_TOWN)) a.npcs.push({ id: id === 'town' ? -101 : -102, kind: 'stranger', name: STRANGER_NAME, title: '', x: at.x + 0.5, y: at.y + 0.5, facing: Math.PI * 0.75 });
     } else {
       this.populate(a, rng);
     }
@@ -892,7 +899,8 @@ export class World {
     const fought = this.questState('wyrm_fight') !== 'none';
     // A thief who got away and comes back finds him awake and waiting.
     const hunted = this.questState('wyrm_theft') === 'done' && !fought;
-    this.setWyrm(m, hunted ? 'fight' : fought ? 'yielded' : 'asleep', hunted);
+    // Once the fight is behind them he does not bother to pretend to be asleep.
+    this.setWyrm(m, hunted ? 'fight' : fought ? 'awake' : 'asleep', hunted);
     for (const [dx, dy] of [[-3, 1], [3, 2], [0, -3]]) {
       const s = nearestFloor(l, { x: spot.x + dx, y: spot.y + dy });
       a.objects.push({ id: this.id(), x: s.x + 0.5, y: s.y + 0.5, kind: 'chest', used: fought || hunted, hoard: true });
@@ -900,6 +908,14 @@ export class World {
   }
 
   private setWyrm(m: Monster, state: WyrmState, angry = m.wyrmAngry) {
+    // Awake and not fighting, he wears a man's shape. Anything else is the dragon.
+    const shape = state === 'awake' ? 'wyrm_man' : undefined;
+    if (shape !== m.shape && m.wyrm && this.area === this.areas.get(WYRM_AREA)) {
+      this.fx({ kind: 'teleport', x: m.x, y: m.y, dur: 0.6 });
+      this.fx({ kind: 'shout', x: m.x, y: m.y, dur: 0.5, r: shape ? 2 : 4, color: '#ffd070' });
+      this.emit({ type: 'flash', color: '#ffd070', a: shape ? 0.18 : 0.3 });
+    }
+    m.shape = shape;
     m.wyrm = state;
     m.calm = state !== 'fight';
     m.alert = state === 'fight';
@@ -932,6 +948,14 @@ export class World {
     if (this.questState('wyrm_theft') === 'done') return 'robbed';
     if (errand === 'active') return 'errand_out';
     return fight === 'rewarded' && errand === 'rewarded' ? 'done' : 'greet';
+  }
+
+  /** What the stranger in town says: it depends on whether the hero has been up to the cave, and on the letter. */
+  strangerTalk(): StrangerTalk {
+    const errand = this.questState('wyrm_errand');
+    if (errand === 'active' && this.area.def.id === ERRAND_TOWN) return 'errand';
+    if (errand === 'rewarded' || this.questState('wyrm_fight') === 'rewarded') return 'paid';
+    return this.questState('wyrm_met') === 'none' ? 'unmet' : 'met';
   }
 
   /** Whether he will still hand over the letter, and whether he can still be challenged, on this difficulty. */
@@ -1423,10 +1447,11 @@ export class World {
       case 'wyrm': {
         const m = this.wyrm();
         if (!m || !m.calm) break;
-        if (m.wyrm === 'asleep') {
+        if (m.wyrm !== 'awake') {
+          this.sound(m.wyrm === 'asleep' ? 'roar' : 'portal');
           this.setWyrm(m, 'awake');
-          this.sound('roar');
         }
+        if (this.questState('wyrm_met') === 'none') this.setQuest('wyrm_met', 'done');
         this.emit({ type: 'open', panel: 'wyrm' });
         break;
       }
@@ -3089,6 +3114,7 @@ export class World {
     const m = this.wyrm();
     if (!m) return;
     if (m.wyrm === 'yielded' || this.questState('wyrm_fight') !== 'none') return this.msg('He is watching you. Best not.', '#e8b040', 'hoard');
+    if (this.questState('wyrm_met') === 'none') this.setQuest('wyrm_met', 'done');
     const a = this.area;
     this.setQuest('wyrm_theft', 'done');
     for (const o of a.objects) {

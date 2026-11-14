@@ -623,8 +623,21 @@ export class Renderer {
       // Up in the dark: only his shadow, sliding across the floor and growing as he comes down.
       const low = 1 - Math.min(1, m.sub / 3.4);
       ctx.fillStyle = `rgba(0,0,0,${0.3 + 0.3 * low})`;
+      const k2 = (0.75 + 0.75 * low) * z;
+      const beat = Math.sin(this.time * 5) * 6 * k2;
       ctx.beginPath();
-      ctx.ellipse(s.x, s.y, (26 + 30 * low) * z, (11 + 13 * low) * z, 0, 0, Math.PI * 2);
+      ctx.ellipse(s.x, s.y, 30 * k2, 11 * k2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Wings either side, beating, and the long neck ahead.
+      for (const d of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(s.x - 6 * k2, s.y);
+        ctx.quadraticCurveTo(s.x - 4 * k2, s.y + d * (24 * k2 + beat), s.x - 30 * k2, s.y + d * (30 * k2 + beat));
+        ctx.quadraticCurveTo(s.x - 16 * k2, s.y + d * 10 * k2, s.x - 22 * k2, s.y);
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.ellipse(s.x + 36 * k2, s.y, 14 * k2, 4 * k2, 0, 0, Math.PI * 2);
       ctx.fill();
       return;
     }
@@ -638,7 +651,8 @@ export class Renderer {
       return;
     }
     // Aura ring for special monsters; servants get a pale green one.
-    const ring = m.thief ? '#ffd040' : m.built ? '#e8b050' : m.ally ? '#7ad070' : m.rarity === 'champion' ? '#5c7cff' : m.rarity === 'unique' ? '#d8b050' : m.rarity === 'boss' ? '#ff4020' : null;
+    // Nothing rings a creature that is not in the fight.
+    const ring = m.calm ? null : m.thief ? '#ffd040' : m.built ? '#e8b050' : m.ally ? '#7ad070' : m.rarity === 'champion' ? '#5c7cff' : m.rarity === 'unique' ? '#d8b050' : m.rarity === 'boss' ? '#ff4020' : null;
     if (ring) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
@@ -662,7 +676,7 @@ export class Renderer {
       ctx.restore();
     }
     // Illusions cast no shadow, which is how you tell them apart.
-    if (!m.illusion) this.shadow(m.x, m.y, m.def.radius * 1.4);
+    if (!m.illusion) this.shadow(m.x, m.y, m.shape === 'wyrm_man' ? 0.5 : m.def.radius * 1.4);
     const act = m.action;
     const attack = act ? Math.min(1, act.t / act.dur) : 0;
     const pose = this.pose(m.facing, m.walk, m.walk > 0 && !act, attack, act?.kind === 'cast' ? attack : 0);
