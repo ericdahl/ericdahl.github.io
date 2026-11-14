@@ -35,7 +35,8 @@ const stories = (w: World, id: string) => w.events.filter((e) => e.type === 'sto
 
 describe('act 2 content', () => {
   it('is as large as act 1', () => {
-    const act1 = AREAS.filter((a) => !a.act);
+    // The road through Act 1, not the cave off to one side of it.
+    const act1 = AREAS.filter((a) => !a.act && !a.side);
     expect(ACT2.length).toBe(act1.length);
     const packs = (l: typeof AREAS) => l.reduce((n, a) => n + a.packs, 0);
     expect(packs(ACT2)).toBeGreaterThanOrEqual(packs(act1));

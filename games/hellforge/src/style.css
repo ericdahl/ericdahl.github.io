@@ -1067,3 +1067,12 @@ button {
   .tree-lv { padding-top: 18px; }
 }
 @media (prefers-reduced-motion: reduce) { .tnode.open .tn-icon { animation: none; } }
+
+/* The Brass Wyrm's panel: his lines, then what can be done about him. */
+.panel.wyrm { max-width: 760px; }
+.wyrm-body { display: flex; flex-direction: column; gap: 9px; }
+.wyrm-line { font-size: 14px; line-height: 1.4; color: #e0cfa0; }
+.wyrm-line:first-child { color: #a89878; font-style: italic; }
+.wyrm-picks { display: flex; gap: 10px; flex-wrap: wrap; }
+.wyrm-pick { flex: 1 1 190px; display: flex; flex-direction: column; gap: 6px; border: 1px solid rgba(160, 130, 80, 0.35); border-radius: 4px; padding: 8px; }
+.wyrm-pick .tt { flex: 1; }

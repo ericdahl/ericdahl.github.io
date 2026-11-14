@@ -1,6 +1,18 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.22.0',
+    date: '2026-11-14',
+    notes: [
+      'Something is asleep above Gloomwood. There is a cave high on the ridge that no quest sends you to, and in it Tyriach, the Brass Wyrm, on a hoard. He is far stronger than anything else in the wood: if you find him early, come back later.',
+      'He would rather talk than fight. Walk up and speak to him and he will, at length. He has a letter that needs carrying to the captain in Tel Maresh, and he pays for errands from the hoard.',
+      'Or challenge him. He breathes a fan of fire that is marked on the ground before it lands, beats his wings to throw you across the cave, splits into copies that cast no shadow, and takes to the air where you cannot reach him while fire comes down. Watch his shadow: that is where he lands.',
+      'He does not die. Wear him down far enough and he yields, and you choose one of three things from the hoard: a unique, a set piece or a rare.',
+      'Or rob him while he sleeps. All three chests of the hoard pay out at once, and he wakes up. He hits harder, takes longer to give up, and pays nothing more when he does.',
+      'He is there again on Nightmare and on Hell. A Hiveborn with Sky Hunter will find that he counts as a bird. He does not agree.',
+    ],
+  },
+  {
     version: '0.21.0',
     date: '2026-11-14',
     notes: [

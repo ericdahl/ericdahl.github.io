@@ -8,7 +8,7 @@ export type MonsterShape =
   | 'corvin' | 'noon'
   | 'thrall' | 'bellwarden' | 'slag' | 'eater' | 'phylactery' | 'frostwright' | 'unlit'
   | 'ballista' | 'bellows' | 'sentinel' | 'furnace'
-  | 'hire_guard' | 'hire_archer' | 'hire_mage' | 'worker';
+  | 'hire_guard' | 'hire_archer' | 'hire_mage' | 'worker' | 'wyrm';
 export type MonsterAI = 'melee' | 'ranged' | 'caster' | 'bat' | 'hexer' | 'boss' | 'burrow' | 'eater' | 'totem';
 
 export interface Resists {
@@ -23,7 +23,8 @@ export type BossAbility =
   | 'nova_fire' | 'nova_cold' | 'fire_spread' | 'summon_imps' | 'summon_skeletons' | 'charge' | 'meteor_rain'
   | 'poison_spray' | 'summon_scarabs' | 'burrow_strike' | 'summon_kites' | 'corpse_feast' | 'sun_lance'
   | 'summon_mummies' | 'raise_dead' | 'mirage_split' | 'summon_acolytes' | 'noon_burst'
-  | 'ice_lance' | 'summon_thralls' | 'summon_eaters' | 'cold_snap' | 'snuff' | 'frost_rain' | 'toll';
+  | 'ice_lance' | 'summon_thralls' | 'summon_eaters' | 'cold_snap' | 'snuff' | 'frost_rain' | 'toll'
+  | 'breath' | 'buffet' | 'take_wing';
 
 /** A boss stage, entered once life falls to `at` (0..1 of maximum). */
 export interface BossPhase {
@@ -83,6 +84,8 @@ export interface MonsterDef {
   slag?: boolean;
   /** Drinks the hero's ember from a distance. */
   drains?: boolean;
+  /** Takes to the air: while it is up it cannot be reached, and only its shadow shows. */
+  flies?: boolean;
 }
 
 const D = (d: Omit<MonsterDef, 'res' | 'scale'> & { res?: Partial<Resists>; scale?: number }): MonsterDef => ({ res: {}, scale: 1, ...d });
@@ -119,6 +122,15 @@ export const MONSTERS: Record<string, MonsterDef> = {
   hire_archer: D({ id: 'hire_archer', name: 'Bowman', shape: 'hire_archer', ai: 'ranged', lifeMul: 1.9, dmgMul: 0.95, speed: 4.2, radius: 0.32, range: 8, attackRate: 1.05, xpMul: 0, missile: { element: 'phys', speed: 15, kind: 'arrow' }, res: { fire: 10, cold: 10, light: 10, poison: 10 }, color: '#4a6a3a' }),
   hire_mage: D({ id: 'hire_mage', name: 'Ember-Keeper', shape: 'hire_mage', ai: 'caster', lifeMul: 1.6, dmgMul: 1.15, speed: 4.2, radius: 0.32, range: 7.5, attackRate: 0.8, xpMul: 0, missile: { element: 'fire', speed: 11, kind: 'firebolt' }, res: { fire: 50, cold: 25, light: 10, poison: 10 }, color: '#a84a2a' }),
   mother: D({ id: 'mother', name: 'Vhorza, Mother of Cinders', shape: 'mother', ai: 'boss', lifeMul: 30, dmgMul: 2.6, speed: 2.3, radius: 0.9, range: 1.0, attackRate: 0.8, xpMul: 40, element: 'fire', missile: { element: 'fire', speed: 8, kind: 'm_fire' }, res: { fire: 75, poison: 30, light: 20, cold: 10 }, scale: 2.1, color: '#c23b1f', abilities: ['fire_spread', 'nova_fire', 'summon_imps', 'meteor_rain'] }),
+
+  // The Brass Wyrm (see wyrm.ts). He does not die: at a quarter of his life he yields.
+  wyrm: D({ id: 'wyrm', name: 'Tyriach, the Brass Wyrm', shape: 'wyrm', ai: 'boss', lifeMul: 46, dmgMul: 2.3, speed: 2.5, radius: 1.15, range: 1.2, attackRate: 0.75, xpMul: 60, element: 'fire', flies: true,
+    res: { fire: 75, cold: 20, light: 30, poison: 40, phys: 25 }, scale: 2.7, color: '#b8862e',
+    abilities: ['breath', 'buffet', 'fire_spread', 'breath'],
+    phases: [
+      { at: 0.7, abilities: ['breath', 'take_wing', 'buffet', 'mirage_split', 'breath'], line: '"You are still standing. How novel. Let us see how you manage when I am not."' },
+      { at: 0.45, abilities: ['take_wing', 'breath', 'meteor_rain', 'buffet', 'mirage_split', 'breath'], line: '"I had forgotten what this felt like. Do not flatter yourself: it feels like indigestion."' },
+    ] }),
 
   // ------------------------------------------------------------ Act 2: The Glass Sea
   jackal: D({ id: 'jackal', name: 'Dust Jackal', shape: 'hound', ai: 'melee', lifeMul: 0.8, dmgMul: 0.85, speed: 4.3, radius: 0.34, range: 0.45, attackRate: 1.6, xpMul: 0.95, res: { fire: 15 }, color: '#a8875a' }),
