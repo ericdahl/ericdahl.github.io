@@ -42,6 +42,7 @@ Panels pause the game.
 - **Act 3: The Ember Road.** Killing Corvane opens the road back north. The ember Vhorza left is dying and the cold she held back is loose: Emberwatch lies in ruins under snow (a new town), and beyond it are Rimefall Pass, the frozen Drowned Mines, the Bellfounders' Halls, the Cold Furnace and the Hellforge's Heart. **Warmth:** in the cold the ember burns down (faster in a whiteout) and its light shrinks; once it is out, frostbite builds, slowing and then wounding. Touch a brazier to light it and stand in its glow to refill the ember; fire skills, burning weapons and burning monsters help too. Rime-Thralls shatter into ember-sapping ice unless burned, Bellwardens ring a shockwave to dodge-roll through, Slag Golems go molten in fire and brittle in cold, and Hearth-Eaters drink the ember from range unless you stand in firelight. Bosses: the Frostwright (shelter at a lit brazier from his cold snap), Corvane's Echo (break his phylactery) and the Unlit (it snuffs fires, and heals while your ember is out).
 - **The Underforge.** Finishing Act 3 opens an endless dungeon at every waypoint (per difficulty). Floors are rolled from the run's seed with layouts and monsters from all three acts, one monster level deeper each. A warden seals the stairs on every floor, every fifth floor is a returning boss, and from the third floor down the whole floor carries one to three afflictions that every monster shares. Magic find, gold find and elite density rise with depth, wardens pay out Cinders for the Forge, and clearing a boss floor lets the next descent start below it.
 - **Hirelings.** A captain in every town hires out one companion: a Shieldbearer (melee, tough), a Bowman (ranged) or an Ember-Keeper (fire, and warm to stand beside in Act 3). They fight at the hero's level, follow between areas, mend out of combat, and are brought back at any captain for a fee if they fall.
+- **Shared stash.** The town stash has a second tab that every hero in this browser shares (items and gold), so gear can be passed between heroes. Hardcore heroes have a separate one.
 - **Respec.** Each difficulty finished earns one respec (three in all), spent from the Character or Skills panel: every skill and attribute point comes back to be placed again.
 - **Dodging and sprees.** A dodge roll (1.5 second cooldown) makes the hero untouchable for a moment and cancels a swing or cast. Kills made within four seconds of each other build a spree (Killing Spree at 5, then Rampage, Massacre, Slaughter, Annihilation, Hell Unleashed); each rank adds run speed and experience per kill, and restores some life and mana.
 - **Things to find.** Soul orbs restore life or mana when walked over. A Tithe Imp may hide in any area but the Hollow Cave: it flees, drops gold when struck, and escapes through a portal unless killed. Shrines grant Armor, Combat, Experience, Storm, Fortune or Fleet blessings, refill life and mana, or (Cursed) call a three-wave ambush with a hoard at the end. Killing everything in an area purges it for experience and loot.
@@ -50,7 +51,7 @@ Panels pause the game.
 
 Music, ambient sound and weather are all generated in code too; the menu has switches for each.
 
-Progress saves automatically to the browser's local storage. To move heroes to another device, use **Export / Import** on the title screen: download a save file or copy a short save code, then load the file or paste the code on the other device. Importing replaces a hero with the same identity and keeps the rest.
+Progress saves automatically to the browser's local storage. To move heroes to another device, use **Export / Import** on the title screen: download a save file or copy a short save code, then load the file or paste the code on the other device. Importing replaces a hero with the same identity and keeps the rest. The shared stash is exported too, and replaces the one on the other device only if that one is empty or you agree.
 
 ## Versions
 
@@ -58,6 +59,7 @@ The version is shown at the bottom of the title screen; tap it for the player-fa
 
 | Version | Commit | Notes |
 |---|---|---|
+| 0.18.0 | | Shared stash: a second stash tab shared by every hero on the device, carried in exports |
 | 0.17.0 | | Hirelings: a captain in every town, three companions to hire, revive and dismiss |
 | 0.16.0 | | Respec: one for each difficulty finished, giving back every skill and attribute point |
 | 0.15.0 | | The Underforge: an endless, scaling dungeon after Act 3 (wardens, boss floors, afflictions, starting floors) |

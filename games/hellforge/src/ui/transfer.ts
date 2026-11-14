@@ -1,4 +1,4 @@
-import type { Character } from '../game/character';
+import type { Character, SharedStash } from '../game/character';
 
 /**
  * Save transfer: pack heroes into a portable file or a copy/paste code, and read them back.
@@ -11,14 +11,18 @@ export interface SaveBundle {
   format: 1;
   exported: number;
   chars: Character[];
+  /** The shared stashes, when there is anything in them. Older saves have none. */
+  shared?: { soft: SharedStash; hard: SharedStash };
 }
 
-export function bundle(chars: Character[]): SaveBundle {
-  return { game: 'hellforge', format: 1, exported: Date.now(), chars };
+export function bundle(chars: Character[], shared?: SaveBundle['shared']): SaveBundle {
+  const b: SaveBundle = { game: 'hellforge', format: 1, exported: Date.now(), chars };
+  if (shared && (shared.soft.items.length || shared.soft.gold || shared.hard.items.length || shared.hard.gold)) b.shared = shared;
+  return b;
 }
 
-export function bundleJson(chars: Character[]): string {
-  return JSON.stringify(bundle(chars), null, 1);
+export function bundleJson(chars: Character[], shared?: SaveBundle['shared']): string {
+  return JSON.stringify(bundle(chars, shared), null, 1);
 }
 
 function toB64(bytes: Uint8Array): string {
@@ -39,14 +43,19 @@ async function pipe(bytes: Uint8Array, stream: GenericTransformStream): Promise<
   return new Uint8Array(await res.arrayBuffer());
 }
 
-export async function encodeCode(chars: Character[]): Promise<string> {
-  const raw = new TextEncoder().encode(JSON.stringify(bundle(chars)));
+export async function encodeCode(chars: Character[], shared?: SaveBundle['shared']): Promise<string> {
+  const raw = new TextEncoder().encode(JSON.stringify(bundle(chars, shared)));
   if (typeof CompressionStream === 'undefined') return `HF0.${toB64(raw)}`;
   return `HF1.${toB64(await pipe(raw, new CompressionStream('gzip')))}`;
 }
 
 /** Accepts a save code or the contents of an exported file. Throws with a readable message. */
 export async function decodeSave(text: string): Promise<Character[]> {
+  return (await decodeBundle(text)).chars;
+}
+
+/** As decodeSave, with the shared stashes the save carried, if any. */
+export async function decodeBundle(text: string): Promise<{ chars: Character[]; shared?: SaveBundle['shared'] }> {
   const t = text.trim();
   let json: string;
   if (t.startsWith('{')) json = t;
@@ -74,7 +83,9 @@ export async function decodeSave(text: string): Promise<Character[]> {
   if (data?.game !== 'hellforge' || !Array.isArray(data.chars)) throw new Error('That does not look like a Hellforge save.');
   const chars = data.chars.filter((c) => c && typeof c.id === 'string' && typeof c.name === 'string' && typeof c.classId === 'string');
   if (!chars.length) throw new Error('The save has no heroes in it.');
-  return chars;
+  const ok = (s?: SharedStash) => !!s && Array.isArray(s.items) && typeof s.gold === 'number';
+  const sh = data.shared;
+  return { chars, shared: sh && ok(sh.soft) && ok(sh.hard) ? sh : undefined };
 }
 
 export function downloadFile(name: string, text: string) {

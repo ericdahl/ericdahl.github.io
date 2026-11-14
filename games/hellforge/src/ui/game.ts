@@ -9,8 +9,8 @@ import { Renderer } from '../render/renderer';
 import { Audio } from './audio';
 import { h, isTouch } from './dom';
 import { forgeKey, resetForgeUi } from './forge';
-import { itemActions, panelItemContext, renderPanel, resetRespecUi, type PanelHost, type PanelKind, type Selection } from './panels';
-import { loadSettings, saveCharacter, saveSettings, type Settings } from './save';
+import { itemActions, panelItemContext, renderPanel, resetRespecUi, resetStashUi, type PanelHost, type PanelKind, type Selection } from './panels';
+import { loadSettings, loadShared, saveCharacter, saveSettings, saveShared, type Settings } from './save';
 
 const TOUCH_JOY_ZONE = 0.42;
 
@@ -47,7 +47,7 @@ export class Game implements PanelHost {
   constructor(root: HTMLElement, char: Character, onExit: () => void, seed?: number) {
     this.root = root;
     this.onExit = onExit;
-    this.world = new World(char, seed);
+    this.world = new World(char, seed, loadShared(char.hardcore));
     root.innerHTML = '';
     this.canvas = h('canvas', { class: 'view' });
     root.append(this.canvas);
@@ -87,6 +87,7 @@ export class Game implements PanelHost {
 
   save() {
     saveCharacter(this.world.char);
+    saveShared(this.world.char.hardcore, this.world.shared);
   }
 
   private resize = () => {
@@ -601,6 +602,7 @@ export class Game implements PanelHost {
     if (this.panel !== p) {
       this.sel = null;
       if (p === 'forge') resetForgeUi();
+      if (p === 'stash') resetStashUi();
       resetRespecUi();
     }
     this.panel = p;

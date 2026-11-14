@@ -1,6 +1,16 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.18.0',
+    date: '2026-11-14',
+    notes: [
+      'A shared stash. The stash in town now has two tabs: your hero\'s own, and one that every hero on this device can reach. Leave a bow for your Huntress with your Reaver and she will find it there.',
+      'The shared stash holds gold as well as items, and is as big as a hero\'s own. Hardcore heroes share one of their own, apart from everyone else\'s.',
+      'It travels with Export / Import. If the device you import onto already has things in its shared stash, you are asked before they are replaced.',
+      'The sage identifies what is in the shared stash along with everything else.',
+    ],
+  },
+  {
     version: '0.17.0',
     date: '2026-11-14',
     notes: [

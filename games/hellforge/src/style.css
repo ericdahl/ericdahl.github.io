@@ -1017,3 +1017,8 @@ button {
 .hire-btn { flex: none; }
 .buff.b-hire { border-color: #5a8a50; color: #9fe08a; }
 .buff.b-hiredown { border-color: #7a3a2a; color: #ff8a6a; }
+
+/* Stash tabs: the hero's own stash and the one shared between heroes. */
+.stash-tabs { display: flex; gap: 6px; margin-bottom: 6px; }
+.stash-tabs .btn.tab { flex: 1; }
+.shared-say { max-width: calc(var(--cell) * 10); }
