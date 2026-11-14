@@ -95,7 +95,10 @@ The version is shown at the bottom of the title screen; tap it for the player-fa
 npm test           # Vitest: engine unit tests, world simulation, and a bot that plays all three acts with every class
 npm run e2e        # Playwright on phone-landscape, phone-portrait and desktop (screenshots land in test-results/)
 npm run typecheck
+npm run balance    # the bot plays every class through all three acts on three seeds and rewrites BALANCE.md (about 5 minutes)
 ```
+
+`BALANCE.md` is the bot's balance report: time, deaths, potions and time to kill for each class in each act and area, with the classes that are out of line with the others listed at the top. It is committed so that running `npm run balance` after a change shows what moved as a diff. `BALANCE_SEEDS=99` or `BALANCE_CLASSES=reaver,arcanist` narrows a run, and `BALANCE_OUT=path` writes somewhere else.
 
 | Path | What |
 |---|---|
@@ -107,5 +110,5 @@ npm run typecheck
 | `src/render/figures.ts`, `creatures.ts`, `looks.ts` | Character art: the shading kit and humanoids, monster bodies, and what the hero and townsfolk wear |
 | `gallery.html` | Dev-only page (`npm run dev`, then `/gallery.html`) showing every character model in several poses; `?zoom=4&m=imp,bat` narrows it |
 | `src/ui/` | DOM HUD, panels, title screen, input, audio, saves |
-| `tests/` | Vitest suites (`bot.ts` is the playthrough bot used by `act.test.ts`) |
+| `tests/` | Vitest suites (`bot.ts` is the playthrough bot used by `act.test.ts`; `balance.ts` turns its runs into `BALANCE.md`, and `balance.report.ts` is the runner behind `npm run balance`) |
 | `e2e/` | Playwright specs |
