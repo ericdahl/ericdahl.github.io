@@ -1,12 +1,11 @@
 import { ACT_NAMES, AREA_BY_ID, areaAct, DIFFICULTY_LEVELS, QUESTS } from '../game/areas';
 import {
-  allocStat, canLearn, CLASSES, DIFFICULTIES, difficultiesFinished, hasSpentPoints, INV_COLS, INV_ROWS, learnSkill, requirementError,
-  respecsLeft, skillLevel, sortGrid, STASH_COLS, STASH_ROWS, type GridEntry,
+  allocStat, CLASSES, DIFFICULTIES, difficultiesFinished, hasSpentPoints, INV_COLS, INV_ROWS, requirementError,
+  respecsLeft, sortGrid, STASH_COLS, STASH_ROWS, type GridEntry,
 } from '../game/character';
 import { baseOf, buyPrice, displayName, gamblePrice, itemColor, sellPrice, type Item, type Slot } from '../game/items';
-import { classSkills, SKILL_BY_ID } from '../game/skills';
 import { GAMBLE_KINDS, type World } from '../game/world';
-import { itemIconUrl, skillIconUrl } from '../render/icons';
+import { itemIconUrl } from '../render/icons';
 import { h, isTouch } from './dom';
 import { compareEquip, defaultSlot } from './compare';
 import { forgeActions, forgeBadge, forgePanel } from './forge';
@@ -14,6 +13,7 @@ import { DEPTH_BASE_LEVEL } from '../game/depths';
 import { forgeRank, MASTERY_RANKS } from '../game/forge';
 import { hireCost, HIRE_KINDS, HIRELINGS, reviveCost } from '../game/hireling';
 import { itemTooltip } from './tooltip';
+import { skillsPanel } from './skilltree';
 
 export type PanelKind = 'inventory' | 'character' | 'skills' | 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan' | 'forge' | 'captain' | 'menu' | 'help';
 
@@ -366,7 +366,7 @@ export function resetRespecUi() {
 }
 
 /** The respec button and its second ask, or a line saying how one is earned. Shared by the Character and Skills panels. */
-function respecControl(host: PanelHost): HTMLElement {
+export function respecControl(host: PanelHost): HTMLElement {
   const w = host.world;
   const c = w.char;
   const left = respecsLeft(c);
@@ -456,51 +456,6 @@ function characterPanel(host: PanelHost) {
       ),
     ),
   );
-}
-
-function skillsPanel(host: PanelHost) {
-  const w = host.world;
-  const c = w.char;
-  const tiers = new Map<number, ReturnType<typeof classSkills>>();
-  for (const s of classSkills(c.classId)) tiers.set(s.reqLevel, [...(tiers.get(s.reqLevel) ?? []), s]);
-  const body = h('div', { class: 'skills' });
-  for (const [lvl, list] of [...tiers.entries()].sort((a, b) => a[0] - b[0])) {
-    const cards = h('div', { class: 'tier-cards' });
-    const row = h('div', { class: 'tier' }, h('div', { class: 'tier-l' }, `Lv ${lvl}`), cards);
-    for (const s of list) {
-      const hard = c.skills[s.id] ?? 0;
-      const eff = skillLevel(c, s.id);
-      const why = canLearn(c, s);
-      const cur = eff > 0 ? s.lines(s.params(eff)) : [];
-      const next = s.lines(s.params(Math.max(1, eff + 1)));
-      const mana = s.mana(Math.max(1, eff));
-      const card = h(
-        'div',
-        { class: `skill ${hard ? 'known' : ''} ${why && !hard ? 'locked' : ''}` },
-        h('img', { src: skillIconUrl(s.id), alt: '' }),
-        h(
-          'div',
-          { class: 'sk-info' },
-          h('div', { class: 'sk-name' }, s.name, h('span', { class: 'sk-lvl' }, hard ? ` ${hard}${eff > hard ? ` (+${eff - hard})` : ''}` : '')),
-          h('div', { class: 'dim small' }, s.desc + (s.prereq ? ` Requires ${s.prereq.map((p) => SKILL_BY_ID[p].name).join(', ')}.` : '')),
-          cur.length ? h('div', { class: 'small' }, h('span', { class: 'dim' }, 'Now: '), cur.join(' · ')) : null,
-          h('div', { class: 'small blue' }, h('span', { class: 'dim' }, eff ? 'Next: ' : 'Level 1: '), next.join(' · ')),
-          s.kind !== 'passive' ? h('div', { class: 'small dim' }, `Mana: ${Number(mana.toFixed(1))}`) : h('div', { class: 'small dim' }, 'Passive'),
-          s.synergies ? h('div', { class: 'small green' }, `Synergy: ${s.synergies.map((x) => `+${x.pct}% per ${SKILL_BY_ID[x.skill].name} level`).join(', ')}`) : null,
-          hard && s.kind !== 'passive'
-            ? h('div', { class: 'assign' }, h('span', { class: 'dim small' }, 'Slot:'), ...[0, 1, 2, 3].map((i) =>
-                h('button', { class: `btn tiny ${c.hotbar[i] === s.id ? 'on' : ''}`, onclick: () => { c.hotbar[i] = s.id; host.refresh(); } }, String(i + 1))))
-            : null,
-        ),
-        h('button', { class: 'plus big', disabled: !!why, title: why ?? 'Learn', 'aria-label': `Learn ${s.name}`, onclick: () => { learnSkill(c, s.id); w.refreshStats(); host.refresh(); } }, '+'),
-      );
-      cards.append(card);
-    }
-    body.append(row);
-  }
-  const attackAssign = h('div', { class: 'assign' }, h('span', { class: 'dim small' }, 'Basic Attack slot:'), ...[0, 1, 2, 3].map((i) =>
-    h('button', { class: `btn tiny ${c.hotbar[i] === 'attack' ? 'on' : ''}`, onclick: () => { c.hotbar[i] = 'attack'; host.refresh(); } }, String(i + 1))));
-  return h('div', { class: 'panel skl' }, header(host, 'Skills', c.skillPoints ? `${c.skillPoints} point${c.skillPoints > 1 ? 's' : ''} to spend` : undefined), h('div', { class: 'p-body' }, attackAssign, body, respecControl(host)));
 }
 
 function waypointPanel(host: PanelHost) {
@@ -682,6 +637,7 @@ function helpPanel(host: PanelHost) {
     ['Potions', 'Tap a potion slot (hold for details)', '1 health, 2 mana, 3 rejuvenation'],
     ['Town Portal', 'Portal button', 'T'],
     ['Panels', 'Bottom buttons', 'I inventory · C character · K skills · M/Tab map'],
+    ['Skill tree', 'Tap a skill, then Learn', 'Click a skill, then Learn. Lines show what each skill requires'],
     ['Items', 'Tap an item, then a button', 'Hover an item: E equip/unequip · U use · S sell · B buy · D drop · X stash/inventory · G socket. Right-click for the main action'],
     ['The Forge', 'Tap an item, then a job', 'Hover an item: H heat · J strike by hand · T temper · Q quench · L ember-seal · P punch socket · M crucible · S salvage'],
   ];

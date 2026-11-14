@@ -10,6 +10,7 @@ import { Audio } from './audio';
 import { h, isTouch } from './dom';
 import { forgeKey, resetForgeUi } from './forge';
 import { itemActions, panelItemContext, renderPanel, resetRespecUi, resetStashUi, type PanelHost, type PanelKind, type Selection } from './panels';
+import { resetSkillUi } from './skilltree';
 import { loadSettings, loadShared, saveCharacter, saveSettings, saveShared, type Settings } from './save';
 
 const TOUCH_JOY_ZONE = 0.42;
@@ -603,6 +604,7 @@ export class Game implements PanelHost {
       this.sel = null;
       if (p === 'forge') resetForgeUi();
       if (p === 'stash') resetStashUi();
+      if (p === 'skills') resetSkillUi();
       resetRespecUi();
     }
     this.panel = p;
