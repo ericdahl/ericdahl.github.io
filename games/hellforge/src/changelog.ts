@@ -1,6 +1,15 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.16.0',
+    date: '2026-11-14',
+    notes: [
+      'Respec. Each difficulty you finish earns one respec: Normal, Nightmare and Hell, three in all. Heroes who have already finished a difficulty have theirs waiting.',
+      'Spend it from the Character or Skills panel. Every skill point and attribute point comes back to be placed again; your gear, level and quests are untouched. It asks twice first.',
+      'Skeletons, golems, turrets and standing spells made with your old skills are dismissed when you respec. Shrine blessings stay.',
+    ],
+  },
+  {
     version: '0.15.0',
     date: '2026-11-14',
     notes: [

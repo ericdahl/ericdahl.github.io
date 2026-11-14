@@ -1,7 +1,7 @@
 import { AREA_BY_ID, areaAct, DIFFICULTY_LEVELS, QUEST_BY_ID, QUESTS, TOWN_OF_ACT, WAYPOINT_AREAS, type AreaDef } from './areas';
 import {
   addPotion, addToGrid, addToInventory, addXp, choosePotion, CLASSES, computeStats, equipFromInventory, INV_COLS, INV_ROWS,
-  removeFromGrid, skillLevel, STASH_COLS, STASH_ROWS, takePotion, unequip, xpForLevel, xpMultiplier,
+  removeFromGrid, respec, skillLevel, STASH_COLS, STASH_ROWS, takePotion, unequip, xpForLevel, xpMultiplier,
   type Buffs, type Character, type PotionPool, type Stats,
 } from './character';
 import { applyResists, hitChance, reducePhysical, roll, ZERO_DAMAGE, type Damage } from './combat';
@@ -2582,6 +2582,7 @@ export class World {
           this.frost = 0;
           for (const o of a.objects) if (o.kind === 'brazier') o.used = true;
           this.char.maxDifficulty = Math.max(this.char.maxDifficulty, Math.min(2, this.char.difficulty + 1));
+          this.msg('You have earned a respec: see the Character or Skills panel', '#e8c860');
           this.emit({ type: 'victory' });
         }
       }
@@ -2714,6 +2715,23 @@ export class World {
     this.sound('death');
     this.emit({ type: 'death' });
     if (this.char.hardcore) this.char.dead = true;
+  }
+
+  /** Spends a respec (see character.ts). Servants and standing spells made with the old skills go with them. */
+  respec(): boolean {
+    if (this.player.dead || !respec(this.char)) return false;
+    const p = this.player;
+    this.minions = [];
+    p.buffs = Object.fromEntries(Object.entries(p.buffs).filter(([k]) => k.startsWith('shrine_')));
+    p.frenzy = { stacks: 0, t: 0 };
+    p.heat = 0;
+    p.overheat = false;
+    p.action = null;
+    p.intent = null;
+    this.refreshStats();
+    this.sound('quest');
+    this.msg('Your skills and attributes are yours to place again', '#e8c860');
+    return true;
   }
 
   /** Softcore respawn: lose some gold (and experience on higher difficulties), wake in town. */

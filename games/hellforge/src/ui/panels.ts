@@ -1,7 +1,7 @@
 import { ACT_NAMES, AREA_BY_ID, areaAct, DIFFICULTY_LEVELS, QUESTS } from '../game/areas';
 import {
-  allocStat, canLearn, CLASSES, DIFFICULTIES, INV_COLS, INV_ROWS, learnSkill, requirementError, skillLevel, sortGrid, STASH_COLS,
-  STASH_ROWS, type GridEntry,
+  allocStat, canLearn, CLASSES, DIFFICULTIES, difficultiesFinished, hasSpentPoints, INV_COLS, INV_ROWS, learnSkill, requirementError,
+  respecsLeft, skillLevel, sortGrid, STASH_COLS, STASH_ROWS, type GridEntry,
 } from '../game/character';
 import { baseOf, buyPrice, displayName, gamblePrice, itemColor, sellPrice, type Item, type Slot } from '../game/items';
 import { classSkills, SKILL_BY_ID } from '../game/skills';
@@ -342,6 +342,38 @@ function stashPanel(host: PanelHost) {
   );
 }
 
+let respecArmed = false;
+/** Forget a half-confirmed respec when a panel is opened afresh. */
+export function resetRespecUi() {
+  respecArmed = false;
+}
+
+/** The respec button and its second ask, or a line saying how one is earned. Shared by the Character and Skills panels. */
+function respecControl(host: PanelHost): HTMLElement {
+  const w = host.world;
+  const c = w.char;
+  const left = respecsLeft(c);
+  const box = h('div', { class: 'respec' });
+  if (!left) {
+    const done = difficultiesFinished(c);
+    box.append(h('div', { class: 'dim small' }, done >= DIFFICULTIES.length ? 'Every respec has been spent.' : done ? `Respec spent. Finish ${DIFFICULTIES[done]} to earn another.` : 'Finish a difficulty to earn a respec: every skill and attribute point back, to place again.'));
+    return box;
+  }
+  const count = `${left} respec${left > 1 ? 's' : ''} left`;
+  if (!hasSpentPoints(c)) {
+    box.append(h('div', { class: 'dim small' }, `${count}. Nothing to give back yet.`));
+  } else if (!respecArmed) {
+    box.append(h('button', { class: 'btn respec-btn', onclick: () => { respecArmed = true; host.refresh(); document.querySelector('.respec .acts')?.scrollIntoView({ block: 'nearest' }); } }, `Respec (${count})`));
+  } else {
+    box.append(
+      h('div', { class: 'small' }, `Take back every skill and attribute point and place them again? This spends a respec${left > 1 ? '' : ', and it is your last until you finish another difficulty'}.`),
+      h('div', { class: 'acts' },
+        h('button', { class: 'btn danger respec-yes', onclick: () => { respecArmed = false; w.respec(); host.refresh(); } }, 'Respec'),
+        h('button', { class: 'btn respec-no', onclick: () => { respecArmed = false; host.refresh(); } }, 'Keep my build')));
+  }
+  return box;
+}
+
 function characterPanel(host: PanelHost) {
   const w = host.world;
   const c = w.char;
@@ -378,6 +410,7 @@ function characterPanel(host: PanelHost) {
         statRow('Vitality', 'vit', s.vit),
         statRow('Energy', 'ene', s.ene),
         h('div', { class: 'dim small' }, 'Strength boosts melee damage, Dexterity boosts bows, attack rating and defense, Vitality adds life, Energy adds mana.'),
+        respecControl(host),
       ),
       h(
         'div',
@@ -450,7 +483,7 @@ function skillsPanel(host: PanelHost) {
   }
   const attackAssign = h('div', { class: 'assign' }, h('span', { class: 'dim small' }, 'Basic Attack slot:'), ...[0, 1, 2, 3].map((i) =>
     h('button', { class: `btn tiny ${c.hotbar[i] === 'attack' ? 'on' : ''}`, onclick: () => { c.hotbar[i] = 'attack'; host.refresh(); } }, String(i + 1))));
-  return h('div', { class: 'panel skl' }, header(host, 'Skills', c.skillPoints ? `${c.skillPoints} point${c.skillPoints > 1 ? 's' : ''} to spend` : undefined), h('div', { class: 'p-body' }, attackAssign, body));
+  return h('div', { class: 'panel skl' }, header(host, 'Skills', c.skillPoints ? `${c.skillPoints} point${c.skillPoints > 1 ? 's' : ''} to spend` : undefined), h('div', { class: 'p-body' }, attackAssign, body, respecControl(host)));
 }
 
 function waypointPanel(host: PanelHost) {
@@ -604,7 +637,7 @@ function helpPanel(host: PanelHost) {
       h('div', { class: 'small', html: [
         'Explore the Cinder Fields east of camp, find waypoints, and push down through the Catacombs to the Hellforge.',
         'Gear drops in <span class="blue">magic</span>, <span class="gold2">rare</span>, <span class="green">set</span> and <span class="uniq">unique</span> qualities. Old Corvin identifies items for free. Insert gems into socketed gear.',
-        'Each level grants 5 stat points and 1 skill point. Higher difficulties lower your resistances, so collect resist gear.',
+        'Each level grants 5 stat points and 1 skill point. Higher difficulties lower your resistances, so collect resist gear. Each difficulty you finish earns one <span class="gold2">respec</span>, spent from the Character or Skills panel: every point comes back to be placed again.',
         'Dodging makes you untouchable for a moment and cuts short a swing or a cast. Kill quickly to build a <span class="gold2">spree</span>: each rank makes you faster, kills worth more experience, and gives you a second wind.',
         'Red and blue soul orbs restore life and mana when you walk over them. A <span class="gold2">Tithe Imp</span> drops gold with every blow and a hoard if you kill it before it escapes. A purple Cursed Shrine calls an ambush and pays out if you survive it. Clearing an area completely earns a reward.',
         'At <span class="gold2">the Forge</span> beside the blacksmith, salvage loot you do not need into Cinders and Essences, then spend them on the gear you keep: Heat it up to +10, Temper or Quench its affixes, Smelt three items into a better one. Heating past +5 can fail and crack the item back a level. Forge mastery grows with every job and teaches new ones.',
