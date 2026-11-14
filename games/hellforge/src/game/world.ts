@@ -11,6 +11,7 @@ import {
 } from './items';
 import { afflictionLabel, DEPTH_BOSSES, DEPTH_STRIDE, depthCinders, depthDef, depthFortune, depthId, depthOf, depthStarts, isDepthId } from './depths';
 import { forgeApply, type ForgeAction, type ForgeResult } from './forge';
+import { hireCost, hirelingName, HIRELINGS, reviveCost, type HireKind } from './hireling';
 import { floodDistances, generateLevel, idx, isWalkable, nearestFloor, type Level, type Point } from './map';
 import {
   baseDamage, baseLife, MOD_LABEL, MONSTERS, monsterStats, rollUniqueMods, uniqueName,
@@ -29,7 +30,7 @@ export type SoundId =
 /** Seconds a ground item takes to bounce when it lands or refuses to be picked up. */
 export const LOOT_BOUNCE = 0.4;
 
-export type Panel = 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan' | 'forge';
+export type Panel = 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan' | 'forge' | 'captain';
 
 export type GameEvent =
   | { type: 'sound'; id: SoundId }
@@ -193,12 +194,12 @@ export const BRAZIER_RADIUS = 4.5;
 /** Seconds a full ember lasts in the cold with no fire near, and how long frostbite takes to set in once it is out. */
 export const EMBER_TIME = 60;
 export const FROST_TIME = 10;
-export type Ally = 'skeleton' | 'golem' | 'ballista' | 'bellows' | 'sentinel' | 'furnace';
-const ALLY_DEF: Record<Ally, string> = {
+export type Ally = 'skeleton' | 'golem' | 'ballista' | 'bellows' | 'sentinel' | 'furnace' | 'hireling';
+const ALLY_DEF: Record<Exclude<Ally, 'hireling'>, string> = {
   skeleton: 'raised_skeleton', golem: 'grave_golem', ballista: 'ballista_turret', bellows: 'bellows_turret', sentinel: 'brass_sentinel', furnace: 'furnace',
 };
 /** Which servant each Forgewright construct skill builds. */
-export const CONSTRUCT_OF: Record<string, Ally> = { ballista: 'ballista', bellows: 'bellows', brass_sentinel: 'sentinel', furnace: 'furnace' };
+export const CONSTRUCT_OF: Record<string, Exclude<Ally, 'hireling'>> = { ballista: 'ballista', bellows: 'bellows', brass_sentinel: 'sentinel', furnace: 'furnace' };
 
 /** Heat: where Slag Burst becomes usable, where it leaves burning ground, and where an overheated smith stops burning. */
 export const HEAT_MAX = 100;
@@ -289,7 +290,7 @@ const SHRINE_NAMES: Record<ShrineKind, string> = {
 };
 const SHRINE_TIME: Partial<Record<ShrineKind, number>> = { storm: 45, fortune: 120, haste: 60 };
 
-export type NpcKind = 'healer' | 'smith' | 'sage' | 'fence' | 'caravan';
+export type NpcKind = 'healer' | 'smith' | 'sage' | 'fence' | 'caravan' | 'captain';
 export interface Npc {
   id: number;
   kind: NpcKind;
@@ -306,6 +307,7 @@ export const NPC_INFO: Record<NpcKind, { name: string; title: string }> = {
   sage: { name: 'Old Corvin', title: 'Sage' },
   fence: { name: 'Mirela', title: 'Gambler' },
   caravan: { name: 'Dov', title: 'Caravan Master' },
+  captain: { name: 'Captain Hale', title: 'Captain of the Watch' },
 };
 
 const NPC_ACT2: Record<NpcKind, { name: string; title: string }> = {
@@ -314,6 +316,7 @@ const NPC_ACT2: Record<NpcKind, { name: string; title: string }> = {
   sage: { name: 'Keeper Imre', title: 'Archivist' },
   fence: { name: 'Sefa', title: 'Bonecaster' },
   caravan: { name: 'Dov', title: 'Caravan Master' },
+  captain: { name: 'Zarifa', title: 'Sellsword Broker' },
 };
 
 const NPC_ACT3: Record<NpcKind, { name: string; title: string }> = {
@@ -322,6 +325,7 @@ const NPC_ACT3: Record<NpcKind, { name: string; title: string }> = {
   sage: { name: 'Wren', title: 'Last of the Watch' },
   fence: { name: 'Ysolde', title: 'Scavenger' },
   caravan: { name: 'Dov', title: 'Caravan Master' },
+  captain: { name: 'Captain Hale', title: 'What Is Left of the Watch' },
 };
 
 export interface Hazard {
@@ -666,7 +670,7 @@ export class World {
       a.objects.push(obj);
     }
     if (def.town) {
-      for (const k of ['healer', 'smith', 'sage', 'fence'] as NpcKind[]) this.addNpc(a, k);
+      for (const k of ['healer', 'smith', 'sage', 'fence', 'captain'] as NpcKind[]) this.addNpc(a, k);
     } else {
       this.populate(a, rng);
     }
@@ -908,6 +912,7 @@ export class World {
     if (!a.def.cold) (this.ember = 1), (this.frost = 0);
     // Turrets and furnaces are left behind; anything that walks comes along.
     this.minions = this.minions.filter((mi) => !mi.dead && !mi.fixed);
+    this.syncHireling();
     for (const mi of this.minions) this.placeMinion(mi);
     a.flow.update(p.x, p.y);
     this.markExplored(true);
@@ -2646,6 +2651,8 @@ export class World {
 
   private levelUp() {
     this.refreshStats();
+    const hired = this.hirelingMinion();
+    if (hired) this.fitHireling(hired, true);
     const p = this.player;
     p.life = this.stats.maxLife;
     p.mana = this.stats.maxMana;
@@ -2721,7 +2728,7 @@ export class World {
   respec(): boolean {
     if (this.player.dead || !respec(this.char)) return false;
     const p = this.player;
-    this.minions = [];
+    this.minions = this.minions.filter((mi) => mi.ally === 'hireling');
     p.buffs = Object.fromEntries(Object.entries(p.buffs).filter(([k]) => k.startsWith('shrine_')));
     p.frenzy = { stacks: 0, t: 0 };
     p.heat = 0;
@@ -3462,6 +3469,8 @@ export class World {
     // A Forgewright's furnace is a fire like any other, and a smith running hot is warm company.
     for (const mi of this.minions) if (mi.ally === 'furnace' && !mi.dead && Math.hypot(mi.x - x, mi.y - y) <= mi.built!.pr.radius!) return 1;
     if (this.player.heat >= HEAT_SLAG && Math.hypot(this.player.x - x, this.player.y - y) <= 1.5) return 0.5;
+    // An Ember-Keeper carries a coal of their own.
+    for (const mi of this.minions) if (mi.def.id === 'hire_mage' && !mi.dead && Math.hypot(mi.x - x, mi.y - y) <= 2) return 0.5;
     for (const m of a.monsters) {
       if (m.dead || m.sub) continue;
       const hot = (m.burnT ?? 0) > 0 || (m.heat ?? 0) >= SLAG_MOLTEN || m.mods.includes('fireEnch');
@@ -3834,7 +3843,7 @@ export class World {
     this.fx({ kind: 'spark', x: mi.x, y: mi.y, dur: 0.5, color: '#e8b860' });
   }
 
-  private raiseMinion(kind: Ally, x: number, y: number, pr: SkillParams, syn = 1): Monster {
+  private raiseMinion(kind: Exclude<Ally, 'hireling'>, x: number, y: number, pr: SkillParams, syn = 1): Monster {
     const def = MONSTERS[ALLY_DEF[kind]];
     const lvl = this.char.level;
     const undead = kind === 'skeleton' || kind === 'golem';
@@ -3892,6 +3901,10 @@ export class World {
       this.fx({ kind: 'spark', x: mi.x, y: mi.y, dur: 0.5, color: mi.built ? '#e8b860' : '#e8e0c8' });
       if (mi.built) this.fx({ kind: 'dust', x: mi.x, y: mi.y, dur: 0.5 });
       this.sound(mi.built ? 'thud' : 'death');
+      if (mi.ally === 'hireling' && this.char.hireling) {
+        this.char.hireling.dead = true;
+        this.msg(`${mi.name} has fallen. The captain in town can bring them back.`, '#ff8a6a');
+      }
     }
   }
 
@@ -3926,7 +3939,8 @@ export class World {
       mi.wanderT -= dt;
       if (!calm && (!foe || mi.wanderT <= 0)) {
         mi.wanderT = 0.6;
-        let bd = foe ? Math.hypot(foe.x - mi.x, foe.y - mi.y) - 1 : 7;
+        // Those who shoot look as far as they can reach.
+        let bd = foe ? Math.hypot(foe.x - mi.x, foe.y - mi.y) - 1 : Math.max(7, mi.def.missile ? mi.def.range : 0);
         for (const m of this.area.monsters) {
           if (m.dead || m.sub || Math.abs(m.x - mi.x) > bd || Math.abs(m.y - mi.y) > bd) continue;
           const d = Math.hypot(m.x - mi.x, m.y - mi.y);
@@ -3950,6 +3964,23 @@ export class World {
       }
       let goal: Point | null = null;
       let speed = mi.speed * slow;
+      // A hireling catches their breath between fights.
+      if (mi.ally === 'hireling' && !foe && mi.life < mi.maxLife) mi.life = Math.min(mi.maxLife, mi.life + mi.maxLife * 0.03 * dt);
+      const shot = mi.def.missile;
+      if (foe && shot && Math.hypot(foe.x - mi.x, foe.y - mi.y) <= mi.def.range && lineOfSight(l, mi, foe)) {
+        // Archers and mages stand off and shoot rather than close in.
+        mi.facing = Math.atan2(foe.y - mi.y, foe.x - mi.x);
+        if (mi.atkCd <= 0) {
+          mi.atkCd = 1 / mi.def.attackRate;
+          mi.action = { t: 0, hitAt: 0, dur: 0.45, done: true, kind: shot.element === 'phys' ? 'shoot' : 'cast' };
+          this.spawnProjectile({
+            x: mi.x, y: mi.y, ang: mi.facing, speed: shot.speed, ttl: mi.def.range / shot.speed + 0.2, owner: 'player', kind: shot.kind, radius: 0.3,
+            dmg: elemDamage(shot.element, roll(this.rng, mi.dmgMin, mi.dmgMax)), ar: shot.element === 'phys' ? mi.ar : undefined, srcLevel: mi.level, servant: mi,
+          });
+          if (dp < 12) this.sound(shot.element === 'phys' ? 'bow' : 'fire');
+        }
+        continue;
+      }
       if (foe) {
         const d = Math.hypot(foe.x - mi.x, foe.y - mi.y);
         mi.facing = Math.atan2(foe.y - mi.y, foe.x - mi.x);
@@ -4049,6 +4080,92 @@ export class World {
       if (Math.abs(angleDiff(Math.atan2(m.y - mi.y, m.x - mi.x), ang)) > 0.75 || !lineOfSight(l, mi, m)) continue;
       this.damageMonster(m, elemDamage('fire', roll(this.rng, b.pr.min!, b.pr.max!) * b.syn * perTick), { minion: mi });
     }
+  }
+
+  // ---------------------------------------------------------------- hirelings
+
+  /** The hired companion, if they are alive and at the hero's side. */
+  hirelingMinion(): Monster | undefined {
+    return this.minions.find((mi) => mi.ally === 'hireling' && !mi.dead);
+  }
+
+  /** Sets a hireling's numbers for the hero's level. With `heal`, they are mended as well. */
+  private fitHireling(mi: Monster, heal = false) {
+    const lvl = this.char.level;
+    const ratio = heal ? 1 : mi.life / mi.maxLife;
+    const dmg = baseDamage(lvl) * mi.def.dmgMul;
+    mi.level = lvl;
+    mi.maxLife = Math.round(baseLife(lvl) * mi.def.lifeMul);
+    mi.life = Math.max(1, Math.round(mi.maxLife * ratio));
+    mi.dmgMin = Math.max(1, Math.round(dmg * 0.6));
+    mi.dmgMax = Math.max(2, Math.round(dmg * 1.25));
+    mi.ar = Math.round(20 + lvl * 13);
+    mi.def_ = Math.round(10 + lvl * 9 * (mi.def.id === 'hire_guard' ? 1.5 : 1));
+  }
+
+  /** Brings the hired companion to the hero's side if they should be there and are not, and mends them in town. */
+  private syncHireling() {
+    const h = this.char.hireling;
+    let mi = this.hirelingMinion();
+    if (!h || h.dead) {
+      if (mi) this.minions = this.minions.filter((x) => x !== mi);
+      return;
+    }
+    if (!mi) {
+      const def = MONSTERS[HIRELINGS[h.kind].def];
+      const p = this.player;
+      mi = {
+        id: this.id(), def, x: p.x, y: p.y, life: 1, maxLife: 1, level: 1, dmgMin: 1, dmgMax: 2, ar: 1, def_: 1,
+        res: { phys: 0, fire: 0, cold: 0, light: 0, poison: 0, ...def.res }, speed: def.speed, xp: 0, rarity: 'normal', name: h.name, mods: [],
+        alert: true, homeX: p.x, homeY: p.y, wanderT: 0, wanderTo: null, atkCd: 0.4, action: null, abilityCd: 0, chill: 0, stun: 0,
+        poison: { dps: 0, t: 0 }, fleeT: 0, knock: { x: 0, y: 0 }, dead: false, deadT: 0, packId: -1, facing: p.facing, walk: 0, flash: 0, revived: 0,
+        ally: 'hireling',
+      };
+      this.fitHireling(mi, true);
+      this.minions.push(mi);
+    } else if (this.area.def.town) this.fitHireling(mi, true);
+  }
+
+  /** Hires a companion at the captain, replacing any other. Returns an error message or null. */
+  hire(kind: HireKind): string | null {
+    const c = this.char;
+    const cost = hireCost(c.level);
+    if (c.hireling && !c.hireling.dead && c.hireling.kind === kind) return 'Already at your side';
+    if (c.gold < cost) return 'Not enough gold';
+    c.gold -= cost;
+    this.minions = this.minions.filter((mi) => mi.ally !== 'hireling');
+    c.hireling = { kind, name: hirelingName(kind, this.luck) };
+    this.syncHireling();
+    const mi = this.hirelingMinion()!;
+    this.placeMinion(mi);
+    this.fx({ kind: 'levelup', x: mi.x, y: mi.y, dur: 0.8 });
+    this.sound('gold');
+    this.msg(`${c.hireling.name} the ${HIRELINGS[kind].title} joins you`, '#9fe08a');
+    return null;
+  }
+
+  /** Pays to bring a fallen hireling back. Returns an error message or null. */
+  reviveHireling(): string | null {
+    const c = this.char;
+    if (!c.hireling?.dead) return 'No one to bring back';
+    const cost = reviveCost(c.level);
+    if (c.gold < cost) return 'Not enough gold';
+    c.gold -= cost;
+    c.hireling.dead = false;
+    this.syncHireling();
+    const mi = this.hirelingMinion()!;
+    this.placeMinion(mi);
+    this.fx({ kind: 'heal', x: mi.x, y: mi.y, dur: 0.8 });
+    this.sound('gold');
+    this.msg(`${c.hireling.name} is back on their feet`, '#9fe08a');
+    return null;
+  }
+
+  dismissHireling() {
+    if (!this.char.hireling) return;
+    this.msg(`${this.char.hireling.name} takes their leave`);
+    delete this.char.hireling;
+    this.syncHireling();
   }
 
   private chainLightning(from: Monster, n: number, dmg: Damage) {

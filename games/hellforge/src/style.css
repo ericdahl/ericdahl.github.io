@@ -1006,3 +1006,14 @@ button {
 
 /* Respec: sits under the attributes and under the skill tree, apart from the things tapped often. */
 .respec { margin-top: 12px; padding-top: 8px; border-top: 1px solid rgba(160, 130, 80, 0.25); display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+
+/* The captain's panel: who is with you, and who is for hire. */
+.hire-now { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.hire-name { color: var(--gold); font-size: 15px; }
+.hire-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.hire { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 8px; border: 1px solid rgba(160, 130, 80, 0.3); border-radius: 4px; }
+.hire.mine { border-color: var(--gold); }
+.hire-info { flex: 1; min-width: 0; }
+.hire-btn { flex: none; }
+.buff.b-hire { border-color: #5a8a50; color: #9fe08a; }
+.buff.b-hiredown { border-color: #7a3a2a; color: #ff8a6a; }

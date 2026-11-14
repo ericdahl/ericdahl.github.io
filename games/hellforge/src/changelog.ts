@@ -1,6 +1,17 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.17.0',
+    date: '2026-11-14',
+    notes: [
+      'Hirelings. A captain now stands in every town and will hire out one companion to walk with you.',
+      'Three to choose from. The Shieldbearer is tough and fights up close. The Bowman shoots from behind you. The Ember-Keeper throws fire, sets monsters alight, and is a little warm to stand beside on the Ember Road.',
+      'A companion fights at your level and grows as you do, follows you between areas and through portals, and mends between fights and in town. Monsters will turn on them as they do on any servant.',
+      'If they fall, any captain will bring them back for a fee, a good deal less than hiring anew. Your own death does not cost you your companion.',
+      'Their name and how hurt they are show above your life orb. Hiring another kind replaces the one you have.',
+    ],
+  },
+  {
     version: '0.16.0',
     date: '2026-11-14',
     notes: [
