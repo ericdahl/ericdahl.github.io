@@ -3,6 +3,7 @@ import {
   alpha, art, circle, drawHumanoid, rgbOf, slitEyes, swingPose, ellipse, mix, eyes, fillInk, glow, ink, INK, lin, limb, poly, rad, roundRect, shade,
   type HumanoidLook, type Pose,
 } from './figures';
+import { HIRE_LOOKS } from './looks';
 
 export interface MonsterDrawOpts {
   /** Corpse: no glowing eyes or auras. */
@@ -75,6 +76,9 @@ export function drawMonsterShape(ctx: CanvasRenderingContext2D, shape: string, c
       case 'bellows': bellows(ctx, color, s); break;
       case 'sentinel': sentinel(ctx, color, s); break;
       case 'furnace': furnace(ctx, color, s); break;
+      case 'hire_guard':
+      case 'hire_archer':
+      case 'hire_mage': drawHumanoid(ctx, HIRE_LOOKS[shape], { ...s.pose, dir: 1 }, t); break;
     }
   } finally {
     ctx.restore();

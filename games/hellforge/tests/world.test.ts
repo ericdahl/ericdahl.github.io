@@ -8,7 +8,7 @@ describe('town', () => {
   it('starts in a safe town with vendors', () => {
     const w = makeWorld();
     expect(w.area.def.id).toBe('town');
-    expect(w.area.npcs.map((n) => n.kind).sort()).toEqual(['fence', 'healer', 'sage', 'smith']);
+    expect(w.area.npcs.map((n) => n.kind).sort()).toEqual(['captain', 'fence', 'healer', 'sage', 'smith']);
     expect(w.area.monsters.length).toBe(0);
     expect(w.vendors.smith.length).toBeGreaterThan(5);
     w.cmdSkill('attack', w.player.x + 1, w.player.y);

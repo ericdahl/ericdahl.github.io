@@ -2,6 +2,7 @@ import {
   BASES, baseOf, itemDefense, itemMods, makeItem, SET_BY_ID, weaponBaseDamage,
   type BaseItem, type ClassId, type Item, type Mod, type PotionInfo, type Slot, type StatKey,
 } from './items';
+import type { HirelingState } from './hireling';
 import { classSkills, SKILL_BY_ID, type SkillDef } from './skills';
 
 export interface ClassDef {
@@ -128,6 +129,8 @@ export interface Character {
   deepest?: number[];
   /** Respecs spent. One is earned for each difficulty finished. */
   respecsUsed?: number;
+  /** The companion hired at a town's captain, if any. */
+  hireling?: HirelingState;
 }
 
 export function createCharacter(name: string, classId: ClassId, hardcore = false): Character {

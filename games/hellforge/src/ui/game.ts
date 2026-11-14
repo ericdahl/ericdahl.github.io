@@ -503,6 +503,12 @@ export class Game implements PanelHost {
     // Shrine blessings and how long they have left.
     const names: Record<string, string> = { shrine_armor: 'Armor', shrine_combat: 'Combat', shrine_experience: 'Experience', shrine_storm: 'Storm', shrine_fortune: 'Fortune', shrine_haste: 'Fleet' };
     const chips = Object.entries(p.buffs).filter(([k]) => names[k]).map(([k, b]) => `${k}:${names[k]} ${Math.ceil(b.t)}s`);
+    // The hired companion sits with the blessings: how hurt they are, or that they have fallen.
+    const hired = c.hireling;
+    if (hired) {
+      const mi = w.hirelingMinion();
+      chips.push(hired.dead || !mi ? `shrine_hiredown:${hired.name} ${hired.dead ? 'has fallen' : 'is waiting'}` : `shrine_hire:${hired.name} ${Math.ceil((mi.life / mi.maxLife) * 20) * 5}%`);
+    }
     const bk = chips.join('|');
     if (this.hudCache.buffs !== bk) {
       this.hudCache.buffs = bk;

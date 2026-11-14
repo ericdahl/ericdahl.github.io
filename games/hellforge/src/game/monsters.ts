@@ -7,7 +7,8 @@ export type MonsterShape =
   | 'scarab' | 'scorpion' | 'burrower' | 'kite' | 'mummy' | 'raider' | 'acolyte' | 'mirage' | 'colossus'
   | 'corvin' | 'noon'
   | 'thrall' | 'bellwarden' | 'slag' | 'eater' | 'phylactery' | 'frostwright' | 'unlit'
-  | 'ballista' | 'bellows' | 'sentinel' | 'furnace';
+  | 'ballista' | 'bellows' | 'sentinel' | 'furnace'
+  | 'hire_guard' | 'hire_archer' | 'hire_mage';
 export type MonsterAI = 'melee' | 'ranged' | 'caster' | 'bat' | 'hexer' | 'boss' | 'burrow' | 'eater' | 'totem';
 
 export interface Resists {
@@ -111,6 +112,10 @@ export const MONSTERS: Record<string, MonsterDef> = {
   bellows_turret: D({ id: 'bellows_turret', name: 'Bellows Turret', shape: 'bellows', ai: 'caster', lifeMul: 1.6, dmgMul: 0, speed: 0, radius: 0.4, range: 3.6, attackRate: 2, xpMul: 0, res: { poison: 100, fire: 75 }, color: '#7a4a2a' }),
   brass_sentinel: D({ id: 'brass_sentinel', name: 'Brass Sentinel', shape: 'sentinel', ai: 'melee', lifeMul: 3.2, dmgMul: 1.0, speed: 3.6, radius: 0.5, range: 0.7, attackRate: 0.85, xpMul: 0, res: { poison: 100, phys: 20, fire: 25 }, scale: 1.2, color: '#c89a3c' }),
   furnace: D({ id: 'furnace', name: 'Furnace', shape: 'furnace', ai: 'melee', lifeMul: 2.2, dmgMul: 0, speed: 0, radius: 0.5, range: 0, attackRate: 2, xpMul: 0, res: { poison: 100, fire: 100 }, color: '#5a4a44' }),
+  // Hirelings (never spawned as enemies). They fight at the hero's level.
+  hire_guard: D({ id: 'hire_guard', name: 'Shieldbearer', shape: 'hire_guard', ai: 'melee', lifeMul: 3.6, dmgMul: 0.95, speed: 4.2, radius: 0.34, range: 0.6, attackRate: 1.1, xpMul: 0, res: { phys: 25, fire: 15, cold: 15, light: 15, poison: 15 }, color: '#7a8088' }),
+  hire_archer: D({ id: 'hire_archer', name: 'Bowman', shape: 'hire_archer', ai: 'ranged', lifeMul: 1.9, dmgMul: 0.95, speed: 4.2, radius: 0.32, range: 8, attackRate: 1.05, xpMul: 0, missile: { element: 'phys', speed: 15, kind: 'arrow' }, res: { fire: 10, cold: 10, light: 10, poison: 10 }, color: '#4a6a3a' }),
+  hire_mage: D({ id: 'hire_mage', name: 'Ember-Keeper', shape: 'hire_mage', ai: 'caster', lifeMul: 1.6, dmgMul: 1.15, speed: 4.2, radius: 0.32, range: 7.5, attackRate: 0.8, xpMul: 0, missile: { element: 'fire', speed: 11, kind: 'firebolt' }, res: { fire: 50, cold: 25, light: 10, poison: 10 }, color: '#a84a2a' }),
   mother: D({ id: 'mother', name: 'Vhorza, Mother of Cinders', shape: 'mother', ai: 'boss', lifeMul: 30, dmgMul: 2.6, speed: 2.3, radius: 0.9, range: 1.0, attackRate: 0.8, xpMul: 40, element: 'fire', missile: { element: 'fire', speed: 8, kind: 'm_fire' }, res: { fire: 75, poison: 30, light: 20, cold: 10 }, scale: 2.1, color: '#c23b1f', abilities: ['fire_spread', 'nova_fire', 'summon_imps', 'meteor_rain'] }),
 
   // ------------------------------------------------------------ Act 2: The Glass Sea

@@ -175,6 +175,10 @@ const NPC_ACT1: Record<NpcKind, HumanoidLook> = {
     body: '#8a6a3a', trim: '#3a2a18', skin: '#b08860', legs: '#3a2c1a', boots: '#2a1e12', head: 'turban', headColor: '#d8c8a0', weapon: 'staff', weaponColor: '#6a4a24',
     beard: '#2a1a0a', armor: 'cloth', cape: '#6a4a2a', accent: '#c84a2a',
   },
+  captain: {
+    body: '#8a8e96', trim: '#7a2a22', skin: '#c8a080', legs: '#3a3430', boots: '#2a2018', head: 'helm', headColor: '#9aa0aa', beard: '#6a5a4a',
+    weapon: 'sword', weaponColor: '#c8ccd4', armor: 'mail', pauldrons: '#8a8e96', tabard: '#7a2a22', cape: '#5a1e1a', shield: '#6a2a22', shieldShape: 'heater', build: 1.1, gloves: '#4a3a2a',
+  },
 };
 
 const NPC_ACT2: Partial<Record<NpcKind, HumanoidLook>> = {
@@ -193,6 +197,10 @@ const NPC_ACT2: Partial<Record<NpcKind, HumanoidLook>> = {
   fence: {
     body: '#8a2a3a', trim: '#e8c860', skin: '#a87850', legs: '#2a1a1a', boots: '#1a1010', head: 'hair', hair: 'long', headColor: '#141014', cape: '#5a1a2a',
     weapon: 'dagger', weaponColor: '#e8c860', armor: 'cloth', accent: '#e8c860',
+  },
+  captain: {
+    body: '#8a6a3a', trim: '#70c8c8', skin: '#8a5a38', legs: '#4a3a24', boots: '#2e2216', head: 'turban', headColor: '#a83a2a', weapon: 'sword', weaponId: 'scimitar',
+    weaponColor: '#d8d8c8', armor: 'scale', cape: '#a83a2a', build: 1.05, gloves: '#4a3420', accent: '#70c8c8',
   },
 };
 
@@ -213,6 +221,26 @@ const NPC_ACT3: Partial<Record<NpcKind, HumanoidLook>> = {
   fence: {
     body: '#6a6258', trim: '#a8c0d0', skin: '#c8a888', legs: '#3a342c', boots: '#2a2620', head: 'hood', headColor: '#8a8478', cape: '#9a9488',
     weapon: 'dagger', weaponColor: '#c8d8e0', armor: 'leather', accent: '#a8c0d0', gloves: '#4a4038',
+  },
+  captain: {
+    body: '#7a7e86', trim: '#7a2a22', skin: '#c09878', legs: '#3a3430', boots: '#3a3028', head: 'greathelm', headColor: '#8a94a8', beard: '#8a8078',
+    weapon: 'sword', weaponColor: '#c8ccd4', armor: 'mail', pauldrons: '#7a7e86', cape: '#8a7a68', shield: '#4a4e58', shieldShape: 'heater', build: 1.1, gloves: '#4a4038',
+  },
+};
+
+/** Hirelings: dressed like the watch rather than like anything that lives out there. */
+export const HIRE_LOOKS: Record<string, HumanoidLook> = {
+  hire_guard: {
+    body: '#8a8e96', trim: '#2a4a7a', skin: '#c8a080', legs: '#3a3430', boots: '#2a2018', head: 'helm', headColor: '#9aa0aa', weapon: 'sword', weaponColor: '#c8ccd4',
+    armor: 'mail', pauldrons: '#8a8e96', tabard: '#2a4a7a', shield: '#2a4a7a', shieldShape: 'kite', build: 1.12, gloves: '#4a3a2a',
+  },
+  hire_archer: {
+    body: '#4a6a3a', trim: '#2a3a20', skin: '#d0a888', legs: '#3a3428', boots: '#4a3220', head: 'hood', headColor: '#3a5a30', openHood: true, hairUnder: '#6a4a24',
+    weapon: 'bow', armor: 'leather', quiver: true, cape: '#2e4a2a', build: 0.95, gloves: '#5a3e24',
+  },
+  hire_mage: {
+    body: '#a84a2a', trim: '#e8c060', skin: '#d8b090', legs: '#2e2a24', boots: '#3a2418', head: 'hood', headColor: '#8a3a20', openHood: true, hairUnder: '#2a1a14',
+    robe: true, weapon: 'staff', weaponColor: '#ff9040', weaponGlow: '#ffb060', accent: '#e8c060', cape: '#6a2a18',
   },
 };
 

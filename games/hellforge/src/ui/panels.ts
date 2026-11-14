@@ -12,9 +12,10 @@ import { compareEquip, defaultSlot } from './compare';
 import { forgeActions, forgeBadge, forgePanel } from './forge';
 import { DEPTH_BASE_LEVEL } from '../game/depths';
 import { forgeRank, MASTERY_RANKS } from '../game/forge';
+import { hireCost, HIRE_KINDS, HIRELINGS, reviveCost } from '../game/hireling';
 import { itemTooltip } from './tooltip';
 
-export type PanelKind = 'inventory' | 'character' | 'skills' | 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan' | 'forge' | 'menu' | 'help';
+export type PanelKind = 'inventory' | 'character' | 'skills' | 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan' | 'forge' | 'captain' | 'menu' | 'help';
 
 export interface Selection {
   uid: number;
@@ -252,6 +253,8 @@ export function renderPanel(host: PanelHost, kind: PanelKind): HTMLElement {
       return waypointPanel(host);
     case 'caravan':
       return caravanPanel(host);
+    case 'captain':
+      return captainPanel(host);
     case 'sage':
       return sagePanel(host);
     case 'fence':
@@ -543,6 +546,46 @@ function caravanPanel(host: PanelHost) {
   );
 }
 
+/** The captain: hire a companion, bring a fallen one back, or send one home. */
+function captainPanel(host: PanelHost) {
+  const w = host.world;
+  const c = w.char;
+  const info = w.npcInfo('captain');
+  const cur = c.hireling;
+  const mi = w.hirelingMinion();
+  const cost = hireCost(c.level);
+  const back = reviveCost(c.level);
+  const tell = (err: string | null) => { if (err) host.toast(err, '#ff8a6a'); host.refresh(); };
+  const say = w.act === 3 ? 'There were forty of us. I can spare you one. Bring them back with all their fingers.'
+    : w.act === 2 ? 'Blades, bows, one who throws fire. All good, all paid by the week, none of them cheap.'
+    : 'You should not go out there alone. Nobody should. Coin for their keep, and one of mine walks with you.';
+  const now = h('div', { class: 'hire-now' });
+  if (!cur) now.append(h('div', { class: 'dim small' }, 'No one is with you. A companion fights at your level, follows you everywhere, and can be brought back here if they fall.'));
+  else {
+    now.append(
+      h('div', { class: 'hire-name' }, cur.name, h('span', { class: 'p-sub' }, HIRELINGS[cur.kind].title)),
+      h('div', { class: `small ${cur.dead ? 'red' : 'green'}` }, cur.dead ? 'Fallen. Waiting here to be brought back.' : mi ? `At your side · Life ${Math.ceil(mi.life)} / ${mi.maxLife} · Damage ${mi.dmgMin}-${mi.dmgMax}` : 'At your side'),
+      h('div', { class: 'acts' },
+        cur.dead ? h('button', { class: 'btn primary hire-revive', disabled: c.gold < back, onclick: () => tell(w.reviveHireling()) }, `Bring back (${back} gold)`) : null,
+        h('button', { class: 'btn hire-dismiss', onclick: () => { w.dismissHireling(); host.refresh(); } }, 'Dismiss')));
+  }
+  const list = h('div', { class: 'hire-list' });
+  for (const k of HIRE_KINDS) {
+    const d = HIRELINGS[k];
+    const mine = cur?.kind === k && !cur.dead;
+    list.append(h('div', { class: `hire ${mine ? 'mine' : ''}` },
+      h('div', { class: 'hire-info' }, h('div', { class: 'hire-name' }, d.title), h('div', { class: 'dim small' }, d.desc)),
+      h('button', { class: 'btn hire-btn', 'data-kind': k, disabled: mine || c.gold < cost, onclick: () => tell(w.hire(k)) }, mine ? 'Hired' : `${cur ? 'Replace' : 'Hire'} (${cost})`)));
+  }
+  return h(
+    'div',
+    { class: 'panel captain' },
+    header(host, info.name, info.title),
+    h('div', { class: 'npc-say' }, say),
+    h('div', { class: 'p-body' }, now, h('div', { class: 'sub' }, 'For hire'), list, goldRow(host)),
+  );
+}
+
 function sagePanel(host: PanelHost) {
   const w = host.world;
   const unid = [...w.char.inventory, ...w.char.stash].filter((e) => !e.item.identified).length + Object.values(w.char.equipment).filter((i) => i && !i.identified).length;
@@ -642,6 +685,7 @@ function helpPanel(host: PanelHost) {
         'Red and blue soul orbs restore life and mana when you walk over them. A <span class="gold2">Tithe Imp</span> drops gold with every blow and a hoard if you kill it before it escapes. A purple Cursed Shrine calls an ambush and pays out if you survive it. Clearing an area completely earns a reward.',
         'At <span class="gold2">the Forge</span> beside the blacksmith, salvage loot you do not need into Cinders and Essences, then spend them on the gear you keep: Heat it up to +10, Temper or Quench its affixes, Smelt three items into a better one. Heating past +5 can fail and crack the item back a level. Forge mastery grows with every job and teaches new ones.',
         'Finish the Ember Road and <span class="gold2">the Underforge</span> opens at every waypoint: an endless descent, one monster level harder a floor. A warden holds the stairs on each floor, every fifth floor is a boss, and deeper floors carry afflictions that everything on them shares. The deeper you go, the better the loot and the more Cinders each warden leaves for the Forge.',
+        'The <span class="gold2">captain</span> in every town hires out one companion at a time: a Shieldbearer, a Bowman or an Ember-Keeper. They fight at your level, follow you between areas, and can be brought back at any captain for a fee if they fall.',
         'Necromancers raise skeletons from fresh corpses: cast Raise Skeleton near a body (or tap its button to use the nearest one). Servants follow you between areas.',
         'Forgewrights build <span class="gold2">Heat</span> with every hammer blow that lands (the gauge above the experience bar). Heat adds fire to your blows with Temper, and Slag Burst spends it all at once. Let it reach 100 and you overheat and burn until it cools or you vent it. Turrets and the Furnace stay where you build them and wind down after a while; the Brass Sentinel follows you between areas.',
       ].map((t) => `<p>${t}</p>`).join('') }),

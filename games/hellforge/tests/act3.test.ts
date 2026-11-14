@@ -193,7 +193,7 @@ describe('the road north', () => {
     const w = makeWorld();
     openNorth(w);
     w.enterArea('emberwatch_ruins', 'start');
-    expect(w.area.npcs.map((n) => n.kind).sort()).toEqual(['caravan', 'fence', 'healer', 'sage', 'smith']);
+    expect(w.area.npcs.map((n) => n.kind).sort()).toEqual(['captain', 'caravan', 'fence', 'healer', 'sage', 'smith']);
     expect(w.npcInfo('sage')).toEqual({ name: 'Wren', title: 'Last of the Watch' });
     expect(w.npcInfo('fence').name).toBe('Ysolde');
     expect(w.area.level.props.some((p) => p.kind === 'hearth')).toBe(true);

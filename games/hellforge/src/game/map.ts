@@ -476,6 +476,7 @@ function genTown(spec: LevelSpec): Level {
     stash: { x: cx + 2, y: cy - 2 },
     forge: { x: cx + 8, y: cy - 5 },
     caravan: { x: cx + 10, y: cy + 2 },
+    captain: { x: cx - 9, y: cy + 1 },
   };
   l.waypoint = { x: cx - 2, y: cy - 2 };
   l.start = { x: cx + 2, y: cy + 3 };

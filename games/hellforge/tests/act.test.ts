@@ -5,7 +5,7 @@ import { ACT, ACT2, ACT3, playAct } from './bot';
 // This guards overall balance: monster scaling, item drops, skills and leveling together.
 // The bot can stall shooting at walls or go a whole act without finding a weapon, so a run depends on its seed.
 // Every class plays seed 99 unless that seed gives it an unlucky run; anything that changes what drops can move these.
-const SEEDS: Record<string, number> = { huntress: 7 };
+const SEEDS: Record<string, number> = { huntress: 7, arcanist: 77 };
 
 describe('full act playthrough', () => {
   for (const cls of ['reaver', 'arcanist', 'huntress', 'necromancer', 'forgewright'] as const) {
