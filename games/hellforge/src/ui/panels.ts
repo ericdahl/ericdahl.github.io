@@ -1,6 +1,6 @@
 import { ACT_NAMES, AREA_BY_ID, areaAct, DIFFICULTY_LEVELS, QUESTS } from '../game/areas';
 import {
-  allocStat, CLASSES, DIFFICULTIES, difficultiesFinished, hasSpentPoints, INV_COLS, INV_ROWS, requirementError,
+  allocStat, CLASSES, DIFFICULTIES, difficultiesFinished, fourArmed, slotsFor, hasSpentPoints, INV_COLS, INV_ROWS, requirementError,
   respecsLeft, sortGrid, STASH_COLS, STASH_ROWS, type GridEntry,
 } from '../game/character';
 import { baseOf, buyPrice, displayName, gamblePrice, itemColor, sellPrice, type Item, type Slot } from '../game/items';
@@ -97,7 +97,8 @@ export function paperDoll(host: PanelHost) {
   const doll = h('div', { class: 'doll' });
   for (const s of SLOT_LAYOUT) {
     const it = c.equipment[s.slot];
-    const cell = h('div', { class: `slot s-${s.area}` }, it ? itemTile(host, it, { from: 'equip', slot: s.slot }) : h('span', { class: 'slot-l' }, s.label));
+    const label = s.slot === 'offhand' && fourArmed(c) ? 'Off Hand' : s.label;
+    const cell = h('div', { class: `slot s-${s.area}` }, it ? itemTile(host, it, { from: 'equip', slot: s.slot }) : h('span', { class: 'slot-l' }, label));
     doll.append(cell);
   }
   return doll;
@@ -147,10 +148,10 @@ function compareView(host: PanelHost, item: Item, slot: Slot, tip: HTMLElement):
   const cmp = compareEquip(c, item, slot, w.buffTotals());
   const worn = cmp.replaced.length
     ? cmp.replaced.map((r) => h('div', { class: 'tt', html: itemTooltip(r, c) }))
-    : [h('div', { class: 'tt empty' }, `No ${SLOT_NAMES[slot]} equipped`)];
+    : [h('div', { class: 'tt empty' }, `No ${slot === 'offhand' && fourArmed(c) ? 'off-hand item' : SLOT_NAMES[slot]} equipped`)];
   const sides = h('div', { class: 'cmp' },
     h('div', { class: 'cmp-col' }, h('div', { class: 'cmp-h' }, 'Selected'), tip),
-    h('div', { class: 'cmp-col' }, h('div', { class: 'cmp-h' }, `Equipped${slot.startsWith('ring') ? ` (${SLOT_NAMES[slot]})` : ''}`), ...worn));
+    h('div', { class: 'cmp-col' }, h('div', { class: 'cmp-h' }, `Equipped${slot.startsWith('ring') ? ` (${SLOT_NAMES[slot]})` : fourArmed(c) && baseOf(item).kind === 'weapon' ? ` (${slot === 'offhand' ? 'off hand' : 'main hand'})` : ''}`), ...worn));
   const err = requirementError(c, item, w.stats);
   const delta = h('div', { class: 'delta' }, h('div', { class: 'cmp-h' }, 'If you equip it'));
   if (err) delta.append(h('div', { class: 'red small' }, `Can't equip yet: ${err}`));
@@ -217,6 +218,10 @@ export function itemActions(host: PanelHost, sel: Selection, context: ItemContex
       if (b.kind === 'ring') {
         act('Equip Left', 'E', () => equip('ring1'), 'primary', context !== 'vendor');
         act('Equip Right', 'R', () => equip('ring2'), 'primary');
+      } else if (slotsFor(item, w.char).length > 1) {
+        // The four-armed choose a hand for a one-handed weapon.
+        act('Equip Main Hand', 'E', () => equip('weapon'), 'primary', context !== 'vendor');
+        act('Equip Off Hand', 'R', () => equip('offhand'), 'primary');
       } else act('Equip', 'E', () => equip(), 'primary', context !== 'vendor');
     }
     if (b.kind === 'potion' || b.kind === 'scroll') act(b.kind === 'potion' ? 'Drink' : 'Read', 'U', () => w.useItem(item.uid) && host.select(null), 'primary', context !== 'vendor');
@@ -433,6 +438,7 @@ function characterPanel(host: PanelHost) {
         'div',
         { class: 'col' },
         kv('Damage', `${lo}-${hi}${s.fireMax ? ` +${s.fireMin}-${s.fireMax} fire` : ''}${s.coldMax ? ` +${s.coldMin}-${s.coldMax} cold` : ''}${s.lightMax ? ` +${s.lightMin}-${s.lightMax} light` : ''}`),
+        s.clawMax ? kv('Claws', `${s.clawMin}-${s.clawMax}`) : null,
         kv('Attack Rating', String(s.ar)),
         kv('Attacks / sec', s.attackSpeed.toFixed(2)),
         kv('Defense', String(s.def)),
@@ -570,7 +576,7 @@ function sagePanel(host: PanelHost) {
     'div',
     { class: 'panel sage' },
     header(host, info.name, info.title),
-    h('div', { class: 'npc-say' }, w.act === 3 ? 'Keep your hand closed over it when you are out there. It is the only warm thing north of the glass, and everything knows it.' : w.act === 2 ? 'The archive survived the glass. Most of what it says, you will not like.' : info.name === 'Wren' ? 'He left in the night. Took his staff and none of his books. He has never done that.' : 'Stay a moment, wanderer. Let an old man share what he knows.'),
+    h('div', { class: 'npc-say' }, w.act === 3 ? 'Keep your hand closed over it when you are out there. It is the only warm thing north of the glass, and everything knows it.' : w.act === 2 ? (fourArmed(w.char) ? 'One of the Glass Hive, above ground and alone? The archive has a word for that. It is not a kind one. Sit anyway.' : 'The archive survived the glass. Most of what it says, you will not like.') : info.name === 'Wren' ? 'He left in the night. Took his staff and none of his books. He has never done that.' : (fourArmed(w.char) ? 'Four arms, and it reads. Sit, sit. I have not spoken with one of your people in a very long time.' : 'Stay a moment, wanderer. Let an old man share what he knows.')),
     h('div', { class: 'p-body' },
       h('button', { class: 'btn primary', disabled: !unid, onclick: () => { const n = w.identifyAll(); host.toast(n ? `Identified ${n} item${n > 1 ? 's' : ''}` : 'Nothing to identify'); host.refresh(); } }, unid ? `Identify all items (${unid})` : 'Nothing to identify'),
       quests),
@@ -656,6 +662,7 @@ function helpPanel(host: PanelHost) {
         'At <span class="gold2">the Forge</span> beside the blacksmith, salvage loot you do not need into Cinders and Essences, then spend them on the gear you keep: Heat it up to +10, Temper or Quench its affixes, Smelt three items into a better one. Heating past +5 can fail and crack the item back a level. Forge mastery grows with every job and teaches new ones.',
         'Finish the Ember Road and <span class="gold2">the Underforge</span> opens at every waypoint: an endless descent, one monster level harder a floor. A warden holds the stairs on each floor, every fifth floor is a boss, and deeper floors carry afflictions that everything on them shares. The deeper you go, the better the loot and the more Cinders each warden leaves for the Forge.',
         'The <span class="gold2">captain</span> in every town hires out one companion at a time: a Shieldbearer, a Bowman or an Ember-Keeper. They fight at your level, follow you between areas, and can be brought back at any captain for a fee if they fall.',
+        'The <span class="gold2">Hiveborn</span> has four arms. A one-handed weapon can go in either upper hand (Equip Main Hand or Equip Off Hand), and a two-hander or a bow can be held with a shield or a second weapon beside it. The lower arms are claws: they add their damage to every blow struck up close, and with a bow in hand a plain attack on something within reach is a claw strike.',
         'Necromancers raise skeletons from fresh corpses: cast Raise Skeleton near a body (or tap its button to use the nearest one). Servants follow you between areas.',
         'Forgewrights build <span class="gold2">Heat</span> with every hammer blow that lands (the gauge above the experience bar). Heat adds fire to your blows with Temper, and Slag Burst spends it all at once. Let it reach 100 and you overheat and burn until it cools or you vent it. Turrets and the Furnace stay where you build them and wind down after a while; the Brass Sentinel follows you between areas.',
       ].map((t) => `<p>${t}</p>`).join('') }),

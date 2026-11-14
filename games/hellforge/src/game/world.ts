@@ -194,12 +194,13 @@ export const BRAZIER_RADIUS = 4.5;
 /** Seconds a full ember lasts in the cold with no fire near, and how long frostbite takes to set in once it is out. */
 export const EMBER_TIME = 60;
 export const FROST_TIME = 10;
-export type Ally = 'skeleton' | 'golem' | 'ballista' | 'bellows' | 'sentinel' | 'furnace' | 'hireling';
+export type Ally = 'skeleton' | 'golem' | 'ballista' | 'bellows' | 'sentinel' | 'furnace' | 'worker' | 'hireling';
 const ALLY_DEF: Record<Exclude<Ally, 'hireling'>, string> = {
   skeleton: 'raised_skeleton', golem: 'grave_golem', ballista: 'ballista_turret', bellows: 'bellows_turret', sentinel: 'brass_sentinel', furnace: 'furnace',
+  worker: 'hive_worker',
 };
 /** Which servant each Forgewright construct skill builds. */
-export const CONSTRUCT_OF: Record<string, Exclude<Ally, 'hireling'>> = { ballista: 'ballista', bellows: 'bellows', brass_sentinel: 'sentinel', furnace: 'furnace' };
+export const CONSTRUCT_OF: Record<string, Exclude<Ally, 'hireling'>> = { ballista: 'ballista', bellows: 'bellows', brass_sentinel: 'sentinel', furnace: 'furnace', congregation: 'worker' };
 
 /** Heat: where Slag Burst becomes usable, where it leaves burning ground, and where an overheated smith stops burning. */
 export const HEAT_MAX = 100;
@@ -633,6 +634,8 @@ export class World {
     if (p.shrine_combat) add('edPct', 80), add('ar', 150);
     if (p.shrine_haste) add('ias', 30), add('frw', 30);
     if (p.white_heat) add('ias', p.white_heat.p.pct!);
+    if (p.hold_the_line) add('defPct', p.hold_the_line.p.pct!), add('edPct', p.hold_the_line.p.pct2!);
+    if (p.hymn) add('ias', p.hymn.p.pct2!);
     // A spree quickens the feet: each rank is worth a little more speed.
     if (this.streak.tier >= 0) add('frw', 5 * (this.streak.tier + 1));
     const fr = this.player.frenzy;
@@ -1020,7 +1023,7 @@ export class World {
     const def = SKILL_BY_ID[skill];
     if (!def) return;
     const p = this.player;
-    const self = ['buff', 'nova', 'ring', 'vent', 'quake'].includes(def.kind) || def.id === 'grave_golem';
+    const self = ['buff', 'nova', 'ring', 'vent', 'quake', 'mend'].includes(def.kind) || def.id === 'grave_golem' || def.id === 'congregation';
     if (self) return this.cmdSkill(skill, p.x, p.y);
     if (def.kind === 'summon' || def.kind === 'corpse') {
       // Raise from the corpse nearest you; explode the corpse nearest your target.
@@ -1057,6 +1060,16 @@ export class World {
       if (score < bestScore) (bestScore = score), (best = m);
     }
     return best;
+  }
+
+  /** How far a blow struck up close reaches. With a bow in the upper arms, a Hiveborn's claws still only reach so far. */
+  get meleeReach() {
+    return this.stats.isBow ? 1 : this.stats.range;
+  }
+
+  /** The four-armed can strike up close whatever they hold: the lower arms are claws. */
+  get clawed() {
+    return this.stats.clawMax > 0;
   }
 
   isMeleeSkill(def: SkillDef) {
@@ -1874,7 +1887,7 @@ export class World {
     if (target) this.setFocus(target);
     const melee = this.isMeleeSkill(def) && def.kind === 'attack';
     if (melee && target) {
-      const reach = 0.3 + target.def.radius + this.stats.range;
+      const reach = 0.3 + target.def.radius + this.meleeReach;
       if (Math.hypot(tx - p.x, ty - p.y) > reach) {
         p.pathT -= dt;
         if (p.pathT <= 0 || !p.path.length) this.repath(tx, ty);
@@ -1883,7 +1896,9 @@ export class World {
       }
     }
     // Ranged skills need line of sight to their target, and short-ranged ones need to get close.
-    const castRange = def.kind === 'shards' ? 6.5 : def.kind === 'curse' ? 10 : def.kind === 'anvil' ? 9 : def.kind === 'cone' ? 3.2 : Infinity;
+    // A cone is swung from well inside its own reach, or a short one would be swung at nothing.
+    const coneReach = def.kind === 'cone' ? def.params(Math.max(1, skillLevel(this.char, def.id))).range! : 0;
+    const castRange = def.kind === 'shards' ? 6.5 : def.kind === 'curse' ? 10 : def.kind === 'anvil' ? 9 : def.kind === 'cone' ? Math.min(3.2, coneReach * 0.8) : Infinity;
     if (target && !melee && def.kind !== 'teleport' && (!lineOfSight(this.area.level, p, target) || Math.hypot(tx - p.x, ty - p.y) > castRange)) {
       p.pathT -= dt;
       if (p.pathT <= 0 || !p.path.length) this.repath(tx, ty);
@@ -1906,7 +1921,7 @@ export class World {
     const lvl = skillLevel(this.char, def.id);
     if (!lvl) return;
     if (def.weapon === 'bow' && !st.isBow) return this.msg('Requires a bow', '#ff8a6a', 'bow');
-    if (def.weapon === 'melee' && st.isBow) return this.msg('Requires a melee weapon', '#ff8a6a', 'melee');
+    if (def.weapon === 'melee' && st.isBow && !this.clawed) return this.msg('Requires a melee weapon', '#ff8a6a', 'melee');
     if (def.id === 'raise_skeleton' || def.kind === 'corpse') {
       if (!this.findCorpse(tx, ty, 2.5) && !this.findCorpse(p.x, p.y, 10)) return this.msg('No corpse nearby', '#c8b890', 'corpse');
     }
@@ -1946,7 +1961,10 @@ export class World {
       return;
     }
     if (def.kind === 'attack' || def.kind === 'multishot' || def.kind === 'strafe' || def.kind === 'cone' || def.kind === 'quake') {
-      const bow = st.isBow && def.weapon !== 'melee';
+      // A plain attack with a bow in hand shoots, unless a Hiveborn's target is close enough to claw.
+      const near = targetId !== undefined ? this.area.monsters.find((m) => m.id === targetId && !m.dead) : undefined;
+      const claw = this.clawed && def.id === 'attack' && !!near && Math.hypot(near.x - p.x, near.y - p.y) <= 0.3 + near.def.radius + this.meleeReach;
+      const bow = st.isBow && def.weapon !== 'melee' && !claw;
       if (bow) {
         const dur = def.kind === 'strafe' ? attackDur * 2.2 : attackDur;
         p.action = { ...base, kind: 'shoot', dur, hitAt: def.kind === 'strafe' ? 0.15 * dur : 0.45 * dur, tick: 0 };
@@ -2094,7 +2112,7 @@ export class World {
       const target = act.targetId !== undefined ? this.area.monsters.find((m) => m.id === act.targetId && !m.dead) : undefined;
       const victims = target ? [target] : this.monstersNear(p.x + Math.cos(ang) * 0.7, p.y + Math.sin(ang) * 0.7, 0.9).slice(0, 1);
       for (const m of victims) {
-        if (Math.hypot(m.x - p.x, m.y - p.y) > m.def.radius + this.stats.range + 0.6) continue;
+        if (Math.hypot(m.x - p.x, m.y - p.y) > m.def.radius + this.meleeReach + 0.6) continue;
         if (this.playerWeaponHit(m, def, pr, { knock: def.id === 'bash' ? 1.2 : 0 })) {
           this.gainHeat(def.id === 'attack' ? 5 : 8);
           if (def.id === 'sunder' && !m.dead) m.sunder = { t: pr.duration!, pct: pr.pct! };
@@ -2171,7 +2189,35 @@ export class World {
         for (const m of this.monstersNear(c.x, c.y, pr.radius!)) this.damageMonster(m, { phys: amt / 2, fire: amt / 2, cold: 0, light: 0, poison: 0 }, {});
         break;
       }
+      case 'mend': {
+        // Prayer of Mending: the hero and everyone at their side within reach.
+        const heal = pr.pct! / 100;
+        p.life = Math.min(this.stats.maxLife, p.life + this.stats.maxLife * heal);
+        p.poison.t = 0;
+        this.fx({ kind: 'heal', x: p.x, y: p.y, dur: 0.8, color: '#ffe890' });
+        this.fx({ kind: 'shout', x: p.x, y: p.y, dur: 0.5, r: pr.radius, color: '#ffe890' });
+        for (const mi of this.minions) {
+          if (mi.dead || Math.hypot(mi.x - p.x, mi.y - p.y) > pr.radius!) continue;
+          mi.life = Math.min(mi.maxLife, mi.life + mi.maxLife * heal);
+          this.fx({ kind: 'heal', x: mi.x, y: mi.y, dur: 0.6, color: '#ffe890' });
+        }
+        this.sound('shrine');
+        break;
+      }
       case 'summon': {
+        if (def.id === 'congregation') {
+          // Workers come up out of the ground around the hero. A new call sends the last ones home.
+          for (const o of this.minions) if (o.ally === 'worker') this.scrapConstruct(o);
+          this.minions = this.minions.filter((mi) => !mi.dead);
+          for (let i = 0; i < pr.count!; i++) {
+            const a2 = ang + ((i + 0.5) / pr.count!) * TAU;
+            const s = nearestFloor(this.area.level, { x: p.x + Math.cos(a2) * 1.4, y: p.y + Math.sin(a2) * 1.4 });
+            const mi = this.raiseMinion('worker', s.x + 0.5, s.y + 0.5, pr);
+            mi.ttl = pr.duration;
+          }
+          this.sound('thud');
+          break;
+        }
         if (def.id === 'grave_golem') {
           for (const g of this.minions) if (g.ally === 'golem') g.dead = true;
           const at = isWalkable(this.area.level, act.x, act.y) && Math.hypot(act.x - p.x, act.y - p.y) < 8 ? { x: act.x, y: act.y } : { x: p.x + Math.cos(ang), y: p.y + Math.sin(ang) };
@@ -2295,9 +2341,9 @@ export class World {
       }
       case 'buff': {
         p.buffs[def.id] = { t: pr.duration!, p: pr };
-        const col = def.id === 'frost_shell' ? '#bfefff' : def.id === 'bone_ward' ? '#e8dcc0' : def.id === 'white_heat' ? '#ffd8a0' : '#ffe080';
+        const col = def.id === 'frost_shell' ? '#bfefff' : def.id === 'bone_ward' ? '#e8dcc0' : def.id === 'white_heat' ? '#ffd8a0' : def.id === 'hold_the_line' ? '#c8a878' : '#ffe080';
         this.fx({ kind: def.id === 'battle_shout' ? 'shout' : 'nova', x: p.x, y: p.y, dur: 0.6, r: 1.6, color: col });
-        this.sound(def.id === 'battle_shout' ? 'roar' : def.id === 'bone_ward' ? 'swing' : def.id === 'white_heat' ? 'fire' : 'cold');
+        this.sound(def.id === 'battle_shout' || def.id === 'hold_the_line' ? 'roar' : def.id === 'bone_ward' ? 'swing' : def.id === 'white_heat' ? 'fire' : def.id === 'hymn' || def.id === 'ward_of_faith' ? 'shrine' : 'cold');
         if (def.id === 'white_heat') {
           p.heat = HEAT_MAX;
           p.overheat = false;
@@ -2323,10 +2369,12 @@ export class World {
   }
 
   /** Physical (with crits) plus elemental adds from gear and the skill. */
-  private weaponDamage(def: SkillDef, pr: SkillParams): { dmg: Damage; crit: boolean } {
+  private weaponDamage(def: SkillDef, pr: SkillParams, melee = false): { dmg: Damage; crit: boolean } {
     const st = this.stats;
     const rng = this.rng;
-    let phys = roll(rng, st.minDmg, st.maxDmg) * (1 + (pr.dmgPct ?? 0) / 100);
+    // Up close a Hiveborn's claws are in every blow. With a bow in the upper arms they are the whole of it.
+    const claws = melee && st.clawMax > 0;
+    let phys = ((claws && st.isBow ? 0 : roll(rng, st.minDmg, st.maxDmg)) + (claws ? roll(rng, st.clawMin, st.clawMax) : 0)) * (1 + (pr.dmgPct ?? 0) / 100);
     const crit = rng.chance(st.crit / 100);
     if (crit) phys *= 2;
     const dmg: Damage = {
@@ -2399,7 +2447,7 @@ export class World {
 
   private playerWeaponHit(m: Monster, def: SkillDef, pr: SkillParams, opts: { knock?: number; stun?: number }): boolean {
     const p = this.player;
-    const { dmg, crit } = this.weaponDamage(def, pr);
+    const { dmg, crit } = this.weaponDamage(def, pr, true);
     const hit = this.damageMonster(m, dmg, {
       ar: this.stats.ar * (1 + (pr.arPct ?? 0) / 100), crit, leech: true, stun: opts.stun,
       knock: opts.knock ? { x: m.x - p.x, y: m.y - p.y, f: opts.knock } : undefined,
@@ -2454,6 +2502,11 @@ export class World {
       return false;
     }
     if (m.curse && m.curse.t > 0 && d.phys > 0) d = { ...d, phys: d.phys * (1 + m.curse.pct / 100) };
+    // Sky Hunter: a Hiveborn Archer's arrows and claws alike are worse news for anything with wings.
+    if (!o.minion && m.def.ai === 'bat' && d.phys > 0) {
+      const sl = skillLevel(this.char, 'sky_hunter');
+      if (sl) d = { ...d, phys: d.phys * (1 + SKILL_BY_ID.sky_hunter.params(sl).pct2! / 100) };
+    }
     if (m.sunder && m.sunder.t > 0 && d.phys > 0) d = { ...d, phys: d.phys * (1 + m.sunder.pct / 100) };
     // Struck by a servant: turn on it some of the time.
     if (o.minion && (m.foe === undefined || this.rng.chance(0.3))) m.foe = o.minion.id;
@@ -2704,13 +2757,14 @@ export class World {
     const res: Resists = { phys: 0, fire: st.res.fire, cold: st.res.cold, light: st.res.light, poison: st.res.poison };
     const dd = { ...d, phys: d.phys > 0 ? reducePhysical(d.phys, st.dmgReduce) : 0 };
     let { total, poison } = applyResists(dd, res);
-    const ward = p.buffs.bone_ward;
+    const wardId = p.buffs.bone_ward ? 'bone_ward' : 'ward_of_faith';
+    const ward = p.buffs[wardId];
     if (ward && total > 0) {
       const ab = Math.min(total, ward.p.min ?? 0);
       ward.p.min = (ward.p.min ?? 0) - ab;
       total -= ab;
       poison *= 0.5;
-      if (ward.p.min <= 0) delete p.buffs.bone_ward;
+      if (ward.p.min <= 0) delete p.buffs[wardId];
       if (ab >= 1) this.floatText(p.x, p.y, String(Math.round(ab)), '#d8ccb0');
     }
     if (poison > 0) p.poison = { dps: poison / 4, t: 4 };
@@ -3860,6 +3914,12 @@ export class World {
     return { alive: this.minions.filter((mi) => mi.ally === kind && !mi.dead).length, max: SKILL_BY_ID[skillId].params(lvl).count ?? 1 };
   }
 
+  /** Hymn of the Hive: how much harder the hero's allies hit while it is sung. */
+  private allyZeal() {
+    const h = this.player.buffs.hymn;
+    return h ? 1 + h.p.pct! / 100 : 1;
+  }
+
   private scrapConstruct(mi: Monster) {
     mi.dead = true;
     mi.action = null;
@@ -3871,7 +3931,8 @@ export class World {
     const def = MONSTERS[ALLY_DEF[kind]];
     const lvl = this.char.level;
     const undead = kind === 'skeleton' || kind === 'golem';
-    const mastery = undead ? 'skeletal_mastery' : 'gearwork';
+    // Workers answer to no mastery: Congregation's own numbers are all they have.
+    const mastery = undead ? 'skeletal_mastery' : kind === 'worker' ? '' : 'gearwork';
     const ml = skillLevel(this.char, mastery);
     const mp = ml ? SKILL_BY_ID[mastery].params(ml) : { pct: 0, pct2: 0 };
     const dmgK = (1 + (pr.pct ?? 0) / 100) * (1 + (mp.pct ?? 0) / 100) * syn;
@@ -3980,7 +4041,7 @@ export class World {
         if (!act.done && act.t >= act.hitAt) {
           act.done = true;
           if (foe && Math.hypot(foe.x - mi.x, foe.y - mi.y) <= mi.def.radius + foe.def.radius + mi.def.range + 0.4) {
-            this.damageMonster(foe, elemDamage('phys', roll(this.rng, mi.dmgMin, mi.dmgMax)), { ar: mi.ar, minion: mi });
+            this.damageMonster(foe, elemDamage('phys', roll(this.rng, mi.dmgMin, mi.dmgMax) * this.allyZeal()), { ar: mi.ar, minion: mi });
           }
         }
         if (act.t >= act.dur) mi.action = null;
@@ -3999,7 +4060,7 @@ export class World {
           mi.action = { t: 0, hitAt: 0, dur: 0.45, done: true, kind: shot.element === 'phys' ? 'shoot' : 'cast' };
           this.spawnProjectile({
             x: mi.x, y: mi.y, ang: mi.facing, speed: shot.speed, ttl: mi.def.range / shot.speed + 0.2, owner: 'player', kind: shot.kind, radius: 0.3,
-            dmg: elemDamage(shot.element, roll(this.rng, mi.dmgMin, mi.dmgMax)), ar: shot.element === 'phys' ? mi.ar : undefined, srcLevel: mi.level, servant: mi,
+            dmg: elemDamage(shot.element, roll(this.rng, mi.dmgMin, mi.dmgMax) * this.allyZeal()), ar: shot.element === 'phys' ? mi.ar : undefined, srcLevel: mi.level, servant: mi,
           });
           if (dp < 12) this.sound(shot.element === 'phys' ? 'bow' : 'fire');
         }

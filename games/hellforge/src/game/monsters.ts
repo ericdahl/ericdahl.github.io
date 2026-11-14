@@ -8,7 +8,7 @@ export type MonsterShape =
   | 'corvin' | 'noon'
   | 'thrall' | 'bellwarden' | 'slag' | 'eater' | 'phylactery' | 'frostwright' | 'unlit'
   | 'ballista' | 'bellows' | 'sentinel' | 'furnace'
-  | 'hire_guard' | 'hire_archer' | 'hire_mage';
+  | 'hire_guard' | 'hire_archer' | 'hire_mage' | 'worker';
 export type MonsterAI = 'melee' | 'ranged' | 'caster' | 'bat' | 'hexer' | 'boss' | 'burrow' | 'eater' | 'totem';
 
 export interface Resists {
@@ -112,6 +112,8 @@ export const MONSTERS: Record<string, MonsterDef> = {
   bellows_turret: D({ id: 'bellows_turret', name: 'Bellows Turret', shape: 'bellows', ai: 'caster', lifeMul: 1.6, dmgMul: 0, speed: 0, radius: 0.4, range: 3.6, attackRate: 2, xpMul: 0, res: { poison: 100, fire: 75 }, color: '#7a4a2a' }),
   brass_sentinel: D({ id: 'brass_sentinel', name: 'Brass Sentinel', shape: 'sentinel', ai: 'melee', lifeMul: 3.2, dmgMul: 1.0, speed: 3.6, radius: 0.5, range: 0.7, attackRate: 0.85, xpMul: 0, res: { poison: 100, phys: 20, fire: 25 }, scale: 1.2, color: '#c89a3c' }),
   furnace: D({ id: 'furnace', name: 'Furnace', shape: 'furnace', ai: 'melee', lifeMul: 2.2, dmgMul: 0, speed: 0, radius: 0.5, range: 0, attackRate: 2, xpMul: 0, res: { poison: 100, fire: 100 }, color: '#5a4a44' }),
+  // Hiveborn Workers, called up for a while by Congregation (never spawned as enemies).
+  hive_worker: D({ id: 'hive_worker', name: 'Worker', shape: 'worker', ai: 'melee', lifeMul: 1.3, dmgMul: 0.7, speed: 3.9, radius: 0.3, range: 0.55, attackRate: 1.3, xpMul: 0, res: { poison: 25, phys: 10 }, scale: 0.85, color: '#6a4a2a' }),
   // Hirelings (never spawned as enemies). They fight at the hero's level.
   hire_guard: D({ id: 'hire_guard', name: 'Shieldbearer', shape: 'hire_guard', ai: 'melee', lifeMul: 3.6, dmgMul: 0.95, speed: 4.2, radius: 0.34, range: 0.6, attackRate: 1.1, xpMul: 0, res: { phys: 25, fire: 15, cold: 15, light: 15, poison: 15 }, color: '#7a8088' }),
   hire_archer: D({ id: 'hire_archer', name: 'Bowman', shape: 'hire_archer', ai: 'ranged', lifeMul: 1.9, dmgMul: 0.95, speed: 4.2, radius: 0.32, range: 8, attackRate: 1.05, xpMul: 0, missile: { element: 'phys', speed: 15, kind: 'arrow' }, res: { fire: 10, cold: 10, light: 10, poison: 10 }, color: '#4a6a3a' }),

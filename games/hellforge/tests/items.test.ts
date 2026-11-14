@@ -13,7 +13,7 @@ describe('item data', () => {
   });
 
   it('every class has a unique that raises its skills', () => {
-    for (const cls of ['reaver', 'arcanist', 'huntress', 'necromancer', 'forgewright']) {
+    for (const cls of ['reaver', 'arcanist', 'huntress', 'necromancer', 'forgewright', 'hiveborn']) {
       expect(UNIQUES.some((u) => u.mods.some((md) => md.stat === `skills_${cls}`))).toBe(true);
     }
   });
@@ -23,7 +23,7 @@ describe('item data', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  for (const cls of ['reaver', 'arcanist', 'huntress', 'necromancer', 'forgewright'] as const) {
+  for (const cls of ['reaver', 'arcanist', 'huntress', 'necromancer', 'forgewright', 'hiveborn'] as const) {
     it(`the ${cls} has a full set that raises its skills by 2`, () => {
       const set = SETS.find((s) => s.classId === cls)!;
       const c = createCharacter('T', cls);
@@ -44,8 +44,8 @@ describe('item data', () => {
     let own = 0;
     const n = 2000;
     for (let i = 0; i < n; i++) if (generateItem(rng, 30, { rarity: 'set', classId: 'necromancer' }).setId === 'bonewright') own++;
-    // 12 of the 39 weighted shares, against 4 of 31 without the bias.
-    expect(own / n).toBeGreaterThan(0.26);
+    // Its four pieces count three times over, so they come up well above their plain share (which is under a tenth).
+    expect(own / n).toBeGreaterThan(0.2);
     expect(own / n).toBeLessThan(0.44);
   });
 

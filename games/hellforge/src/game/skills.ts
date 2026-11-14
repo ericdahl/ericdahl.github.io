@@ -5,7 +5,7 @@ export type SkillKind =
   | 'attack' | 'passive' | 'buff' | 'projectile' | 'nova' | 'teleport' | 'leap' | 'whirlwind'
   | 'meteor' | 'multishot' | 'strafe' | 'bolts'
   | 'summon' | 'curse' | 'corpse' | 'shards' | 'ring'
-  | 'construct' | 'anvil' | 'cone' | 'quake' | 'vent';
+  | 'construct' | 'anvil' | 'cone' | 'quake' | 'vent' | 'mend';
 
 export interface SkillParams {
   /** Bonus % weapon damage for attack skills. */
@@ -354,6 +354,96 @@ export const SKILLS: SkillDef[] = [
     mana: (l) => 10 + 0.5 * l, params: (l) => ({ duration: 6 + 0.5 * l, pct: 10 + 2 * l }),
     desc: 'Stoke yourself to full Heat and hold it there without burning. When it ends you are left at full Heat: vent it or pay for it.',
     lines: (p) => [`Full Heat for ${p.duration}s`, `+${p.pct}% Attack Speed`], color: '#fff0c0', glyph: '☼', castTime: 0.6,
+  },
+  // ------------------------------------------------------------ Hiveborn
+  // Soldier: the lower arms are claws, and they are in every blow struck up close, whatever the upper arms hold.
+  {
+    id: 'rend', name: 'Rend', classId: 'hiveborn', reqLevel: 1, kind: 'attack', weapon: 'melee',
+    mana: () => 2, params: (l) => ({ dmgPct: 35 + 16 * l, arPct: 15 + 8 * l }),
+    desc: 'Strike with every arm at once. Works with whatever you hold, a bow included: up close, the claws do the work.',
+    lines: (p) => [`+${p.dmgPct}% Damage`, `+${p.arPct}% Attack Rating`], color: '#b07a3a', glyph: '⟁',
+  },
+  {
+    id: 'carapace', name: 'Carapace', classId: 'hiveborn', reqLevel: 1, kind: 'passive',
+    mana: () => 0, params: (l) => ({ pct: 20 + 10 * l, min: Math.ceil(l / 2), pct2: 10 * l }),
+    desc: 'Passive: thicker plates and sharper claws.',
+    lines: (p) => [`+${p.pct}% Defense`, `Damage Reduced by ${p.min}`, `+${p.pct2}% Claw Damage`], color: '#6a4a2a', glyph: '⬢',
+  },
+  {
+    id: 'many_hands', name: 'Many Hands', classId: 'hiveborn', reqLevel: 6, prereq: ['rend'], kind: 'passive',
+    mana: () => 0, params: (l) => ({ pct: 5 * l, pct2: dim(4, 2, l, 40) }),
+    desc: 'Passive: an off-hand weapon adds more of its damage to every blow, and all four arms move faster.',
+    lines: (p) => [`Off-hand weapon adds ${50 + p.pct!}% of its damage`, `+${p.pct2}% Attack Speed`], color: '#c8a060', glyph: '⚔',
+  },
+  {
+    id: 'hold_the_line', name: 'Hold the Line', classId: 'hiveborn', reqLevel: 12, prereq: ['carapace'], kind: 'buff',
+    mana: () => 10, params: (l) => ({ pct: 40 + 10 * l, pct2: 10 + 4 * l, duration: 20 + 2 * l }),
+    desc: 'Plant your feet as a Soldier does. Harder to hurt, and harder-hitting, until it ends.',
+    lines: (p) => [`+${p.pct}% Defense`, `+${p.pct2}% Damage`, `Duration: ${p.duration}s`], color: '#8a6a4a', glyph: '▣',
+  },
+  {
+    id: 'fourfold', name: 'Fourfold Strike', classId: 'hiveborn', reqLevel: 18, prereq: ['many_hands'], kind: 'cone', weapon: 'melee',
+    mana: (l) => 5 + 0.25 * l, params: (l) => ({ dmgPct: 30 + 12 * l, range: 3.2 }),
+    desc: 'Four arms, four blows: everything in front of you is struck and thrown back.',
+    lines: (p) => [`+${p.dmgPct}% Damage`, `Reach: ${p.range} yards`, 'Knocks back'], color: '#d89040', glyph: '✣',
+    synergies: [{ skill: 'rend', pct: 6 }],
+  },
+  // Archer: a bow in the upper arms, and a great fondness for anything with wings.
+  {
+    id: 'loose', name: 'Loose', classId: 'hiveborn', reqLevel: 1, kind: 'attack', weapon: 'bow',
+    mana: () => 1.5, params: (l) => ({ dmgPct: 40 + 18 * l, arPct: 25 + 10 * l }),
+    desc: 'A patient, well-aimed arrow.', lines: (p) => [`+${p.dmgPct}% Damage`, `+${p.arPct}% Attack Rating`],
+    color: '#c8c080', glyph: '➵',
+  },
+  {
+    id: 'sky_hunter', name: 'Sky Hunter', classId: 'hiveborn', reqLevel: 6, prereq: ['loose'], kind: 'passive',
+    mana: () => 0, params: (l) => ({ pct: dim(8, 4, l, 60), pct2: 40 + 12 * l }),
+    desc: 'Passive: a keen eye with a bow, and keenest of all for birds. Bats and kites count as birds. So does anything else that flies.',
+    lines: (p) => [`${p.pct}% chance of double damage with a bow`, `+${p.pct2}% Damage to anything that flies`], color: '#a8d0e8', glyph: '🜁',
+  },
+  {
+    id: 'volley', name: 'Volley', classId: 'hiveborn', reqLevel: 12, prereq: ['sky_hunter'], kind: 'multishot', weapon: 'bow',
+    mana: (l) => 4 + 0.5 * l, params: (l) => ({ count: Math.min(12, 2 + l), dmgPct: -25 + 8 * l }),
+    desc: 'A fan of arrows.', lines: (p) => [`Arrows: ${p.count}`, `${p.dmgPct! >= 0 ? '+' : ''}${p.dmgPct}% Damage`],
+    color: '#b0c870', glyph: '⋔', synergies: [{ skill: 'loose', pct: 6 }],
+  },
+  {
+    id: 'skyfall', name: 'Skyfall', classId: 'hiveborn', reqLevel: 24, prereq: ['volley'], kind: 'strafe', weapon: 'bow',
+    mana: () => 10, params: (l) => ({ count: Math.min(10, 3 + Math.floor(l / 2)), dmgPct: 30 + 10 * l }),
+    desc: 'An arrow for everything in sight, one after another.', lines: (p) => [`Targets: ${p.count}`, `+${p.dmgPct}% Damage`],
+    color: '#e0e8c0', glyph: '⇶', synergies: [{ skill: 'volley', pct: 5 }],
+  },
+  // Faith: prayers a Worker was never meant to know.
+  {
+    id: 'mending', name: 'Prayer of Mending', classId: 'hiveborn', reqLevel: 1, kind: 'mend',
+    mana: (l) => 8 + 0.6 * l, params: (l) => ({ pct: Math.min(70, 16 + 3 * l), radius: 6 }),
+    desc: 'Mend yourself and everyone at your side: servants, workers and hirelings.',
+    lines: (p) => [`Restores ${p.pct}% of maximum life`, `Radius: ${p.radius} yards`], color: '#f0e0a0', glyph: '✚', castTime: 0.8,
+  },
+  {
+    id: 'ward_of_faith', name: 'Ward of Faith', classId: 'hiveborn', reqLevel: 6, prereq: ['mending'], kind: 'buff',
+    mana: (l) => 10 + l, params: (l) => ({ min: 24 + 14 * l, duration: 120 }),
+    desc: 'A shell of light that takes blows meant for you until it breaks.',
+    lines: (p) => [`Absorbs ${p.min} damage`, `Duration: ${p.duration}s`], color: '#ffe8a0', glyph: '⛨',
+  },
+  {
+    id: 'congregation', name: 'Congregation', classId: 'hiveborn', reqLevel: 12, kind: 'summon',
+    mana: (l) => 14 + l, params: (l) => ({ count: Math.min(5, 2 + Math.floor(l / 4)), pct: 12 * (l - 1), pct2: 12 * (l - 1), duration: 25 + l }),
+    desc: 'Call Workers up out of the ground to fight beside you for a while. They need no corpses, and they do not stay.',
+    lines: (p) => [`Workers: ${p.count}`, `+${p.pct}% Worker Damage`, `+${p.pct2}% Worker Life`, `They stay ${p.duration}s`], color: '#a88a5a', glyph: '⛏', castTime: 0.8,
+  },
+  {
+    id: 'hymn', name: 'Hymn of the Hive', classId: 'hiveborn', reqLevel: 18, prereq: ['congregation'], kind: 'buff',
+    mana: () => 14, params: (l) => ({ pct: 20 + 6 * l, pct2: 8 + 2 * l, duration: 30 + 2 * l }),
+    desc: 'Sing, and everyone who fights for you fights harder: workers, servants and hirelings. You are quicker for it too.',
+    lines: (p) => [`+${p.pct}% Damage for your allies`, `+${p.pct2}% Attack Speed for you`, `Duration: ${p.duration}s`], color: '#f8d070', glyph: '♪',
+  },
+  {
+    id: 'judgement', name: 'Sky Above', classId: 'hiveborn', reqLevel: 24, prereq: ['hymn'], kind: 'nova', element: 'light',
+    mana: (l) => 16 + l, params: (l) => ({ min: 30 + 16 * (l - 1), max: 55 + 24 * (l - 1), radius: 5, stun: 0.8 + 0.1 * l }),
+    desc: 'For a moment the roof is gone and there is only sky. Everything near you is struck by its light and stands dazed.',
+    lines: (p) => [`Lightning Damage: ${p.min}-${p.max}`, `Stun: ${p.stun!.toFixed(1)}s`, `Radius: ${p.radius} yards`], color: '#e8f4ff', glyph: '☀',
+    synergies: [{ skill: 'mending', pct: 6 }, { skill: 'ward_of_faith', pct: 6 }],
   },
 ];
 

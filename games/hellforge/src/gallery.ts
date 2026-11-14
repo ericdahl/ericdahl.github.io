@@ -65,6 +65,7 @@ const LOADOUTS: Record<ClassId, Gear[]> = {
   arcanist: [gear({}), gear({ weapon: 'short_staff' }), gear({ weapon: 'dial_staff', body: 'chain_mail', head: 'circlet' }, 'rare')],
   huntress: [gear({ weapon: 'short_bow' }), gear({ weapon: 'long_bow', body: 'hard_leather', head: 'skull_cap' }), gear({ weapon: 'recurve_bow', body: 'scale_mail', head: 'full_helm' }, 'unique')],
   forgewright: [gear({ weapon: 'sledge' }), gear({ weapon: 'war_hammer', body: 'studded_leather', head: 'helm' }), gear({ weapon: 'obsidian_maul', body: 'plate_mail', head: 'full_helm', gloves: 'gauntlets', boots: 'greaves' }, 'unique')],
+  hiveborn: [gear({ weapon: 'short_sword', offhand: 'club' }), gear({ weapon: 'long_bow', body: 'hard_leather', offhand: 'jambiya' }), gear({ weapon: 'claymore', body: 'scale_mail', head: 'helm', offhand: 'kite_shield' }, 'rare')],
   necromancer: [gear({ weapon: 'bone_wand' }), gear({ weapon: 'yew_wand', offhand: 'buckler' }), gear({ weapon: 'glass_wand', body: 'lamellar', head: 'wrapped_helm', offhand: 'kite_shield' }, 'rare')],
 };
 

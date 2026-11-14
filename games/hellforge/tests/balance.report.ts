@@ -11,7 +11,7 @@ const nodeFs = 'node:fs';
 // Not part of `npm test`: run it with `npm run balance`. It plays every class through the whole game on each seed
 // (a few minutes) and writes BALANCE.md. BALANCE_SEEDS and BALANCE_CLASSES narrow it, e.g. BALANCE_SEEDS=99 for a quick look.
 const SEEDS = (process.env.BALANCE_SEEDS ?? '99,7,77').split(',').map(Number);
-const CLASSES = (process.env.BALANCE_CLASSES ?? 'reaver,arcanist,huntress,necromancer,forgewright').split(',') as ClassId[];
+const CLASSES = (process.env.BALANCE_CLASSES ?? 'reaver,arcanist,huntress,necromancer,forgewright,hiveborn').split(',') as ClassId[];
 
 it('writes the balance report', async () => {
   const { writeFileSync } = (await import(/* @vite-ignore */ nodeFs)) as { writeFileSync(path: string, text: string): void };

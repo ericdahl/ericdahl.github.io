@@ -1,5 +1,5 @@
-import { computeStats, slotsFor, type Buffs, type Character, type Stats } from '../game/character';
-import { baseOf, type Item, type Slot } from '../game/items';
+import { computeStats, displacedBy, slotsFor, type Buffs, type Character, type Stats } from '../game/character';
+import type { Item, Slot } from '../game/items';
 
 export interface StatChange {
   label: string;
@@ -19,23 +19,20 @@ export interface Comparison {
 
 /** The slot an item would be equipped into by default: a free one, else the first. */
 export function defaultSlot(c: Character, item: Item): Slot | null {
-  const slots = slotsFor(item);
+  const slots = slotsFor(item, c);
   if (!slots.length) return null;
   return slots.find((s) => !c.equipment[s]) ?? slots[0];
 }
 
 /** What wearing `item` in `slot` would change, compared with the current gear. */
 export function compareEquip(c: Character, item: Item, slot: Slot, buffs: Buffs = {}): Comparison {
-  const b = baseOf(item);
   const eq = { ...c.equipment };
   const replaced: Item[] = [];
   const take = (s: Slot) => {
     if (eq[s]) replaced.push(eq[s]!);
     delete eq[s];
   };
-  take(slot);
-  if (b.twoHanded) take('offhand');
-  if (b.kind === 'shield' && eq.weapon && baseOf(eq.weapon).twoHanded) take('weapon');
+  for (const s of displacedBy(c, item, slot)) take(s);
   eq[slot] = item;
   const now = computeStats(c, buffs);
   const next = computeStats({ ...c, equipment: eq }, buffs);
@@ -48,6 +45,7 @@ const int = (v: number) => String(Math.round(v));
 /** Stats worth showing, in tooltip order. `lower` marks stats where less is better. */
 const ROWS: { label: string; get: (s: Stats) => number; fmt?: (v: number, s: Stats) => string; lower?: boolean }[] = [
   { label: 'Damage', get: (s) => (s.minDmg + s.maxDmg) / 2, fmt: (_, s) => `${s.minDmg}-${s.maxDmg}` },
+  { label: 'Claw Damage', get: (s) => (s.clawMin + s.clawMax) / 2, fmt: (_, s) => `${s.clawMin}-${s.clawMax}` },
   { label: 'Attack Speed', get: (s) => s.attackSpeed, fmt: (v) => `${v.toFixed(2)}/s` },
   { label: 'Attack Rating', get: (s) => s.ar },
   { label: 'Fire Damage', get: (s) => (s.fireMin + s.fireMax) / 2, fmt: (_, s) => `${s.fireMin}-${s.fireMax}` },
