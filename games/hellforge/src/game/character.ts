@@ -124,6 +124,8 @@ export interface Character {
   bestSpree?: number;
   tithes?: number;
   purges?: number;
+  /** The deepest floor of the Underforge whose warden has fallen, by difficulty. */
+  deepest?: number[];
 }
 
 export function createCharacter(name: string, classId: ClassId, hardcore = false): Character {

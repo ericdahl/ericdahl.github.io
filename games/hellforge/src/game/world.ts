@@ -9,10 +9,11 @@ import {
   baseOf, buyPrice, displayName, gamble, gamblePrice, generateItem, itemColor, makeItem, potionFor, rollDrops,
   sellPrice, type DropTier, type Item, type ItemKind, type Slot,
 } from './items';
+import { afflictionLabel, DEPTH_BOSSES, DEPTH_STRIDE, depthCinders, depthDef, depthFortune, depthId, depthOf, depthStarts, isDepthId } from './depths';
 import { forgeApply, type ForgeAction, type ForgeResult } from './forge';
 import { floodDistances, generateLevel, idx, isWalkable, nearestFloor, type Level, type Point } from './map';
 import {
-  baseDamage, baseLife, MONSTERS, monsterStats, rollUniqueMods, uniqueName,
+  baseDamage, baseLife, MOD_LABEL, MONSTERS, monsterStats, rollUniqueMods, uniqueName,
   type BossAbility, type MonsterDef, type MonsterRarity, type MonsterShape, type Resists, type UniqueMod,
 } from './monsters';
 import { FlowField, findPath, lineOfSight } from './path';
@@ -166,6 +167,8 @@ export interface Monster {
   drainT?: number;
   /** The phylactery (a monster id) that keeps this boss from harm while it stands. */
   wardId?: number;
+  /** Holds the stairs of an Underforge floor: they stay sealed while it lives. */
+  warden?: boolean;
 }
 
 /** A Slag Golem at or past these tempers is molten or brittle. */
@@ -482,6 +485,8 @@ export class World {
   nearFire = false;
   /** Rolls made at the Forge, kept apart for the same reason. */
   private forgeRng: Rng;
+  /** Descents into the Underforge this session. Each one rolls its floors afresh. */
+  private depthRun = 0;
 
   constructor(char: Character, seed = Date.now() >>> 0) {
     this.char = char;
@@ -568,6 +573,16 @@ export class World {
     return this.char.difficulty;
   }
 
+  /** An area's definition by id. Underforge floors are rolled, so theirs live with the floor. */
+  defOf(id: string): AreaDef {
+    return this.areas.get(id)?.def ?? AREA_BY_ID[id];
+  }
+
+  /** The Underforge floor the hero is on, or 0 anywhere else. */
+  get depth() {
+    return this.area.def.depth ?? 0;
+  }
+
   wpKey(area: string) {
     return `${this.char.difficulty}:${area}`;
   }
@@ -637,8 +652,9 @@ export class World {
   getArea(id: string): AreaState {
     const existing = this.areas.get(id);
     if (existing) return existing;
-    const def = AREA_BY_ID[id];
-    const rng = new Rng(hashSeed(this.seed, id, this.char.difficulty));
+    const deep = isDepthId(id);
+    const rng = new Rng(deep ? hashSeed(this.seed, id, this.char.difficulty, this.depthRun) : hashSeed(this.seed, id, this.char.difficulty));
+    const def = deep ? depthDef(depthOf(id), rng) : AREA_BY_ID[id];
     const level = generateLevel(def.spec, rng);
     const a: AreaState = {
       def, level, monsters: [], ground: [], orbs: [], projectiles: [], objects: [], npcs: [], hazards: [], rings: [], fx: [],
@@ -686,6 +702,8 @@ export class World {
   spawnMonster(a: AreaState, defId: string, x: number, y: number, rarity: MonsterRarity, opts: { mods?: UniqueMod[]; name?: string; packId?: number; level?: number; superId?: string } = {}): Monster {
     const def = MONSTERS[defId];
     const level = opts.level ?? this.mlvl(a.def);
+    // An Underforge floor's afflictions are on everything that draws breath there, except what only runs.
+    if (a.def.afflictions?.length && !def.thief) opts = { ...opts, mods: [...new Set([...(opts.mods ?? []), ...a.def.afflictions])] };
     const st = monsterStats(def, level, rarity, opts.mods, this.char.difficulty);
     const m: Monster = {
       id: this.id(), def, x, y, life: st.life, maxLife: st.life, level, dmgMin: st.dmgMin, dmgMax: st.dmgMax, ar: st.ar,
@@ -714,7 +732,10 @@ export class World {
       occupied.add(idx(l, p.x, p.y));
       return { x: p.x + 0.5, y: p.y + 0.5 };
     };
-    if (def.superUnique) {
+    if (def.depth) {
+      this.placeWarden(a, rng, place);
+      packId++;
+    } else if (def.superUnique) {
       const sd = MONSTERS[def.superUnique];
       const spot = l.spots.boss ?? spots.pop() ?? l.start;
       const isBoss = def.superUnique === 'mother' || def.superUnique === 'corvin' || def.superUnique === 'unlit';
@@ -740,16 +761,18 @@ export class World {
     for (let i = 0; i < def.packs && spots.length; i++) {
       const s = spots.pop()!;
       const type = rng.pick(def.monsters);
+      // Elites thicken with depth: from one pack in seven at the top of the Underforge to nearly one in two.
+      const deep = Math.min(1, (def.depth ?? 0) / 30);
       const roll = rng.next();
-      if (roll < 0.06) {
-        const mods = rollUniqueMods(rng, this.char.difficulty + 1 + (rng.chance(0.4) ? 1 : 0));
+      if (roll < 0.06 + 0.12 * deep) {
+        const mods = rollUniqueMods(rng, Math.min(5, this.char.difficulty + 1 + (rng.chance(0.4) ? 1 : 0) + Math.floor((def.depth ?? 0) / 8)));
         const p = place(s.x, s.y);
         this.spawnMonster(a, type, p.x, p.y, 'unique', { mods, name: uniqueName(rng), packId });
         for (let k = 0; k < rng.int(2, 4); k++) {
           const q = place(s.x, s.y);
           this.spawnMonster(a, type, q.x, q.y, 'minion', { packId });
         }
-      } else if (roll < 0.15) {
+      } else if (roll < 0.15 + 0.3 * deep) {
         for (let k = 0; k < rng.int(2, 4); k++) {
           const q = place(s.x, s.y);
           this.spawnMonster(a, type, q.x, q.y, 'champion', { packId, name: `${rng.pick(['Champion', 'Berserker', 'Fanatic', 'Ghostly'])} ${MONSTERS[type].name}` });
@@ -785,12 +808,78 @@ export class World {
     }
   }
 
+  /**
+   * Stands a warden by the stairs of an Underforge floor: a boss on every fifth floor, a named elite on the rest.
+   * It is found on the way to the stairs, so the hero is never sent back to hunt for it.
+   */
+  private placeWarden(a: AreaState, rng: Rng, place: (cx: number, cy: number) => Point) {
+    const def = a.def;
+    const l = a.level;
+    const depth = def.depth!;
+    const stairs = l.exits.find((e) => e.kind === 'down');
+    const spot = l.spots.boss ?? (stairs ? nearestFloor(l, stairs) : l.start);
+    const at = { x: spot.x + 0.5, y: spot.y + 0.5 };
+    let warden: Monster;
+    if (def.superUnique) {
+      const sd = MONSTERS[def.superUnique];
+      warden = this.spawnMonster(a, sd.id, at.x, at.y, 'boss', { packId: 1, superId: sd.id, level: this.mlvl(def) + 2 });
+      // The Underforge remembers its dead: the same faces come round again, harder each time.
+      const lap = Math.floor((depth / DEPTH_STRIDE - 1) / DEPTH_BOSSES.length);
+      warden.name = lap ? `${sd.name} (${['Twice', 'Thrice'][lap - 1] ?? `${lap + 1} Times`} Risen)` : `${sd.name}, Risen`;
+    } else {
+      const steady = def.monsters.filter((id) => !MONSTERS[id].flees && !MONSTERS[id].mirage && !MONSTERS[id].drains && !['hexer', 'bat', 'kite', 'scarab', 'rime_thrall', 'burrower'].includes(id));
+      const type = steady.length ? rng.pick(steady) : 'brute';
+      warden = this.spawnMonster(a, type, at.x, at.y, 'unique', { packId: 1, mods: rollUniqueMods(rng, Math.min(5, 2 + Math.floor(depth / 4))), name: uniqueName(rng), level: this.mlvl(def) + 1 });
+    }
+    warden.warden = true;
+    const escort = def.monsters.filter((id) => !MONSTERS[id].drains);
+    for (let i = 0; i < 4; i++) {
+      const p = place(spot.x, spot.y);
+      this.spawnMonster(a, rng.pick(escort.length ? escort : ['brute']), p.x, p.y, 'minion', { packId: 1 });
+    }
+  }
+
+  /** The warden still holding this floor's stairs, if there is one. */
+  wardenAlive(): Monster | undefined {
+    return this.area.monsters.find((m) => m.warden && !m.dead);
+  }
+
+  /** The Underforge opens, per difficulty, once the ember has been carried home on it. */
+  get depthsOpen() {
+    const s = this.questState('rekindle');
+    return s === 'done' || s === 'rewarded';
+  }
+
+  /** The deepest floor cleared on this difficulty. */
+  get deepest() {
+    return this.char.deepest?.[this.char.difficulty] ?? 0;
+  }
+
+  /** Floors a new descent can start from. */
+  depthStartList(): number[] {
+    return this.depthsOpen ? depthStarts(this.deepest) : [];
+  }
+
+  /** Starts a fresh descent at one of the open starting floors. Whatever was left of the last one is gone. */
+  descend(depth = 1): boolean {
+    if (this.player.dead || !this.depthStartList().includes(depth)) return false;
+    for (const id of [...this.areas.keys()]) if (isDepthId(id)) this.areas.delete(id);
+    if (this.portal && isDepthId(this.portal.area)) this.portal = null;
+    for (const [k, am] of this.ambushes) if (am.area.def.depth) this.ambushes.delete(k);
+    this.depthRun++;
+    this.sound('portal');
+    this.enterArea(depthId(depth), 'start');
+    return true;
+  }
+
   /** Moves the player to an area. `via` decides where they appear. */
   enterArea(id: string, via: 'start' | 'exit' | 'waypoint' | 'portal', fromId?: string) {
     const prev = this.area;
     if (prev) prev.projectiles.length = 0;
     const a = this.getArea(id);
     this.area = a;
+    // Floors left behind on the way down are let go, apart from one a town portal still leads back to.
+    if (a.def.depth) for (const [k, o] of this.areas) if (o.def.depth && o.def.depth < a.def.depth && this.portal?.area !== k) this.areas.delete(k);
     const l = a.level;
     let pos: Point = l.start;
     if (via === 'exit' && fromId) {
@@ -828,6 +917,9 @@ export class World {
     }
     if (a.def.quest && this.questState(a.def.quest) === 'none') this.setQuest(a.def.quest, 'active');
     this.emit({ type: 'area', id });
+    if (a.def.depth && a.def.afflictions?.length && this.wardenAlive()) {
+      this.emit({ type: 'announce', text: a.def.afflictions.map((m) => afflictionLabel(m).split(' (')[0]).join(' · '), sub: `Everything on this floor is ${a.def.afflictions.map((m) => MOD_LABEL[m]).join(', ')}`, color: '#d080ff' });
+    }
   }
 
   private arrivalNear(l: Level, p: Point): Point {
@@ -1010,7 +1102,7 @@ export class World {
   portalPos(): Point | null {
     if (!this.portal) return null;
     if (this.inTown) {
-      if (areaAct(AREA_BY_ID[this.portal.area]) !== this.act) return null;
+      if (areaAct(this.defOf(this.portal.area)) !== this.act) return null;
       const s = this.townPortalSpot();
       return { x: s.x + 0.5, y: s.y + 0.5 };
     }
@@ -1040,9 +1132,11 @@ export class World {
       case 'forge':
         return 'The Forge';
       case 'portal':
-        return this.inTown ? `Town Portal (${AREA_BY_ID[this.portal!.area].name})` : 'Town Portal';
-      case 'exit':
-        return a.level.exits[t.index]?.label ?? '';
+        return this.inTown ? `Town Portal (${this.defOf(this.portal!.area).name})` : 'Town Portal';
+      case 'exit': {
+        const e = a.level.exits[t.index];
+        return e ? (e.kind === 'down' && this.wardenAlive() ? 'Sealed Stairs' : e.label) : '';
+      }
     }
   }
 
@@ -1125,7 +1219,14 @@ export class World {
         break;
       case 'exit': {
         const e = a.level.exits[t.index];
-        if (e) this.enterArea(e.to, 'exit', a.def.id);
+        if (!e) break;
+        const warden = e.kind === 'down' ? this.wardenAlive() : undefined;
+        if (warden) {
+          this.msg(`The stairs are sealed while ${warden.name} lives`, '#d080ff', 'sealed');
+          this.sound('thud');
+          break;
+        }
+        this.enterArea(e.to, 'exit', a.def.id);
         break;
       }
     }
@@ -1263,7 +1364,9 @@ export class World {
 
   private spawnDrops(x: number, y: number, mlvl: number, tier: DropTier) {
     const lucky = this.player.buffs.shrine_fortune ? 1 : 0;
-    const drops = rollDrops(this.rng, mlvl, tier, { mf: this.stats.mf + 75 * lucky, gf: this.stats.gf + 150 * lucky, classId: this.char.classId });
+    // The deeper the floor, the more the dead give up.
+    const deep = depthFortune(this.depth);
+    const drops = rollDrops(this.rng, mlvl, tier, { mf: this.stats.mf + 75 * lucky + deep, gf: this.stats.gf + 150 * lucky + deep, classId: this.char.classId });
     for (const d of drops) {
       if (d.kind === 'gold') {
         let gx = x;
@@ -2422,6 +2525,7 @@ export class World {
     if (!m.summoned) this.dropOrbs(m);
     if (m.thief) this.jackpot(m);
     if (m.ambush !== undefined) this.ambushKill(m.ambush);
+    if (m.warden) this.wardenSlain(m);
     if (m.mods.includes('fireEnch')) {
       this.fx({ kind: 'explosion', x: m.x, y: m.y, dur: 0.5, r: 2 });
       this.sound('boom');
@@ -2488,6 +2592,27 @@ export class World {
       this.sound('quest');
     }
     this.checkPurge();
+  }
+
+  /** An Underforge floor's warden is dead: the stairs open, the Forge is paid, and the record is kept. */
+  private wardenSlain(m: Monster) {
+    const a = this.area;
+    const depth = a.def.depth;
+    if (!depth) return;
+    const c = this.char;
+    const cinders = depthCinders(depth);
+    c.forge.cinders += cinders;
+    if (m.rarity !== 'boss') this.spawnDrops(m.x, m.y, m.level, 'unique');
+    const best = (c.deepest ??= []);
+    const record = depth > (best[c.difficulty] ?? 0);
+    if (record) best[c.difficulty] = depth;
+    const start = record && depth % DEPTH_STRIDE === 0;
+    this.emit({
+      type: 'announce', text: `Depth ${depth} cleared`, color: '#ffb060',
+      sub: `The stairs are open · +${cinders} Cinders${start ? ` · You can now start from Depth ${depth + 1}` : record ? ' · A new record' : ''}`,
+    });
+    this.sound('quest');
+    this.emit({ type: 'quest', id: 'depths' });
   }
 
   /** The burst a monster dies in, by how it died, plus a jolt for elites and bosses. */
@@ -4353,7 +4478,10 @@ export class World {
     if (a.def.quest === 'hollow' && this.questState('hollow') === 'active') return this.questStrays();
     if (a.def.town || a.purged) return [];
     const alive = a.monsters.filter((m) => !m.dead && !m.thief);
-    return alive.length <= 5 ? alive : [];
+    if (alive.length <= 5) return alive;
+    // An Underforge warden shows once the hero is near enough to hear it, so the stairs can be found.
+    const warden = this.wardenAlive();
+    return warden && Math.hypot(warden.x - this.player.x, warden.y - this.player.y) < 22 ? [warden] : [];
   }
 
   /** The current spree rank, if the run of kills has reached one. */

@@ -10,6 +10,7 @@ import { itemIconUrl, skillIconUrl } from '../render/icons';
 import { h, isTouch } from './dom';
 import { compareEquip, defaultSlot } from './compare';
 import { forgeActions, forgeBadge, forgePanel } from './forge';
+import { DEPTH_BASE_LEVEL } from '../game/depths';
 import { forgeRank, MASTERY_RANKS } from '../game/forge';
 import { itemTooltip } from './tooltip';
 
@@ -397,7 +398,8 @@ function characterPanel(host: PanelHost) {
         s.lifeSteal ? kv('Life Steal', `${s.lifeSteal}%`) : null,
         s.skillBonus ? kv('+Skills', `+${s.skillBonus}`) : null,
         c.forge.xp ? kv('Forge mastery', MASTERY_RANKS[forgeRank(c)].name, 'gold') : null,
-        c.bestSpree || c.tithes || c.purges ? h('div', { class: 'sub' }, 'Feats') : null,
+        c.bestSpree || c.tithes || c.purges || c.deepest?.some(Boolean) ? h('div', { class: 'sub' }, 'Feats') : null,
+        ...(c.deepest ?? []).map((d, i) => (d ? kv(`Underforge${i ? ` (${DIFFICULTIES[i]})` : ''}`, `Depth ${d}`, 'gold') : null)),
         c.bestSpree ? kv('Longest spree', `${c.bestSpree} kills`, 'gold') : null,
         c.tithes ? kv('Tithe Imps caught', String(c.tithes), 'gold') : null,
         c.purges ? kv('Areas purged', String(c.purges), 'gold') : null,
@@ -467,6 +469,20 @@ function waypointPanel(host: PanelHost) {
         wp.name,
         h('span', { class: 'dim small' }, wp.active ? (AREA_BY_ID[wp.id].alvl ? ` · lvl ${AREA_BY_ID[wp.id].alvl + DIFFICULTY_LEVELS[w.char.difficulty]}` : '') : ' · not found'),
       ),
+    );
+  }
+  const starts = w.depthStartList();
+  if (starts.length) {
+    const best = w.deepest;
+    // First in the list: for a hero who has finished the road, this is where the game goes on.
+    list.prepend(
+      h('div', { class: 'wp-act' }, 'The Underforge'),
+      h('div', { class: 'dim small depth-say' }, `An endless descent under the Heart. A warden holds the stairs on every floor, and every fifth floor is a boss. ${best ? `Deepest floor cleared: ${best}.` : 'Clear a boss floor to start the next descent from below it.'}`),
+      // Deepest start first: that is where a returning hero wants to go.
+      ...starts.slice().reverse().slice(0, 4).map((d, i) =>
+        h('button', { class: `btn wp depth ${i === 0 ? 'primary' : ''}`, 'data-depth': d, onclick: () => { host.close(); w.descend(d); } },
+          d === 1 ? 'Descend from the top' : `Descend from Depth ${d}`,
+          h('span', { class: 'dim small' }, ` · lvl ${DEPTH_BASE_LEVEL + d + DIFFICULTY_LEVELS[w.char.difficulty]}`))),
     );
   }
   return h('div', { class: 'panel wpp' }, header(host, 'Waypoints', DIFFICULTIES[w.char.difficulty]), h('div', { class: 'p-body' }, list));
@@ -592,6 +608,7 @@ function helpPanel(host: PanelHost) {
         'Dodging makes you untouchable for a moment and cuts short a swing or a cast. Kill quickly to build a <span class="gold2">spree</span>: each rank makes you faster, kills worth more experience, and gives you a second wind.',
         'Red and blue soul orbs restore life and mana when you walk over them. A <span class="gold2">Tithe Imp</span> drops gold with every blow and a hoard if you kill it before it escapes. A purple Cursed Shrine calls an ambush and pays out if you survive it. Clearing an area completely earns a reward.',
         'At <span class="gold2">the Forge</span> beside the blacksmith, salvage loot you do not need into Cinders and Essences, then spend them on the gear you keep: Heat it up to +10, Temper or Quench its affixes, Smelt three items into a better one. Heating past +5 can fail and crack the item back a level. Forge mastery grows with every job and teaches new ones.',
+        'Finish the Ember Road and <span class="gold2">the Underforge</span> opens at every waypoint: an endless descent, one monster level harder a floor. A warden holds the stairs on each floor, every fifth floor is a boss, and deeper floors carry afflictions that everything on them shares. The deeper you go, the better the loot and the more Cinders each warden leaves for the Forge.',
         'Necromancers raise skeletons from fresh corpses: cast Raise Skeleton near a body (or tap its button to use the nearest one). Servants follow you between areas.',
         'Forgewrights build <span class="gold2">Heat</span> with every hammer blow that lands (the gauge above the experience bar). Heat adds fire to your blows with Temper, and Slag Burst spends it all at once. Let it reach 100 and you overheat and burn until it cools or you vent it. Turrets and the Furnace stay where you build them and wind down after a while; the Brass Sentinel follows you between areas.',
       ].map((t) => `<p>${t}</p>`).join('') }),
