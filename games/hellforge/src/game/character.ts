@@ -126,6 +126,8 @@ export interface Character {
   purges?: number;
   /** The deepest floor of the Underforge whose warden has fallen, by difficulty. */
   deepest?: number[];
+  /** Respecs spent. One is earned for each difficulty finished. */
+  respecsUsed?: number;
 }
 
 export function createCharacter(name: string, classId: ClassId, hardcore = false): Character {
@@ -238,6 +240,42 @@ export function allocStat(c: Character, stat: keyof Character['alloc']): boolean
   if (c.statPoints <= 0) return false;
   c.alloc[stat]++;
   c.statPoints--;
+  return true;
+}
+
+// ---------------------------------------------------------------- respec
+
+/** How many difficulties this hero has finished: the ember carried home on each. */
+export function difficultiesFinished(c: Character): number {
+  return DIFFICULTIES.filter((_, d) => ['done', 'rewarded'].includes(c.quests[`${d}:rekindle`])).length;
+}
+
+/** Respecs still to spend: one for each difficulty finished. */
+export function respecsLeft(c: Character): number {
+  return Math.max(0, difficultiesFinished(c) - (c.respecsUsed ?? 0));
+}
+
+/** Whether there is anything a respec would give back. */
+export function hasSpentPoints(c: Character): boolean {
+  const starter = CLASSES[c.classId].starter;
+  return Object.values(c.alloc).some((n) => n > 0) || Object.entries(c.skills).some(([id, n]) => n > (id === starter ? 1 : 0));
+}
+
+/**
+ * Spends a respec: every skill and attribute point comes back to be placed again.
+ * The class's first skill keeps the one free level every hero starts with. Returns false if there is none to spend.
+ */
+export function respec(c: Character): boolean {
+  if (respecsLeft(c) <= 0 || !hasSpentPoints(c)) return false;
+  const starter = CLASSES[c.classId].starter;
+  const spent = Object.values(c.skills).reduce((n, v) => n + v, 0);
+  // The starter's free level is not a point to hand back, unless an old save somehow lacks it.
+  c.skillPoints += spent - Math.min(1, c.skills[starter] ?? 0);
+  c.skills = { [starter]: 1 };
+  c.statPoints += c.alloc.str + c.alloc.dex + c.alloc.vit + c.alloc.ene;
+  c.alloc = { str: 0, dex: 0, vit: 0, ene: 0 };
+  c.hotbar = ['attack', starter, null, null];
+  c.respecsUsed = (c.respecsUsed ?? 0) + 1;
   return true;
 }
 

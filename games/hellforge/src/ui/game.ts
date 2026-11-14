@@ -9,7 +9,7 @@ import { Renderer } from '../render/renderer';
 import { Audio } from './audio';
 import { h, isTouch } from './dom';
 import { forgeKey, resetForgeUi } from './forge';
-import { itemActions, panelItemContext, renderPanel, type PanelHost, type PanelKind, type Selection } from './panels';
+import { itemActions, panelItemContext, renderPanel, resetRespecUi, type PanelHost, type PanelKind, type Selection } from './panels';
 import { loadSettings, saveCharacter, saveSettings, type Settings } from './save';
 
 const TOUCH_JOY_ZONE = 0.42;
@@ -595,6 +595,7 @@ export class Game implements PanelHost {
     if (this.panel !== p) {
       this.sel = null;
       if (p === 'forge') resetForgeUi();
+      resetRespecUi();
     }
     this.panel = p;
     this.world.cmdMoveDir(null);
@@ -711,6 +712,7 @@ export class Game implements PanelHost {
         h('div', { class: 'ov-title' }, STORIES.rekindle.title),
         ...STORIES.rekindle.lines.map((line) => h('div', { class: 'ov-sub' }, line)),
         h('div', { class: 'ov-sub' }, `${next ? `${next} difficulty is now unlocked from the character screen.` : 'You have conquered every difficulty. Legends will be sung of you.'}`),
+        h('div', { class: 'ov-sub' }, 'You have earned a respec. Spend it from the Character or Skills panel to take back every skill and attribute point and place them again.'),
         h('div', { class: 'ov-sub' }, 'And under the Heart, something has opened. The Underforge can be entered from any waypoint: an endless descent, a floor at a time.'),
         h('button', { class: 'btn primary', onclick: () => this.overlayEl.classList.add('hidden') }, 'Continue'),
       ),
