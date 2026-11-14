@@ -1,6 +1,16 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.19.0',
+    date: '2026-11-14',
+    notes: [
+      'The Skills panel is now a skill tree. Each class\'s skills are laid out in three branches, with a row for each level they open at and a line from every skill to the ones it requires.',
+      'You can see where a skill stands at a glance: learned skills show their rank, skills you can put a point in glow, and locked ones say what they are waiting for, a level or another skill.',
+      'Tap a skill to see it in full beside the tree: what it does now and at the next rank, what it requires, what it leads to, and which skills it grows with. Its lines and neighbours light up in the tree, and tapping a skill\'s name in the details jumps to it.',
+      'Nothing about the skills themselves has changed: the same skills, requirements, synergies and numbers as before.',
+    ],
+  },
+  {
     version: '0.18.0',
     date: '2026-11-14',
     notes: [
