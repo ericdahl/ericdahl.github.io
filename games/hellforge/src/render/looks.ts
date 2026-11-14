@@ -163,6 +163,12 @@ export function heroLook(classId: ClassId, eq: Gear): HumanoidLook {
   return look;
 }
 
+/** The Brass Wyrm when he chooses to be a man: tall, gold-haired, and dressed to be looked at. */
+export const WYRM_MAN: HumanoidLook = {
+  body: '#8a241a', trim: '#f0c850', skin: '#e6c098', legs: '#3a1410', boots: '#2a1008', head: 'hair', hair: 'long', headColor: '#e8c050',
+  robe: true, cape: '#c89a2e', accent: '#f0c850', eyeGlow: '#ffd040', build: 1.1, gloves: '#f0c850', weapon: null,
+};
+
 const NPC_ACT1: Record<NpcKind, HumanoidLook> = {
   healer: {
     body: '#d8d0c0', trim: '#a02020', skin: '#e0c0a0', legs: '#333', head: 'hood', headColor: '#e8e0d0', robe: true, weapon: 'staff', weaponColor: '#ff8080',
@@ -184,6 +190,7 @@ const NPC_ACT1: Record<NpcKind, HumanoidLook> = {
     body: '#8a6a3a', trim: '#3a2a18', skin: '#b08860', legs: '#3a2c1a', boots: '#2a1e12', head: 'turban', headColor: '#d8c8a0', weapon: 'staff', weaponColor: '#6a4a24',
     beard: '#2a1a0a', armor: 'cloth', cape: '#6a4a2a', accent: '#c84a2a',
   },
+  stranger: WYRM_MAN,
   captain: {
     body: '#8a8e96', trim: '#7a2a22', skin: '#c8a080', legs: '#3a3430', boots: '#2a2018', head: 'helm', headColor: '#9aa0aa', beard: '#6a5a4a',
     weapon: 'sword', weaponColor: '#c8ccd4', armor: 'mail', pauldrons: '#8a8e96', tabard: '#7a2a22', cape: '#5a1e1a', shield: '#6a2a22', shieldShape: 'heater', build: 1.1, gloves: '#4a3a2a',

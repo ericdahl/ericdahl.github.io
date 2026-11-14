@@ -3,7 +3,7 @@ import {
   alpha, art, circle, drawHumanoid, rgbOf, slitEyes, swingPose, ellipse, mix, eyes, fillInk, glow, ink, INK, lin, limb, poly, rad, roundRect, shade,
   type HumanoidLook, type Pose,
 } from './figures';
-import { HIRE_LOOKS } from './looks';
+import { HIRE_LOOKS, WYRM_MAN } from './looks';
 
 export interface MonsterDrawOpts {
   /** Corpse: no glowing eyes or auras. */
@@ -81,6 +81,12 @@ export function drawMonsterShape(ctx: CanvasRenderingContext2D, shape: string, c
       case 'hire_guard':
       case 'hire_archer':
       case 'wyrm': wyrm(ctx, color, s, !!opts.asleep); break;
+      case 'wyrm_man':
+        // His monster is drawn at a dragon's scale: bring the man back down to a man's size, and a little over.
+        ctx.scale(0.43, 0.43);
+        glow(ctx, 0, -26, 30, '#ffd070', 0.16 + 0.05 * Math.sin(t * 2));
+        drawHumanoid(ctx, WYRM_MAN, { ...s.pose, dir: 1 }, t);
+        break;
       case 'worker':
       case 'hire_mage': drawHumanoid(ctx, HIRE_LOOKS[shape], { ...s.pose, dir: 1 }, t); break;
     }
@@ -91,114 +97,333 @@ export function drawMonsterShape(ctx: CanvasRenderingContext2D, shape: string, c
 }
 
 /** A curved stroke with an ink outline. */
-/** The Brass Wyrm: long neck, horned head, two wings and a tail. Asleep, he lies with his chin on the ground and his wings folded. */
+/** A point on a cubic curve given as eight numbers. */
+function bez(p: number[], t: number): [number, number] {
+  const u = 1 - t;
+  const a = u * u * u;
+  const b = 3 * u * u * t;
+  const c = 3 * u * t * t;
+  const d = t * t * t;
+  return [a * p[0] + b * p[2] + c * p[4] + d * p[6], a * p[1] + b * p[3] + c * p[5] + d * p[7]];
+}
+
+/** The outline of a limb that follows a curve and narrows from `w0` to `w1` (a neck, a tail). */
+function taperPath(ctx: CanvasRenderingContext2D, p: number[], w0: number, w1: number, n = 14) {
+  const left: number[] = [];
+  const right: number[] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const [x, y] = bez(p, t);
+    const [x2, y2] = bez(p, Math.min(1, t + 0.02));
+    const [x1, y1] = bez(p, Math.max(0, t - 0.02));
+    const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+    const nx = -(y2 - y1) / len;
+    const ny = (x2 - x1) / len;
+    const w = (w0 + (w1 - w0) * t) / 2;
+    left.push(x + nx * w, y + ny * w);
+    right.unshift(x - nx * w, y - ny * w);
+  }
+  poly(ctx, [...left, ...right]);
+}
+
+/** Rows of overlapping scales inside whatever shape `path` lays down. */
+function scales(ctx: CanvasRenderingContext2D, path: () => void, x0: number, y0: number, x1: number, y1: number, step: number, dark = 0.3, light = 0.16) {
+  ctx.save();
+  path();
+  ctx.clip();
+  ctx.lineWidth = 0.55;
+  for (let r = 0, y = y0; y < y1; y += step * 0.72, r++) {
+    for (let x = x0 + (r % 2) * step * 0.5; x < x1; x += step) {
+      ctx.strokeStyle = alpha('#000000', dark);
+      ctx.beginPath();
+      ctx.arc(x, y, step * 0.52, 0.15, Math.PI - 0.15);
+      ctx.stroke();
+      ctx.strokeStyle = alpha('#fff2c8', light);
+      ctx.beginPath();
+      ctx.arc(x, y - 0.5, step * 0.5, Math.PI * 1.2, Math.PI * 1.8);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * The Brass Wyrm. Scaled hide with a pale plated underside, a tapering neck and tail, a horned and frilled head,
+ * and wings of membrane stretched over long fingers. Awake he holds his head high, lunges and opens his jaws on an
+ * attack, and smoke curls from his nostrils. Asleep he lies with his chin on the ground and his wings folded.
+ */
 function wyrm(ctx: CanvasRenderingContext2D, c: string, s: S, asleep: boolean) {
   const { t, atk, sw } = s;
-  const dark = shade(c, -0.35);
-  const belly = mix(c, '#f0d890', 0.45);
-  const breathe = Math.sin(t * (asleep ? 0.9 : 1.6)) * (asleep ? 0.7 : 0.4);
-  const flap = asleep ? 0 : Math.sin(t * 1.3) * 2 + atk * 7;
-  // Tail, curling round behind.
-  curve(ctx, () => {
-    ctx.beginPath();
-    ctx.moveTo(-13, -11);
-    ctx.bezierCurveTo(-24, -6, -30, -2 + sw, -36, -8 + Math.sin(t * 1.1) * 1.5);
-  }, 5, lin(ctx, -36, -10, -12, -4, c, 0.2, -0.4));
-  poly(ctx, [-35, -11, -41, -9 + Math.sin(t * 1.1) * 1.5, -35, -5]);
-  fillInk(ctx, dark, 0.8);
+  const dark = shade(c, -0.38);
+  const deep = shade(c, -0.55);
+  const pale = mix(c, '#f6e2a0', 0.55);
+  const bone = '#efe2c0';
+  const live = !art.dead;
+  const breathe = Math.sin(t * (asleep ? 0.9 : 1.6)) * (asleep ? 0.8 : 0.45);
+  const flap = asleep ? 0 : Math.sin(t * 1.3) * 2.2 + atk * 8;
+  const tailSway = Math.sin(t * 1.1) * 1.6;
+
+  // ---- tail: thick at the root, whip-thin, ending in a spade.
+  const tail = [-13, -11, -24, -5, -31, -1 + sw, -39, -8 + tailSway];
+  taperPath(ctx, tail, 6.4, 1.3);
+  fillInk(ctx, lin(ctx, -39, -12, -12, -2, c, 0.22, -0.45), 1.1);
+  scales(ctx, () => taperPath(ctx, tail, 6.4, 1.3), -40, -14, -11, 2, 2.6, 0.24, 0.1);
+  const [tx, ty] = bez(tail, 1);
+  poly(ctx, [tx + 1, ty - 1, tx - 3.5, ty - 5.5, tx - 8, ty - 1.5, tx - 3.5, ty + 3.2]);
+  fillInk(ctx, lin(ctx, tx - 8, ty - 5, tx + 1, ty + 3, dark, 0.2, -0.3), 0.9);
+  for (const k of [0.25, 0.42, 0.58, 0.72]) {
+    const [x, y] = bez(tail, k);
+    poly(ctx, [x - 1, y - 2.2, x - 0.2, y - 5 + k * 2, x + 1.2, y - 2.4]);
+    fillInk(ctx, deep, 0.5);
+  }
+
+  // ---- wings: membrane over a wrist and four fingers.
   const wing = (far: boolean) => {
-    const col = far ? shade(c, -0.45) : shade(c, -0.12);
-    const ox = far ? -3 : 0;
-    ctx.beginPath();
+    const ox = far ? -3.5 : 0;
+    const oy = far ? 1.5 : 0;
+    const hide = far ? shade(c, -0.5) : shade(c, -0.15);
+    const skin = far ? shade(c, -0.4) : mix(c, '#ffd58a', 0.28);
     if (asleep) {
-      // Folded along the back.
-      ctx.moveTo(-2 + ox, -22);
-      ctx.quadraticCurveTo(-12 + ox, -30 - breathe, -26 + ox, -16);
-      ctx.quadraticCurveTo(-14 + ox, -18, -2 + ox, -14);
-    } else {
-      ctx.moveTo(-1 + ox, -24);
-      ctx.quadraticCurveTo(-2 + ox, -44 - flap, -10 + ox, -58 - flap * 1.6);
-      ctx.quadraticCurveTo(-17 + ox, -47 - flap, -21 + ox, -50 - flap * 1.2);
-      ctx.quadraticCurveTo(-24 + ox, -39 - flap * 0.6, -31 + ox, -38 - flap * 0.6);
-      ctx.quadraticCurveTo(-27 + ox, -29, -33 + ox, -24);
-      ctx.quadraticCurveTo(-18 + ox, -22, -9 + ox, -20);
-    }
-    ctx.closePath();
-    fillInk(ctx, lin(ctx, -30, -56, 0, -20, col, 0.25, -0.4), 1.1);
-    if (!asleep && !far) {
-      // Fingers of the wing.
-      ctx.strokeStyle = alpha('#000000', 0.3);
+      // Folded along the back like a closed fan.
+      ctx.beginPath();
+      ctx.moveTo(-1 + ox, -22 + oy);
+      ctx.quadraticCurveTo(-11 + ox, -33 - breathe + oy, -28 + ox, -17 + oy);
+      ctx.quadraticCurveTo(-21 + ox, -15 + oy, -17 + ox, -18 + oy);
+      ctx.quadraticCurveTo(-12 + ox, -14 + oy, -8 + ox, -17 + oy);
+      ctx.quadraticCurveTo(-5 + ox, -13 + oy, -1 + ox, -15 + oy);
+      ctx.closePath();
+      fillInk(ctx, lin(ctx, -28, -32, 0, -14, skin, 0.2, -0.45), 1.1);
+      ctx.strokeStyle = alpha(deep, 0.75);
       ctx.lineWidth = 0.9;
-      for (const [x, y] of [[-10, -58 - flap * 1.6], [-21, -50 - flap * 1.2], [-31, -38 - flap * 0.6]]) {
+      for (const [x, y] of [[-27, -17], [-17, -18], [-8, -17]]) {
         ctx.beginPath();
-        ctx.moveTo(-1, -24);
-        ctx.lineTo(x, y);
+        ctx.moveTo(-3 + ox, -24 - breathe * 0.5 + oy);
+        ctx.quadraticCurveTo((x - 3) / 2 + ox, -29 - breathe + oy, x + ox, y + oy);
         ctx.stroke();
       }
+      return;
     }
+    const S0: [number, number] = [-1 + ox, -25 + oy];
+    const Wr: [number, number] = [-8 + ox, -49 - flap * 1.2 + oy];
+    const tips: [number, number][] = [
+      [1 + ox, -66 - flap * 1.9 + oy], [-17 + ox, -64 - flap * 1.7 + oy], [-31 + ox, -52 - flap * 1.2 + oy], [-39 + ox, -35 - flap * 0.6 + oy],
+    ];
+    const root: [number, number] = [-13 + ox, -21 + oy];
+    // The membrane: scalloped between the fingertips, sagging toward the wrist.
+    ctx.beginPath();
+    ctx.moveTo(S0[0], S0[1]);
+    ctx.lineTo(Wr[0], Wr[1]);
+    ctx.lineTo(tips[0][0], tips[0][1]);
+    for (let i = 1; i < tips.length; i++) {
+      const a = tips[i - 1];
+      const b = tips[i];
+      ctx.quadraticCurveTo((a[0] + b[0]) / 2 * 0.7 + Wr[0] * 0.3, (a[1] + b[1]) / 2 * 0.7 + Wr[1] * 0.3, b[0], b[1]);
+    }
+    const last = tips[tips.length - 1];
+    ctx.quadraticCurveTo((last[0] + root[0]) / 2 + 4, (last[1] + root[1]) / 2 - 5, root[0], root[1]);
+    ctx.closePath();
+    fillInk(ctx, lin(ctx, -38, -64, 0, -22, skin, 0.3, -0.5), 1.2);
+    if (!far && live) {
+      // Light through the skin near the fingers.
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = alpha('#ffb040', 0.07);
+      ctx.fill();
+      ctx.restore();
+    }
+    // Fingers, arm and the claw at the wrist.
+    for (const tip of tips) {
+      ctx.beginPath();
+      ctx.moveTo(Wr[0], Wr[1]);
+      ctx.quadraticCurveTo((Wr[0] + tip[0]) / 2 - 1.5, (Wr[1] + tip[1]) / 2 - 1.5, tip[0], tip[1]);
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 2.1;
+      ctx.stroke();
+      ctx.strokeStyle = far ? deep : dark;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+    limb(ctx, [S0[0], S0[1], Wr[0], Wr[1]], 3, lin(ctx, S0[0], S0[1], Wr[0], Wr[1], hide, 0.25, -0.3), 1.3);
+    horn(ctx, Wr[0], Wr[1] - 0.5, Wr[0] + 3.5, Wr[1] - 5, 1, 1, bone);
   };
   wing(true);
-  // Far legs.
-  for (const x of [-14, 5]) limb(ctx, [x, -11, x - 1, -5, x + 1.5, -0.8], 4.2, dark);
-  // Body.
-  ellipse(ctx, -4, -14 - breathe, 14, 9.5);
-  fillInk(ctx, lin(ctx, -12, -24, 6, -4, c, 0.28, -0.45), 1.2);
-  ellipse(ctx, -2, -9.5 - breathe * 0.5, 10.5, 4.4);
-  ctx.fillStyle = alpha(belly, art.dead ? 0.3 : 0.85);
+
+  // ---- far legs, in shadow.
+  for (const x of [-14.5, 4.5]) {
+    ellipse(ctx, x + 0.5, -12, 4.2, 5.6);
+    fillInk(ctx, deep, 0.8);
+    limb(ctx, [x, -9, x - 1.6, -4.6, x + 1.4, -0.9], 3.8, deep);
+  }
+
+  // ---- body.
+  const body = () => ellipse(ctx, -4, -14 - breathe, 14.5, 9.8);
+  body();
+  fillInk(ctx, lin(ctx, -14, -25, 6, -3, c, 0.3, -0.5), 1.3);
+  scales(ctx, body, -19, -24 - breathe, 11, -5, 3.1);
+  // Plated underside.
+  ctx.save();
+  body();
+  ctx.clip();
+  ellipse(ctx, -2, -6.2 - breathe * 0.5, 13, 4.6);
+  ctx.fillStyle = alpha(pale, live ? 0.92 : 0.35);
   ctx.fill();
-  // Spines along the back.
-  for (let i = 0; i < 6; i++) {
-    const x = -15 + i * 3.6;
-    poly(ctx, [x, -21.5 - breathe, x + 1.2, -26.5 - breathe, x + 2.4, -21.8 - breathe]);
-    fillInk(ctx, dark, 0.6);
-  }
-  // Near legs, with claws.
-  for (const x of [-11, 8]) {
-    limb(ctx, [x, -10, x - 1.5, -4.5, x + 2, -0.8], 5, lin(ctx, x - 3, -10, x + 3, 0, c, 0.2, -0.4));
-    claws(ctx, x + 2.6, -0.6, 0.2, 3.2);
-  }
-  wing(false);
-  // Neck and head. Awake it is held high and lunges on an attack; asleep the chin is on the ground.
-  const hx = asleep ? 24 : 19 + atk * 7;
-  const hy = asleep ? -4.5 : -41 + atk * 9 + breathe;
-  curve(ctx, () => {
+  ctx.strokeStyle = alpha('#000000', 0.28);
+  ctx.lineWidth = 0.6;
+  for (let x = -14; x <= 10; x += 2.6) {
     ctx.beginPath();
-    ctx.moveTo(7, -17);
-    if (asleep) ctx.bezierCurveTo(14, -18, 18, -9, hx - 4, hy - 1);
-    else ctx.bezierCurveTo(15, -22, 9, -36, hx - 3.5, hy + 1.5);
-  }, 6.4, lin(ctx, 6, -40, 22, -10, c, 0.25, -0.4), 1.5);
-  // Horns sweep back from the skull.
-  horn(ctx, hx - 2.5, hy - 3, hx - 10, hy - 9, -1, 1.5, '#e8dcc0');
-  horn(ctx, hx - 1, hy - 3.4, hx - 7, hy - 11, -1, 1.3, '#d8ccb0');
-  const jaw = asleep ? 0 : atk * 3.2;
-  // Lower jaw, then the skull over it.
-  poly(ctx, [hx - 2, hy + 1.6, hx + 7.5, hy + 2.2 + jaw, hx + 8, hy + 3.4 + jaw, hx - 1.5, hy + 4]);
-  fillInk(ctx, dark, 0.9);
-  if (jaw > 0.6 && !art.dead) {
-    glow(ctx, hx + 6, hy + 1.6 + jaw * 0.5, 9, '#ff9030', 0.5 * atk);
-    teeth(ctx, hx + 2, hx + 8, hy + 1.4, 4, 1.3);
+    ctx.moveTo(x, -10.5);
+    ctx.quadraticCurveTo(x + 0.9, -7, x, -3);
+    ctx.stroke();
   }
+  // A long sheen down the back.
+  ctx.strokeStyle = alpha('#fff4cc', live ? 0.22 : 0.06);
+  ctx.lineWidth = 2.2;
   ctx.beginPath();
-  ctx.moveTo(hx - 4.5, hy - 1);
-  ctx.quadraticCurveTo(hx - 3, hy - 5.2, hx + 2.5, hy - 3.6);
-  ctx.lineTo(hx + 9, hy - 1.2);
-  ctx.quadraticCurveTo(hx + 10, hy + 0.8, hx + 8.5, hy + 1.6);
-  ctx.lineTo(hx - 2.5, hy + 2);
+  ctx.ellipse(-5, -15 - breathe, 11, 7.2, 0, Math.PI * 1.12, Math.PI * 1.72);
+  ctx.stroke();
+  ctx.restore();
+  // Spines along the back, tallest over the shoulders.
+  for (let i = 0; i < 8; i++) {
+    const x = -16.5 + i * 3.1;
+    const h = 3 + Math.sin((i / 7) * Math.PI) * 3.2;
+    const y = -22.6 - breathe + Math.abs(i - 3.8) * 0.45;
+    poly(ctx, [x, y, x + 0.6, y - h, x + 2.6, y + 0.3]);
+    fillInk(ctx, lin(ctx, x, y - h, x + 2, y, dark, 0.3, -0.2), 0.6);
+  }
+
+  // ---- near legs: a heavy haunch and shoulder, then the shank and three hooked claws.
+  const leg = (x: number, rx: number, ry: number) => {
+    ellipse(ctx, x, -12.2 - breathe * 0.3, rx, ry);
+    fillInk(ctx, rad(ctx, x - 1, -14, rx + 2, c, 0.28, -0.42), 1.1);
+    scales(ctx, () => ellipse(ctx, x, -12.2 - breathe * 0.3, rx, ry), x - rx, -19, x + rx, -6, 2.5, 0.22, 0.12);
+    limb(ctx, [x - 0.5, -8, x - 2.2, -4.2, x + 1.8, -1], 4.6, lin(ctx, x - 3, -8, x + 3, 0, c, 0.18, -0.42), 1.3);
+    ellipse(ctx, x + 2.8, -0.9, 3.4, 1.5);
+    fillInk(ctx, dark, 0.8);
+    for (let i = 0; i < 3; i++) horn(ctx, x + 1.6 + i * 1.7, -0.6, x + 3.2 + i * 2, 1.2, 0.5, 0.65, bone);
+  };
+  leg(-11.5, 6.2, 7.2);
+  leg(7.5, 4.8, 6.4);
+
+  wing(false);
+
+  // ---- neck and head. Awake the head is high and lunges on an attack; asleep the chin is on the ground.
+  const hx = asleep ? 25 : 20 + atk * 8;
+  const hy = asleep ? -4.8 : -43 + atk * 11 + breathe;
+  const neck = asleep ? [6, -18, 15, -20, 19, -8, hx - 4.5, hy - 0.8] : [6, -18, 17, -22, 8, -37, hx - 4, hy + 1.5];
+  const neckShape = () => taperPath(ctx, neck, 9.4, 5.2);
+  neckShape();
+  fillInk(ctx, lin(ctx, 5, -44, 24, -8, c, 0.3, -0.45), 1.3);
+  scales(ctx, neckShape, 2, -48, 28, -2, 2.7);
+  // Pale throat plates down the front of the neck.
+  ctx.save();
+  neckShape();
+  ctx.clip();
+  ctx.strokeStyle = alpha(pale, live ? 0.85 : 0.3);
+  ctx.lineWidth = 2.6;
+  ctx.beginPath();
+  for (let i = 0; i <= 10; i++) {
+    const [x, y] = bez(neck, i / 10);
+    const [x2, y2] = bez(neck, Math.min(1, i / 10 + 0.03));
+    const len = Math.hypot(x2 - x, y2 - y) || 1;
+    const px = x + ((y2 - y) / len) * (3.2 - i * 0.12);
+    const py = y - ((x2 - x) / len) * (3.2 - i * 0.12);
+    if (i) ctx.lineTo(px, py);
+    else ctx.moveTo(px, py);
+  }
+  ctx.stroke();
+  // The fire in his throat, when he is about to use it.
+  if (atk > 0.05 && live) {
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = alpha('#ff7a20', 0.55 * atk);
+    ctx.lineWidth = 5;
+    ctx.stroke();
+  }
+  ctx.restore();
+  for (const k of [0.2, 0.4, 0.6, 0.8]) {
+    const [x, y] = bez(neck, k);
+    const [x2, y2] = bez(neck, k + 0.03);
+    const len = Math.hypot(x2 - x, y2 - y) || 1;
+    const nx = -((y2 - y) / len);
+    const ny = (x2 - x) / len;
+    const w = (9.4 + (5.2 - 9.4) * k) / 2;
+    const bx = x - nx * w;
+    const by = y - ny * w;
+    poly(ctx, [bx - (x2 - x) / len, by - (y2 - y) / len, bx - nx * 2.6, by - ny * 2.6, bx + ((x2 - x) / len) * 1.6, by + ((y2 - y) / len) * 1.6]);
+    fillInk(ctx, dark, 0.5);
+  }
+
+  // Head: drawn in its own frame so it can tilt with the lunge.
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.rotate(asleep ? 0.08 : -0.12 + atk * 0.35);
+  const jaw = asleep ? 0 : 0.5 + atk * 4.2;
+  // Frill and horns behind the skull.
+  for (const [ang, len, w] of [[-2.55, 13, 1.7], [-2.85, 10.5, 1.4], [3.0, 7, 1.1]]) {
+    horn(ctx, -3.2, -1.8, -3.2 + Math.cos(ang) * len, -1.8 + Math.sin(ang) * len, -1, w, bone);
+  }
+  poly(ctx, [-4.5, 0.5, -9.5, 3.4, -5.5, 3.2, -8, 6.2, -3.2, 4.2]);
+  fillInk(ctx, lin(ctx, -9, 0, -3, 6, dark, 0.2, -0.3), 0.8);
+  // Lower jaw.
+  ctx.beginPath();
+  ctx.moveTo(-3.4, 1.8);
+  ctx.lineTo(8.6, 2.6 + jaw);
+  ctx.quadraticCurveTo(10.6, 3.2 + jaw, 9.6, 4.6 + jaw);
+  ctx.lineTo(-1.6, 5.2 + jaw * 0.35);
   ctx.closePath();
-  fillInk(ctx, lin(ctx, hx - 4, hy - 5, hx + 9, hy + 2, c, 0.3, -0.4), 1.1);
-  // Nostril and eye.
-  ctx.fillStyle = alpha('#000000', 0.5);
-  circle(ctx, hx + 8, hy - 0.4, 0.5);
+  fillInk(ctx, lin(ctx, -3, 2, 10, 5 + jaw, mix(c, pale, 0.35), 0.15, -0.4), 1);
+  if (jaw > 1.2 && live) {
+    // The mouth, lit from inside.
+    ctx.fillStyle = '#3a0c06';
+    poly(ctx, [-1.5, 2, 9, 2.4, 8.6, 2.6 + jaw, -1.2, 3]);
+    ctx.fill();
+    glow(ctx, 6.5, 2.4 + jaw * 0.5, 11, '#ff8a28', 0.6 * atk);
+    teeth(ctx, 1.5, 9, 2.7 + jaw, 5, 1.5, true, bone);
+  }
+  // Skull and snout.
+  ctx.beginPath();
+  ctx.moveTo(-5.2, -0.6);
+  ctx.quadraticCurveTo(-4.4, -6.4, 1.6, -4.9);
+  ctx.quadraticCurveTo(5, -4.2, 6.2, -2.6);
+  ctx.quadraticCurveTo(9.6, -3.1, 11.4, -1.2);
+  ctx.quadraticCurveTo(12.3, 1, 10, 2.1);
+  ctx.lineTo(-2.8, 2.5);
+  ctx.closePath();
+  fillInk(ctx, lin(ctx, -5, -6, 11, 2.5, c, 0.34, -0.42), 1.2);
+  scales(ctx, () => { ctx.beginPath(); ctx.rect(-5, -6, 9, 8); }, -5, -5, 4, 2, 2, 0.2, 0.12);
+  // Upper teeth, the brow ridge, nostril.
+  teeth(ctx, 2.2, 10, 2.1, 6, 1.5, false, bone);
+  poly(ctx, [-1.6, -4.4, 4.8, -3.3, 3.6, -1.9, -1, -2.6]);
+  fillInk(ctx, dark, 0.6);
+  horn(ctx, 9.6, -1.9, 10.6, -4.8, 0.4, 0.7, bone);
+  ctx.fillStyle = alpha('#000000', 0.6);
+  ellipse(ctx, 10.3, -0.5, 0.75, 0.5, -0.4);
   ctx.fill();
-  if (asleep || art.dead) {
-    ctx.strokeStyle = alpha('#000000', 0.6);
-    ctx.lineWidth = 0.7;
+  if (asleep || !live) {
+    ctx.strokeStyle = alpha('#000000', 0.7);
+    ctx.lineWidth = 0.8;
     ctx.beginPath();
-    ctx.moveTo(hx - 0.2, hy - 1.6);
-    ctx.quadraticCurveTo(hx + 1.2, hy - 0.8, hx + 2.6, hy - 1.6);
+    ctx.moveTo(0.2, -1.5);
+    ctx.quadraticCurveTo(1.8, -0.5, 3.6, -1.5);
     ctx.stroke();
   } else {
-    slitEyes(ctx, hx + 1.2, hy - 1.7, 0, '#ffe060', 2.2);
+    glow(ctx, 1.9, -1.6, 4.5, '#ffd040', 0.5);
+    ellipse(ctx, 1.9, -1.6, 2, 1.25, 0.15);
+    fillInk(ctx, '#ffe26a', 0.6);
+    ctx.fillStyle = '#1a0c04';
+    ellipse(ctx, 2.1, -1.6, 0.45, 1.15, 0.1);
+    ctx.fill();
+  }
+  ctx.restore();
+  // Smoke from the nostrils: a slow curl awake, a thin thread asleep.
+  if (live) {
+    const sx = hx + (asleep ? 10 : 9.5 + atk * 2);
+    const sy = hy - (asleep ? 0.5 : 2.5);
+    for (let i = 0; i < (asleep ? 2 : 4); i++) {
+      const k = (t * (asleep ? 0.22 : 0.45) + i * 0.27) % 1;
+      ctx.fillStyle = alpha('#d8d0c0', (asleep ? 0.2 : 0.28) * (1 - k));
+      circle(ctx, sx + Math.sin(k * 5 + i) * 1.8 + k * 3, sy - k * 13, 1 + k * 2.8);
+      ctx.fill();
+    }
   }
 }
 

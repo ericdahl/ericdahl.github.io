@@ -32,7 +32,7 @@ export type WyrmTalk =
 
 export const WYRM_LINES: Record<WyrmTalk, string[]> = {
   greet: [
-    'One great eye opens. It is the size of a shield, and it is not impressed.',
+    'One great eye opens. It is the size of a shield, and it is not impressed. Then the dragon is simply not there, and a tall man in red and gold is standing on the coins instead, brushing ash from his sleeve.',
     '"A visitor. How tiresome. I have slept through two empires and I was hoping to sleep through whatever this is. You smell of ash. Everything smells of ash lately. It is getting on my gold."',
     '"Well? You have climbed all this way. You want something, or you want to fight me, or you are lost. Be quick. Brevity is a courtesy the short-lived can actually afford."',
   ],
@@ -54,6 +54,28 @@ export const WYRM_LINES: Record<WyrmTalk, string[]> = {
   ],
   robbed: [
     '"Thief. You have had your prize already, out of my own hoard, while I slept. You will get nothing more from me but the door."',
+  ],
+};
+
+/** What the well-dressed stranger in the towns has to say, by how much the hero knows. */
+export type StrangerTalk = 'unmet' | 'met' | 'errand' | 'paid';
+export const STRANGER_NAME = 'A Well-Dressed Stranger';
+export const STRANGER_LINES: Record<StrangerTalk, string[]> = {
+  unmet: [
+    'A tall man in red and gold, far too clean for this place, is studying the camp as if deciding whether to buy it.',
+    '"Hm? No, I am not selling anything. I am merely looking in. One likes to know what the neighbours are doing, and yours have been burning things."',
+    '"You have the look of someone who climbs. There is a ridge above Gloomwood with a fine view and a cave nobody goes into. I should not go into it either, if I were you. I would be very annoyed."',
+  ],
+  met: [
+    'He does not turn round. "Yes, yes. It is me. In a manner of speaking. I am not, strictly, here. I am asleep on a great deal of gold and this is a sort of afterthought."',
+    '"Do stop staring. The shape is a courtesy. People will not sell wine to the other one."',
+  ],
+  errand: [
+    '"Do not look at me. Do not wave. The captain. Over there. The letter goes in the captain\'s hand, not mine. I am here to see that it does, and I was never here at all."',
+  ],
+  paid: [
+    '"Ah. The courier. Or the duellist. Whichever you prefer to be remembered as." He inclines his head a very small distance, which you suspect is a great honour.',
+    '"We are square, you and I. That is rarer than gold. Go on. The world is not going to rescue itself, and I am certainly not going to do it."',
   ],
 };
 
