@@ -824,7 +824,18 @@ button {
 .menu-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .diff-row { display: flex; gap: 6px; }
 .class-cards { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 900px; }
-.class-card { flex-direction: column; text-align: center; width: 250px; min-width: 0; }
+.class-cards { gap: 6px; max-width: 940px; }
+.class-card { flex-direction: column; text-align: center; width: auto; min-width: 0; padding: 6px 14px; }
+.class-card .cc-name { font-size: 14px; }
+/* The New Hero scene: every class round a fire, and what the chosen one is. */
+.hero-scene { display: block; width: min(940px, 100%); border: 1px solid #3a2c1c; border-radius: 6px; cursor: pointer; background: #0a0706; touch-action: manipulation; }
+.class-about { max-width: 620px; text-align: center; min-height: 100px; display: flex; flex-direction: column; gap: 6px; align-items: center; padding-bottom: 6px; }
+.ca-name { font-size: 22px; letter-spacing: 0.06em; filter: brightness(1.5) saturate(0.9); }
+.ca-desc { font-size: 13.5px; color: #c8b890; line-height: 1.35; }
+.ca-branches { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.ca-branch { font-size: 11.5px; color: var(--gold); border: 1px solid #5a452a; border-radius: 10px; padding: 1px 9px; }
+.cc-portrait { overflow: hidden; }
+.cc-figure { display: block; }
 .name-in {
   font-family: inherit;
   font-size: 18px;

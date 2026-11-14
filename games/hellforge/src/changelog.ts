@@ -1,6 +1,15 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.21.0',
+    date: '2026-11-14',
+    notes: [
+      'A new New Hero screen. The six classes stand round a campfire, drawn large and sharp, each wearing gear that says who they are. They breathe and shift in the firelight while you choose.',
+      'Tap a hero, or their name underneath, to pick them. The one you pick steps into the light and shows off: a swing, a drawn bow or a spell. Below, you see what the class is and its three skill branches.',
+      'Your saved heroes now have portraits on the title screen, wearing what they are wearing.',
+    ],
+  },
+  {
     version: '0.20.0',
     date: '2026-11-14',
     notes: [

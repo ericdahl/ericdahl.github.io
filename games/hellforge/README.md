@@ -60,6 +60,7 @@ The version is shown at the bottom of the title screen; tap it for the player-fa
 
 | Version | Commit | Notes |
 |---|---|---|
+| 0.21.0 | | New Hero screen redrawn as an animated campfire scene; portraits for saved heroes |
 | 0.20.0 | | The Hiveborn: a sixth, four-armed class with off-hand weapons, claws, and Soldier, Archer and Faith branches |
 | 0.19.0 | | The Skills panel becomes a skill tree: branches, requirement lines, and a detail pane (no rule changes) |
 | 0.18.0 | | Shared stash: a second stash tab shared by every hero on the device, carried in exports |
@@ -113,6 +114,7 @@ npm run balance    # the bot plays every class through all three acts on three s
 | `src/render/` | Canvas renderer: isometric camera, procedural sprites, lighting, automap, item/skill icons |
 | `src/render/figures.ts`, `creatures.ts`, `looks.ts` | Character art: the shading kit and humanoids, monster bodies, and what the hero and townsfolk wear |
 | `gallery.html` | Dev-only page (`npm run dev`, then `/gallery.html`) showing every character model in several poses; `?zoom=4&m=imp,bat` narrows it |
+| `src/ui/heroselect.ts` | The New Hero campfire scene and saved-hero portraits, drawn with the game's own figure code (`drawHumanoid`), so a new class or a change to a look shows up there with no extra art |
 | `src/ui/` | DOM HUD, panels, title screen, input, audio, saves |
 | `tests/` | Vitest suites (`bot.ts` is the playthrough bot used by `act.test.ts`; `balance.ts` turns its runs into `BALANCE.md`, and `balance.report.ts` is the runner behind `npm run balance`) |
 | `e2e/` | Playwright specs |
