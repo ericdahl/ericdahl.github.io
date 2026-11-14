@@ -2,11 +2,11 @@ import { AREA_BY_ID, areaAct, DIFFICULTY_LEVELS, QUEST_BY_ID, QUESTS, TOWN_OF_AC
 import {
   addPotion, addToGrid, addToInventory, addXp, choosePotion, CLASSES, computeStats, equipFromInventory, INV_COLS, INV_ROWS,
   removeFromGrid, respec, skillLevel, STASH_COLS, STASH_ROWS, takePotion, unequip, xpForLevel, xpMultiplier,
-  type Buffs, type Character, type PotionPool, type Stats,
+  newSharedStash, type Buffs, type Character, type PotionPool, type SharedStash, type Stats,
 } from './character';
 import { applyResists, hitChance, reducePhysical, roll, ZERO_DAMAGE, type Damage } from './combat';
 import {
-  baseOf, buyPrice, displayName, gamble, gamblePrice, generateItem, itemColor, makeItem, potionFor, rollDrops,
+  baseOf, buyPrice, displayName, gamble, gamblePrice, generateItem, itemColor, makeItem, nextUid, potionFor, rollDrops,
   sellPrice, type DropTier, type Item, type ItemKind, type Slot,
 } from './items';
 import { afflictionLabel, DEPTH_BOSSES, DEPTH_STRIDE, depthCinders, depthDef, depthFortune, depthId, depthOf, depthStarts, isDepthId } from './depths';
@@ -492,8 +492,12 @@ export class World {
   /** Descents into the Underforge this session. Each one rolls its floors afresh. */
   private depthRun = 0;
 
-  constructor(char: Character, seed = Date.now() >>> 0) {
+  /** The stash this hero shares with the others on the device. Whoever owns the world keeps it stored. */
+  shared: SharedStash;
+
+  constructor(char: Character, seed = Date.now() >>> 0, shared: SharedStash = newSharedStash()) {
     this.char = char;
+    this.shared = shared;
     this.seed = seed;
     this.rng = new Rng(hashSeed(seed, 'world'));
     this.luck = new Rng(hashSeed(seed, 'luck'));
@@ -1462,12 +1466,15 @@ export class World {
     return false;
   }
 
-  findItem(uid: number): { item: Item; where: 'inventory' | 'stash' | 'equipment'; slot?: Slot } | null {
+  /** Finds an item the hero can reach. `where` is 'stash' for the shared stash too, with `shared` set. */
+  findItem(uid: number): { item: Item; where: 'inventory' | 'stash' | 'equipment'; slot?: Slot; shared?: boolean } | null {
     const inv = this.char.inventory.find((e) => e.item.uid === uid);
     if (inv) return { item: inv.item, where: 'inventory' };
     const st = this.char.stash.find((e) => e.item.uid === uid);
     if (st) return { item: st.item, where: 'stash' };
     for (const [slot, it] of Object.entries(this.char.equipment)) if (it?.uid === uid) return { item: it, where: 'equipment', slot: slot as Slot };
+    const sh = this.shared.items.find((e) => e.item.uid === uid);
+    if (sh) return { item: sh.item, where: 'stash', shared: true };
     return null;
   }
 
@@ -1490,45 +1497,62 @@ export class World {
     return true;
   }
 
-  toStash(uid: number): boolean {
+  /** Moves an inventory item into the hero's own stash, or the shared one. */
+  toStash(uid: number, shared = false): boolean {
     const it = this.char.inventory.find((e) => e.item.uid === uid)?.item;
     if (!it) return false;
-    if (!addToGrid(this.char.stash, STASH_COLS, STASH_ROWS, it)) {
-      this.msg('Stash is full', '#ff8a6a');
+    const grid = shared ? this.shared.items : this.char.stash;
+    // Heroes brought over from another device number their items on their own, so two can share an id.
+    const clash = shared && grid.some((e) => e.item.uid === uid);
+    if (clash) it.uid = nextUid();
+    if (!addToGrid(grid, STASH_COLS, STASH_ROWS, it)) {
+      if (clash) it.uid = uid;
+      this.msg(shared ? 'Shared stash is full' : 'Stash is full', '#ff8a6a');
       return false;
     }
-    removeFromGrid(this.char.inventory, uid);
+    removeFromGrid(this.char.inventory, it.uid);
     return true;
   }
 
+  /** Takes an item out of whichever stash holds it. */
   fromStash(uid: number): boolean {
-    const it = this.char.stash.find((e) => e.item.uid === uid)?.item;
+    const shared = !this.char.stash.some((e) => e.item.uid === uid);
+    const grid = shared ? this.shared.items : this.char.stash;
+    const it = grid.find((e) => e.item.uid === uid)?.item;
     if (!it) return false;
     if (baseOf(it).kind === 'potion') {
       if (!addPotion(this.char, it.base)) {
         this.msg('No room for that potion', '#ff8a6a');
         return false;
       }
-      removeFromGrid(this.char.stash, uid);
+      removeFromGrid(grid, uid);
       return true;
     }
+    const mine = [...this.char.inventory.map((e) => e.item), ...Object.values(this.char.equipment)];
+    const clash = shared && mine.some((o) => o?.uid === uid);
+    removeFromGrid(grid, uid);
+    if (clash) it.uid = nextUid();
     if (!addToGrid(this.char.inventory, INV_COLS, INV_ROWS, it)) {
+      it.uid = uid;
+      addToGrid(grid, STASH_COLS, STASH_ROWS, it);
       this.msg('Inventory is full', '#ff8a6a');
       return false;
     }
-    removeFromGrid(this.char.stash, uid);
     return true;
   }
 
-  depositGold(amount = this.char.gold) {
+  depositGold(amount = this.char.gold, shared = false) {
     const n = Math.min(amount, this.char.gold);
     this.char.gold -= n;
-    this.char.stashGold += n;
+    if (shared) this.shared.gold += n;
+    else this.char.stashGold += n;
   }
 
-  withdrawGold(amount = this.char.stashGold) {
-    const n = Math.min(amount, this.char.stashGold);
-    this.char.stashGold -= n;
+  withdrawGold(amount?: number, shared = false) {
+    const have = shared ? this.shared.gold : this.char.stashGold;
+    const n = Math.min(amount ?? have, have);
+    if (shared) this.shared.gold -= n;
+    else this.char.stashGold -= n;
     this.char.gold += n;
   }
 
@@ -1594,7 +1618,7 @@ export class World {
 
   identifyAll(): number {
     let n = 0;
-    const all = [...this.char.inventory.map((e) => e.item), ...this.char.stash.map((e) => e.item), ...Object.values(this.char.equipment)];
+    const all = [...this.char.inventory.map((e) => e.item), ...this.char.stash.map((e) => e.item), ...this.shared.items.map((e) => e.item), ...Object.values(this.char.equipment)];
     for (const it of all) if (it && !it.identified) (it.identified = true), n++;
     if (n) {
       this.sound('item');

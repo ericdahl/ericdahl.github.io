@@ -224,7 +224,7 @@ export function itemActions(host: PanelHost, sel: Selection, context: ItemContex
       w.socketTargets().forEach((t, i) => act(`Socket into ${displayName(t)}`, i === 0 ? 'G' : undefined, () => w.socketGem(item.uid, t.uid) && host.select(null), '', i === 0 && context !== 'vendor'));
     }
     if (context === 'vendor') act(`Sell (${sellPrice(item)})`, 'S', () => { w.sell(item.uid); host.select(null); }, 'gold-btn', true);
-    if (context === 'stash') act('To Stash', 'X', () => w.toStash(item.uid) && host.select(null), '', true);
+    if (context === 'stash') act(stashShared ? 'To Shared Stash' : 'To Stash', 'X', () => w.toStash(item.uid, stashShared) && host.select(null), '', true);
     if (context === 'inventory') act('Drop', 'D', () => { w.dropFromInventory(item.uid); host.select(null); }, 'danger');
   } else if (sel.from === 'equip' && sel.slot) {
     act('Unequip', 'E', () => { const err = w.unequip(sel.slot!); if (err) host.toast(err, '#ff8a6a'); else host.select(null); }, '', true);
@@ -327,9 +327,20 @@ function vendorPanel(host: PanelHost, kind: 'healer' | 'smith') {
   );
 }
 
+/** Which stash the panel is showing: the hero's own, or the one shared between heroes. */
+let stashShared = false;
+export function resetStashUi() {
+  stashShared = false;
+}
+
 function stashPanel(host: PanelHost) {
   const w = host.world;
   const c = w.char;
+  const shared = stashShared;
+  const entries = shared ? w.shared.items : c.stash;
+  const gold = shared ? w.shared.gold : c.stashGold;
+  const tab = (on: boolean, label: string, id: string) =>
+    h('button', { class: `btn tab ${on === shared ? 'on' : ''}`, 'data-tab': id, 'aria-pressed': String(on === shared), onclick: () => { stashShared = on; host.select(null); host.refresh(); } }, label);
   return h(
     'div',
     { class: 'panel stash' },
@@ -337,8 +348,11 @@ function stashPanel(host: PanelHost) {
     h(
       'div',
       { class: 'p-body stash-body' },
-      h('div', { class: 'col' }, gridHeading(host, `Stash · ${c.stashGold.toLocaleString()} gold`, c.stash, STASH_COLS, STASH_ROWS), grid(host, c.stash, STASH_COLS, STASH_ROWS, 'stash'),
-        h('div', { class: 'acts' }, h('button', { class: 'btn', onclick: () => { w.depositGold(); host.refresh(); } }, 'Deposit gold'), h('button', { class: 'btn', onclick: () => { w.withdrawGold(); host.refresh(); } }, 'Withdraw gold'))),
+      h('div', { class: 'col' },
+        h('div', { class: 'stash-tabs' }, tab(false, c.name, 'own'), tab(true, 'Shared', 'shared')),
+        gridHeading(host, `${shared ? 'Shared stash' : 'Stash'} · ${gold.toLocaleString()} gold`, entries, STASH_COLS, STASH_ROWS), grid(host, entries, STASH_COLS, STASH_ROWS, 'stash'),
+        shared ? h('div', { class: 'dim small shared-say' }, `Every ${c.hardcore ? 'Hardcore ' : ''}hero on this device can reach what is kept here.`) : null,
+        h('div', { class: 'acts' }, h('button', { class: 'btn', onclick: () => { w.depositGold(undefined, shared); host.refresh(); } }, 'Deposit gold'), h('button', { class: 'btn', onclick: () => { w.withdrawGold(undefined, shared); host.refresh(); } }, 'Withdraw gold'))),
       h('div', { class: 'col' }, gridHeading(host, 'Inventory', c.inventory, INV_COLS, INV_ROWS), grid(host, c.inventory, INV_COLS, INV_ROWS, 'inv'), goldRow(host)),
       detail(host, 'stash'),
     ),

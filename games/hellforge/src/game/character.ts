@@ -73,6 +73,16 @@ export interface GridEntry {
   y: number;
 }
 
+/** A stash every hero on this device can reach. Softcore and Hardcore heroes each have their own. */
+export interface SharedStash {
+  items: GridEntry[];
+  gold: number;
+}
+
+export function newSharedStash(): SharedStash {
+  return { items: [], gold: 0 };
+}
+
 export type EssenceType = 'fire' | 'cold' | 'light' | 'poison';
 export const ESSENCE_TYPES: EssenceType[] = ['fire', 'cold', 'light', 'poison'];
 

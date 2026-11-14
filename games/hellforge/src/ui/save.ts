@@ -1,9 +1,16 @@
-import { migrateCharacter, SAVE_VERSION, type Character } from '../game/character';
+import { migrateCharacter, newSharedStash, SAVE_VERSION, type Character, type SharedStash } from '../game/character';
 import { bumpUid, type Item } from '../game/items';
 
 const KEY = 'hellforge.chars.v1';
 const BACKUP = `${KEY}.before-v${SAVE_VERSION}`;
 const SETTINGS = 'hellforge.settings.v1';
+const SHARED = 'hellforge.shared.v1';
+
+/** Both shared stashes as stored: one for softcore heroes, one for Hardcore. */
+export interface SharedStashes {
+  soft: SharedStash;
+  hard: SharedStash;
+}
 
 export interface Settings {
   sound: boolean;
@@ -62,6 +69,31 @@ export function saveCharacter(c: Character) {
 export function deleteCharacter(id: string) {
   write(KEY, read<Character[]>(KEY, []).filter((c) => c.id !== id));
 }
+
+export function loadSharedStashes(): SharedStashes {
+  const s = read<Partial<SharedStashes>>(SHARED, {});
+  const fix = (x?: Partial<SharedStash>): SharedStash => ({ items: Array.isArray(x?.items) ? x.items : [], gold: Number(x?.gold) || 0 });
+  const out = { soft: fix(s.soft), hard: fix(s.hard) };
+  for (const st of [out.soft, out.hard]) for (const e of st.items) bumpUid(e.item.uid);
+  return out;
+}
+
+/** The shared stash a hero of this kind can reach. */
+export function loadShared(hardcore: boolean): SharedStash {
+  return loadSharedStashes()[hardcore ? 'hard' : 'soft'];
+}
+
+export function saveShared(hardcore: boolean, stash: SharedStash) {
+  const all = loadSharedStashes();
+  all[hardcore ? 'hard' : 'soft'] = stash;
+  write(SHARED, all);
+}
+
+export function saveSharedStashes(all: SharedStashes) {
+  write(SHARED, { soft: all.soft ?? newSharedStash(), hard: all.hard ?? newSharedStash() });
+}
+
+export const sharedIsEmpty = (s?: SharedStash) => !s || (!s.items.length && !s.gold);
 
 export function loadSettings(): Settings {
   return { sound: true, music: true, weather: true, screenFx: true, labels: true, numbers: true, automap: 'mini', ...read<Partial<Settings>>(SETTINGS, {}) };

@@ -2,8 +2,8 @@ import { CLASSES, createCharacter, DIFFICULTIES, type Character } from '../game/
 import type { ClassId } from '../game/items';
 import { CHANGELOG } from '../changelog';
 import { h } from './dom';
-import { deleteCharacter, importCharacters, loadCharacters, saveCharacter } from './save';
-import { bundleJson, decodeSave, downloadFile, encodeCode } from './transfer';
+import { deleteCharacter, importCharacters, loadCharacters, loadSharedStashes, saveCharacter, saveSharedStashes, sharedIsEmpty } from './save';
+import { bundleJson, decodeBundle, downloadFile, encodeCode } from './transfer';
 
 /** Title screen: pick, create or delete a hero. Calls `play` with the chosen character. */
 export function showMenu(root: HTMLElement, play: (c: Character) => void) {
@@ -124,12 +124,22 @@ function showTransfer(root: HTMLElement, play: (c: Character) => void) {
 
   const doImport = async (text: string) => {
     try {
-      const incoming = await decodeSave(text);
+      const { chars: incoming, shared: theirs } = await decodeBundle(text);
       const have = new Set(chars.map((c) => c.id));
       const clash = incoming.filter((c) => have.has(c.id));
       if (clash.length && !confirm(`Replace the existing ${clash.map((c) => c.name).join(', ')} with the imported version?`)) return;
       importCharacters(incoming);
-      say(`Imported ${incoming.map((c) => c.name).join(', ')}.`);
+      // The shared stash comes too. One already in use here is only replaced if the player says so.
+      let stash = '';
+      if (theirs) {
+        const mine = loadSharedStashes();
+        const inUse = !sharedIsEmpty(mine.soft) || !sharedIsEmpty(mine.hard);
+        if (!inUse || confirm("Replace this device's shared stash with the imported one? Cancel keeps the one here.")) {
+          saveSharedStashes(theirs);
+          stash = ' The shared stash came with them.';
+        } else stash = ' The shared stash here was kept.';
+      }
+      say(`Imported ${incoming.map((c) => c.name).join(', ')}.${stash}`);
       setTimeout(close, 700);
     } catch (e) {
       say(e instanceof Error ? e.message : String(e), true);
@@ -149,10 +159,10 @@ function showTransfer(root: HTMLElement, play: (c: Character) => void) {
     ? h('div', { class: 'xfer-sec' },
         h('div', { class: 'xfer-h' }, `Export (${chars.length} hero${chars.length === 1 ? '' : 'es'})`),
         h('div', { class: 'menu-actions' },
-          h('button', { class: 'btn', onclick: () => { downloadFile(`hellforge-save-${stamp}.json`, bundleJson(chars)); say('Save file downloaded.'); } }, 'Download file'),
+          h('button', { class: 'btn', onclick: () => { downloadFile(`hellforge-save-${stamp}.json`, bundleJson(chars, loadSharedStashes())); say('Save file downloaded.'); } }, 'Download file'),
           h('button', {
             class: 'btn', onclick: async () => {
-              const c = await encodeCode(chars);
+              const c = await encodeCode(chars, loadSharedStashes());
               code.value = c;
               code.select();
               try {
@@ -174,7 +184,7 @@ function showTransfer(root: HTMLElement, play: (c: Character) => void) {
         h('div', { class: 'menu-actions' },
           h('button', { class: 'btn', onclick: () => file.click() }, 'Load file'),
           h('button', { class: 'btn', onclick: () => doImport(code.value) }, 'Import code')),
-        h('div', { class: 'small dim' }, 'Heroes with the same identity are replaced; others are kept.')),
+        h('div', { class: 'small dim' }, 'Heroes with the same identity are replaced; others are kept. The shared stash travels with an export.')),
       code,
       status,
       file,
