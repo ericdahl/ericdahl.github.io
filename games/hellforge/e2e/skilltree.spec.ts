@@ -78,7 +78,7 @@ test('the skill tree shows branches, requirements and what each skill is waiting
 });
 
 test('every class has a tree that fits', async ({ page }) => {
-  for (const cls of ['reaver', 'arcanist', 'huntress', 'forgewright']) {
+  for (const cls of ['reaver', 'arcanist', 'huntress', 'forgewright', 'hiveborn']) {
     await page.goto(`/?autostart&seed=5&class=${cls}`);
     await page.waitForFunction(() => !!(window as any).game);
     await page.evaluate(() => (window as any).game.open('skills'));

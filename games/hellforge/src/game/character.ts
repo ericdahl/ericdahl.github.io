@@ -57,7 +57,16 @@ export const CLASSES: Record<ClassId, ClassDef> = {
     desc: 'A smith-warden of the old forges. Swings a great hammer, builds turrets and golems mid-fight, and runs hot: Heat makes every blow burn, until it burns the smith.',
     start: ['sledge'], starter: 'sunder',
   },
+  hiveborn: {
+    id: 'hiveborn', name: 'Hiveborn', str: 24, dex: 24, vit: 22, ene: 15, life: 50, lifePerLvl: 2, lifePerVit: 3,
+    mana: 15, manaPerLvl: 1.5, manaPerEne: 1.5, arBonus: 10, castTime: 0.55, color: '#8a5a2a',
+    desc: 'A four-armed insect from a hive buried under the Glass Sea, the first of its kind to walk out alone. Holds a weapon in each upper hand, or a bow, or anything with a shield, and its lower arms are claws. Fights as a Soldier, shoots as an Archer, or prays.',
+    start: ['short_sword', 'club'], starter: 'rend',
+  },
 };
+
+/** Share of an off-hand weapon's damage a Hiveborn adds to each blow, before Many Hands. */
+export const OFFHAND_SHARE = 50;
 
 export const SAVE_VERSION = 3;
 export const INV_COLS = 10;
@@ -176,7 +185,8 @@ export function createCharacter(name: string, classId: ClassId, hardcore = false
   };
   for (const b of cls.start) {
     const it = makeItem(b);
-    c.equipment[baseOf(b).kind === 'shield' ? 'offhand' : 'weapon'] = it;
+    // A second weapon goes in the other hand (only the Hiveborn starts with two).
+    c.equipment[baseOf(b).kind === 'shield' || c.equipment.weapon ? 'offhand' : 'weapon'] = it;
   }
   return c;
 }
@@ -324,6 +334,9 @@ export interface Stats {
   lightMin: number;
   lightMax: number;
   poisonDmg: number;
+  /** A Hiveborn's lower arms: added to every blow struck up close. Zero for everyone else. */
+  clawMin: number;
+  clawMax: number;
   attackSpeed: number;
   castTime: number;
   moveSpeed: number;
@@ -402,22 +415,34 @@ export function computeStats(c: Character, buffs: Buffs = {}): Stats {
   const isBow = wb?.cat === 'bow';
   const meleeMastery = !isBow && wb && ['sword', 'axe', 'mace', 'dagger'].includes(wb.cat!) ? mastery : null;
 
+  // The Hiveborn: a second weapon in the off hand, plates, and claws.
+  const hive = c.classId === 'hiveborn';
+  const off = c.equipment.offhand;
+  const offWeapon = hive && off && baseOf(off).kind === 'weapon' ? weaponBaseDamage(off) : null;
+  const offShare = offWeapon ? (OFFHAND_SHARE + (p('many_hands')?.pct ?? 0)) / 100 : 0;
+  const carapace = p('carapace');
+
   let armorDef = 0;
   for (const it of equippedItems(c)) armorDef += itemDefense(it);
-  const defPct = (iron?.pct ?? 0) + (buffs.defPct ?? 0);
+  const defPct = (iron?.pct ?? 0) + (carapace?.pct ?? 0) + (buffs.defPct ?? 0);
   const def = Math.floor((dex / 4 + armorDef + g('def')) * (1 + defPct / 100));
   const arPct = g('arPct') + (meleeMastery?.pct2 ?? 0);
   const ar = Math.max(10, Math.floor((dex * 5 - 35 + cls.arBonus + (c.level - 1) * 6 + g('ar') + (buffs.ar ?? 0)) * (1 + arPct / 100)));
 
   const wdmg = weapon ? weaponBaseDamage(weapon) : null;
-  const bmin = wdmg?.min ?? 1;
-  const bmax = wdmg?.max ?? 3;
+  // The off-hand weapon is in every swing, unless the upper arms hold a bow: then it is kept for close work with the claws.
+  const bmin = (wdmg?.min ?? 1) + (offWeapon && !isBow ? offWeapon.min * offShare : 0);
+  const bmax = (wdmg?.max ?? 3) + (offWeapon && !isBow ? offWeapon.max * offShare : 0);
   const ed = g('edPct') + (meleeMastery?.pct ?? 0) + (buffs.edPct ?? 0);
   const attrBonus = isBow ? dex : str;
   const minDmg = Math.max(1, Math.floor((bmin * (1 + ed / 100) + g('minDmg')) * (1 + attrBonus / 100)));
   const maxDmg = Math.max(minDmg + 1, Math.floor((bmax * (1 + ed / 100) + g('maxDmg')) * (1 + attrBonus / 100)));
 
-  const ias = dimin(g('ias') + (buffs.ias ?? 0), 120);
+  const clawK = hive ? (1 + (carapace?.pct2 ?? 0) / 100) * (1 + (buffs.edPct ?? 0) / 100) * (1 + str / 100) : 0;
+  const clawMin = Math.floor((1 + c.level * 0.3 + (offWeapon && isBow ? offWeapon.min * offShare : 0)) * clawK);
+  const clawMax = Math.floor((2 + c.level * 0.7 + (offWeapon && isBow ? offWeapon.max * offShare : 0)) * clawK);
+
+  const ias = dimin(g('ias') + (buffs.ias ?? 0) + (p('many_hands')?.pct2 ?? 0), 120);
   const fcr = dimin(g('fcr'), 120);
   const frw = dimin(g('frw') + (buffs.frw ?? 0), 150);
   const penalty = resistPenalty(c.difficulty);
@@ -425,8 +450,7 @@ export function computeStats(c: Character, buffs: Buffs = {}): Stats {
   const r = (k: StatKey) => Math.min(75, g(k) + allRes - penalty + (k === 'fireRes' ? (p('temper')?.pct2 ?? 0) : 0));
 
   let block = 0;
-  const off = c.equipment.offhand;
-  if (off) block = (baseOf(off).block ?? 0) + g('block') + (c.classId === 'reaver' ? 5 : 0);
+  if (off && baseOf(off).kind === 'shield') block = (baseOf(off).block ?? 0) + g('block') + (c.classId === 'reaver' ? 5 : 0);
 
   const potionCap = potionCapOf(c);
 
@@ -439,6 +463,7 @@ export function computeStats(c: Character, buffs: Buffs = {}): Stats {
     coldMin: g('coldMin'), coldMax: g('coldMax'),
     lightMin: g('lightMin'), lightMax: g('lightMax'),
     poisonDmg: g('poisonDmg'),
+    clawMin, clawMax,
     attackSpeed: (wb?.speed ?? 1.5) * (1 + ias / 100),
     castTime: cls.castTime / (1 + fcr / 100),
     moveSpeed: 4.6 * (1 + frw / 100),
@@ -451,9 +476,9 @@ export function computeStats(c: Character, buffs: Buffs = {}): Stats {
     mf: g('mf'),
     gf: g('gf'),
     thorns: g('thorns'),
-    crit: Math.min(75, g('crit') + (meleeMastery?.chill ?? 0) + (isBow ? (p('critical_eye')?.pct ?? 0) : 0)),
+    crit: Math.min(75, g('crit') + (meleeMastery?.chill ?? 0) + (isBow ? (p('critical_eye')?.pct ?? 0) + (p('sky_hunter')?.pct ?? 0) : 0)),
     evade: p('evade')?.pct ?? 0,
-    dmgReduce: g('dmgReduce'),
+    dmgReduce: g('dmgReduce') + (carapace?.min ?? 0),
     lifeOnKill: g('lifeOnKill'),
     manaOnKill: g('manaOnKill'),
     skillBonus: bonus,
@@ -604,10 +629,24 @@ export function migrateCharacter(c: Character & { belt?: string[][] }): boolean 
 
 // ---------------------------------------------------------------- equipment
 
-export function slotsFor(item: Item): Slot[] {
+/** Whether this hero can hold a weapon in the off hand, and a two-hander beside whatever is there. */
+export const fourArmed = (c?: Pick<Character, 'classId'>) => c?.classId === 'hiveborn';
+
+/** What else comes off when `item` goes into `slot`: a shield for a two-hander and the reverse, except for the four-armed. */
+export function displacedBy(c: Character, item: Item, slot: Slot): Slot[] {
+  const b = baseOf(item);
+  const out: Slot[] = [slot];
+  if (fourArmed(c)) return out;
+  if (b.twoHanded) out.push('offhand');
+  if (b.kind === 'shield' && c.equipment.weapon && baseOf(c.equipment.weapon).twoHanded) out.push('weapon');
+  return out;
+}
+
+/** The slots an item can go in. Pass the hero for the four-armed, who can hold a one-handed weapon in either hand. */
+export function slotsFor(item: Item, c?: Pick<Character, 'classId'>): Slot[] {
   switch (baseOf(item).kind) {
     case 'weapon':
-      return ['weapon'];
+      return fourArmed(c) && !baseOf(item).twoHanded ? ['weapon', 'offhand'] : ['weapon'];
     case 'shield':
       return ['offhand'];
     case 'armor':
@@ -645,16 +684,13 @@ export function equipFromInventory(c: Character, uid: number, preferSlot?: Slot)
   const entry = c.inventory.find((e) => e.item.uid === uid);
   if (!entry) return 'Item not found';
   const item = entry.item;
-  const slots = slotsFor(item);
+  const slots = slotsFor(item, c);
   if (!slots.length) return 'Cannot equip that';
   const err = requirementError(c, item);
   if (err) return err;
-  const b = baseOf(item);
   let slot = preferSlot && slots.includes(preferSlot) ? preferSlot : slots[0];
   if (!preferSlot && slots.length > 1) slot = slots.find((s) => !c.equipment[s]) ?? slots[0];
-  const displaced: Slot[] = [slot];
-  if (b.twoHanded) displaced.push('offhand');
-  if (b.kind === 'shield' && c.equipment.weapon && baseOf(c.equipment.weapon).twoHanded) displaced.push('weapon');
+  const displaced = displacedBy(c, item, slot);
   const backup = c.inventory.slice();
   removeFromGrid(c.inventory, uid);
   const moved: { slot: Slot; item: Item }[] = [];

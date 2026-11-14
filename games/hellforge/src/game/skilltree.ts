@@ -39,6 +39,11 @@ export const SKILL_TREES: Record<ClassId, BranchDef[]> = {
     { id: 'hammer', name: 'Hammer', skills: ['sunder', 'anvil_drop', 'shockwave', 'earthshaker'] },
     { id: 'heat', name: 'Heat', skills: ['temper', 'slag_burst', 'white_heat'] },
   ],
+  hiveborn: [
+    { id: 'soldier', name: 'Soldier', skills: ['rend', 'many_hands', 'fourfold', ['carapace', 1], ['hold_the_line', 1]] },
+    { id: 'archer', name: 'Archer', skills: ['loose', 'sky_hunter', 'volley', 'skyfall'] },
+    { id: 'faith', name: 'Faith', skills: ['mending', 'ward_of_faith', 'congregation', 'hymn', 'judgement'] },
+  ],
 };
 
 export interface TreeNode {

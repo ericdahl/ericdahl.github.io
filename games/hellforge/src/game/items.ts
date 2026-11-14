@@ -8,7 +8,7 @@ export type StatKey =
   | 'fireRes' | 'coldRes' | 'lightRes' | 'poisonRes' | 'allRes'
   | 'fireMin' | 'fireMax' | 'coldMin' | 'coldMax' | 'lightMin' | 'lightMax' | 'poisonDmg'
   | 'lifeSteal' | 'manaSteal' | 'ias' | 'frw' | 'fcr' | 'mf' | 'gf' | 'thorns'
-  | 'lifeRegen' | 'manaRegen' | 'allSkills' | 'skills_reaver' | 'skills_arcanist' | 'skills_huntress' | 'skills_necromancer' | 'skills_forgewright'
+  | 'lifeRegen' | 'manaRegen' | 'allSkills' | 'skills_reaver' | 'skills_arcanist' | 'skills_huntress' | 'skills_necromancer' | 'skills_forgewright' | 'skills_hiveborn'
   | 'block' | 'crit' | 'dmgReduce' | 'lifeOnKill' | 'manaOnKill';
 
 export interface Mod {
@@ -26,7 +26,7 @@ export type ItemKind =
 export type WeaponCat = 'sword' | 'axe' | 'mace' | 'dagger' | 'wand' | 'staff' | 'bow';
 export type Rarity = 'normal' | 'magic' | 'rare' | 'set' | 'unique';
 export type Slot = 'head' | 'body' | 'weapon' | 'offhand' | 'gloves' | 'belt' | 'boots' | 'amulet' | 'ring1' | 'ring2';
-export type ClassId = 'reaver' | 'arcanist' | 'huntress' | 'necromancer' | 'forgewright';
+export type ClassId = 'reaver' | 'arcanist' | 'huntress' | 'necromancer' | 'forgewright' | 'hiveborn';
 
 export interface PotionInfo {
   type: 'hp' | 'mp' | 'rejuv';
@@ -336,6 +336,7 @@ export const AFFIXES: Affix[] = [
   P('rangers', "Ranger's", 6, ['bow', 'amulet', 'gloves'], 'skills', [m('skills_huntress', 1, 1)], 4),
   P('gravecallers', "Gravecaller's", 6, ['caster', 'amulet', 'helm'], 'skills', [m('skills_necromancer', 1, 1)], 4),
   P('smiths', "Smith's", 6, ['melee', 'amulet', 'gloves'], 'skills', [m('skills_forgewright', 1, 1)], 4),
+  P('hives', "Hive's", 6, ['melee', 'bow', 'amulet', 'helm'], 'skills', [m('skills_hiveborn', 1, 1)], 4),
   P('lucky', 'Lucky', 3, ['jewelry', 'boots', 'gloves', 'helm'], 'mf', [m('mf', 5, 12)]),
   P('fortuitous', 'Fortuitous', 12, ['jewelry', 'boots', 'gloves', 'helm'], 'mf', [m('mf', 13, 25)]),
   P('lapis', 'Lapis', 4, ['jewelry', 'helm', 'caster', 'shield'], 'mana', [m('mana', 5, 15)]),
@@ -450,6 +451,9 @@ export const UNIQUES: UniqueDef[] = [
   U('bellowsmaw', 'Bellowsmaw', 'war_hammer', 11, [m('skills_forgewright', 2, 2), m('edPct', 90, 120), m('fireMin', 4, 4), m('fireMax', 14, 14), m('fireRes', 25, 25)]),
   U('quenchers_mitts', "Quencher's Mitts", 'heavy_gloves', 9, [m('skills_forgewright', 1, 1), m('ias', 15, 15), m('fireRes', 30, 30), m('str', 8, 8)]),
   U('anvil_of_imhara', 'Anvil of Imhara', 'obsidian_maul', 24, [m('skills_forgewright', 2, 2), m('edPct', 130, 170), m('crit', 12, 12), m('str', 15, 15), m('allRes', 12, 12)]),
+  U('first_claw', 'Firstclaw', 'hand_axe', 4, [m('skills_hiveborn', 1, 1), m('edPct', 60, 90), m('ias', 15, 15), m('life', 12, 12)]),
+  U('free_queens_fang', "The Free Queen's Fang", 'jambiya', 19, [m('skills_hiveborn', 2, 2), m('edPct', 110, 150), m('ias', 20, 20), m('poisonDmg', 30, 30), m('dex', 12, 12)]),
+  U('skywatcher', 'Skywatcher', 'long_bow', 10, [m('skills_hiveborn', 2, 2), m('edPct', 80, 110), m('crit', 12, 12), m('ar', 60, 60)]),
   U('crown_of_ash', 'Crown of Ash', 'full_helm', 18, [m('defPct', 100, 130), m('allSkills', 1, 1), m('life', 30, 30), m('fireRes', 30, 30), m('lifeSteal', 4, 4)]),
 ];
 export const UNIQUE_BY_ID: Record<string, UniqueDef> = Object.fromEntries(UNIQUES.map((u) => [u.id, u]));
@@ -591,6 +595,22 @@ export const SETS: SetDef[] = [
     },
   },
   {
+    id: 'glasshive',
+    name: 'Shell of the Glass Hive',
+    classId: 'hiveborn',
+    pieces: [
+      { id: 'glasshive_casque', name: 'Glasshive Casque', base: 'skull_cap', mods: [m('life', 20, 20), m('allRes', 8, 8)] },
+      { id: 'glasshive_plates', name: 'Glasshive Plates', base: 'studded_leather', mods: [m('defPct', 60, 60), m('dmgReduce', 2, 2)] },
+      { id: 'glasshive_grips', name: 'Glasshive Grips', base: 'heavy_gloves', mods: [m('ias', 15, 15), m('dex', 6, 6)] },
+      { id: 'glasshive_tread', name: 'Glasshive Tread', base: 'heavy_boots', mods: [m('frw', 20, 20), m('str', 6, 6)] },
+    ],
+    bonuses: {
+      2: [{ stat: 'edPct', value: 25 }],
+      3: [{ stat: 'life', value: 40 }, { stat: 'ar', value: 80 }],
+      4: [{ stat: 'skills_hiveborn', value: 2 }, { stat: 'ias', value: 15 }, { stat: 'allRes', value: 15 }],
+    },
+  },
+  {
     id: 'imharan',
     name: 'Regalia of Lost Imhara',
     pieces: [
@@ -631,6 +651,7 @@ const CLASS_WEAPONS: Record<ClassId, WeaponCat[]> = {
   huntress: ['bow', 'dagger'],
   necromancer: ['wand', 'dagger'],
   forgewright: ['mace', 'axe'],
+  hiveborn: ['sword', 'axe', 'dagger', 'bow'],
 };
 
 export function makeItem(baseId: string, ilvl = 1, rarity: Rarity = 'normal'): Item {
@@ -895,6 +916,7 @@ const STAT_TEXT: Record<StatKey, (v: number) => string> = {
   skills_huntress: (v) => `+${v} to Huntress Skills`,
   skills_necromancer: (v) => `+${v} to Necromancer Skills`,
   skills_forgewright: (v) => `+${v} to Forgewright Skills`,
+  skills_hiveborn: (v) => `+${v} to Hiveborn Skills`,
   block: (v) => `${v}% Increased Chance of Blocking`,
   crit: (v) => `${v}% Chance of Deadly Strike`,
   dmgReduce: (v) => `Damage Reduced by ${v}`,

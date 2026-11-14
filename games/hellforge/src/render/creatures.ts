@@ -78,6 +78,7 @@ export function drawMonsterShape(ctx: CanvasRenderingContext2D, shape: string, c
       case 'furnace': furnace(ctx, color, s); break;
       case 'hire_guard':
       case 'hire_archer':
+      case 'worker':
       case 'hire_mage': drawHumanoid(ctx, HIRE_LOOKS[shape], { ...s.pose, dir: 1 }, t); break;
     }
   } finally {

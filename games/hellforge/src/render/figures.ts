@@ -48,6 +48,13 @@ export interface HumanoidLook {
   veils?: string;
   /** Face covered below the eyes. */
   veil?: string;
+  /** A second, lower pair of arms ending in claws (their colour). */
+  lowerArms?: string;
+  /** An insect's head: compound eyes, mandibles and antennae in place of a face. */
+  insect?: boolean;
+  /** A weapon held in the off hand in place of a shield. */
+  offWeapon?: HumanoidLook['weapon'];
+  offWeaponId?: string;
 }
 
 export interface Pose {
@@ -371,6 +378,13 @@ export function drawHumanoid(ctx: CanvasRenderingContext2D, L: HumanoidLook, pos
   }
   if (L.hair === 'long' && L.head === 'hair' && !back) drawLongHairBack(ctx, L.headColor, bob);
   if (!L.shield) drawFarArm(ctx, L, sw, bob);
+  if (L.offWeapon && !L.shield) {
+    // Held low and back in the far hand, so both blades read in silhouette.
+    const fx = -5.8 * B - 2.2 - sw * 2.4;
+    const swing = atk > 0 ? Math.sin(Math.min(1, atk * 1.3) * Math.PI) * 0.9 : 0;
+    drawWeapon(ctx, { ...L, weapon: L.offWeapon, weaponId: L.offWeaponId, weaponGlow: undefined, weaponTier: 1 }, fx, -23 - bob, -2.05 + swing, 0, t);
+  }
+  if (L.lowerArms) drawLowerArm(ctx, L, bob, sw, atk, true);
   drawLegs(ctx, L, sw, ph, pose.moving);
   ctx.save();
   ctx.translate(0, -bob);
@@ -378,6 +392,7 @@ export function drawHumanoid(ctx: CanvasRenderingContext2D, L: HumanoidLook, pos
   if (L.pauldrons) drawPauldron(ctx, L.pauldrons, -6.6 * B, -36.3, 0.92);
   if (L.bones) drawBoneSpikes(ctx, L.accent ?? '#e8e0c8', -6.5 * B);
   drawHead(ctx, L, back, t);
+  if (L.insect) drawAntennae(ctx, L, t);
   if (back) {
     if (L.quiver) drawQuiver(ctx, 0, true);
     if (L.cape) drawCape(ctx, L, sw, 0, t, true);
@@ -385,6 +400,7 @@ export function drawHumanoid(ctx: CanvasRenderingContext2D, L: HumanoidLook, pos
   }
   if (L.shield) drawShield(ctx, L, sw, back);
   ctx.restore();
+  if (L.lowerArms) drawLowerArm(ctx, L, bob, sw, atk, false);
   drawWeaponArm(ctx, L, shX, shY, hx, hy, sp.tool, atk, t);
   if (L.pauldrons) drawPauldron(ctx, L.pauldrons, shX + 0.6, -36.3 - bob, 1);
   if (L.bones) drawBoneSpikes(ctx, L.accent ?? '#e8e0c8', shX + 0.4, -bob);
@@ -397,6 +413,72 @@ export function drawHumanoid(ctx: CanvasRenderingContext2D, L: HumanoidLook, pos
     ctx.fill();
   }
   ctx.restore();
+}
+
+/** One of a second pair of arms, set below the first and ending in two claws. The near one jabs forward on an attack. */
+function drawLowerArm(ctx: CanvasRenderingContext2D, L: HumanoidLook, bob: number, sw: number, atk: number, far: boolean) {
+  const B = L.build ?? 1;
+  const c = far ? shade(L.lowerArms!, -0.28) : L.lowerArms!;
+  const jab = far ? 0 : Math.sin(Math.min(1, atk * 1.6) * Math.PI) * 5.5;
+  const sx = (far ? -4.6 : 4.8) * B;
+  const sy = -29 - bob;
+  const ex = sx + (far ? -3.4 - sw : 3.6 + jab * 0.4);
+  const ey = sy + 4.6 - jab * 0.2;
+  const hx = ex + (far ? 0.8 - sw * 1.6 : 2.6 + jab);
+  const hy = ey + 5 - jab * 0.55;
+  limb(ctx, [sx, sy, ex, ey], 3 * B, c);
+  limb(ctx, [ex, ey, hx, hy], 2.5 * B, c);
+  // Two hooked claws.
+  const dir = far ? -1 : 1;
+  for (const a of [-0.35, 0.5]) {
+    ctx.beginPath();
+    ctx.moveTo(hx, hy);
+    ctx.quadraticCurveTo(hx + dir * 2.6, hy + a * 2, hx + dir * (3.4 + jab * 0.15), hy + 1.6 + a * 3.2);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2.1;
+    ctx.stroke();
+    ctx.strokeStyle = art.dead ? '#5a4a3a' : '#e8dcc0';
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+  }
+}
+
+/** Two antennae, swaying a little. */
+function drawAntennae(ctx: CanvasRenderingContext2D, L: HumanoidLook, t: number) {
+  const cy = -44.5;
+  for (const [x, lean] of [[-0.6, -0.4], [2.2, 1]]) {
+    const sway = Math.sin(t * 2.4 + x) * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(x, cy - 5);
+    ctx.quadraticCurveTo(x + lean * 2 + sway, cy - 11, x + lean * 5.5 + sway * 1.5, cy - 11.5);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+    ctx.strokeStyle = shade(L.skin, 0.1);
+    ctx.lineWidth = 0.9;
+    ctx.stroke();
+  }
+}
+
+/** Compound eyes and mandibles. */
+function drawInsectFace(ctx: CanvasRenderingContext2D, L: HumanoidLook, cy: number) {
+  const eye = art.dead ? '#2a2420' : (L.eyeGlow ?? '#1a1410');
+  ellipse(ctx, 2.9, cy - 0.8, 2.3, 3, 0.25);
+  fillInk(ctx, rad(ctx, 3.4, cy - 1.6, 3.2, eye, 0.6, -0.3), 0.6);
+  ctx.fillStyle = alpha('#ffffff', art.dead ? 0.1 : 0.55);
+  circle(ctx, 3.6, cy - 1.9, 0.7);
+  ctx.fill();
+  for (const dy of [0, 1.5]) {
+    ctx.beginPath();
+    ctx.moveTo(3.2, cy + 3.2 + dy * 0.4);
+    ctx.quadraticCurveTo(6.2, cy + 3.6 + dy, 5.4, cy + 5.6 + dy * 0.3);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.9;
+    ctx.stroke();
+    ctx.strokeStyle = shade(L.skin, -0.25);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
 }
 
 function drawLongHairBack(ctx: CanvasRenderingContext2D, c: string, bob: number) {
@@ -920,7 +1002,7 @@ function drawHead(ctx: CanvasRenderingContext2D, L: HumanoidLook, back: boolean,
     ctx.stroke();
   }
   const covered = L.head === 'greathelm';
-  if (!back && !covered) drawFace(ctx, L, cy);
+  if (!back && !covered) (L.insect ? drawInsectFace : drawFace)(ctx, L, cy);
   if (L.veil && !back) {
     ctx.beginPath();
     ctx.moveTo(-1, cy + 0.6);

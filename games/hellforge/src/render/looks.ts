@@ -104,6 +104,10 @@ const CLASS_BASE: Record<ClassId, HumanoidLook> = {
     body: '#6a5648', trim: '#2a1c12', skin: '#b8805c', legs: '#3a2c20', boots: '#241810', head: 'hair', hair: 'short', headColor: '#5a2a14',
     beard: '#5a2a14', armor: 'cloth', apron: '#4a2c18', build: 1.22, bareArms: true, gloves: '#c8782a', goggles: '#ffb040', accent: '#d8a848',
   },
+  hiveborn: {
+    body: '#6a4526', trim: '#2e1c0e', skin: '#8a5a30', legs: '#553618', boots: '#3a2410', head: 'hair', hair: 'bald', headColor: '#8a5a30',
+    bareArms: true, lowerArms: '#7a4e28', insect: true, build: 1.05, accent: '#c8a060',
+  },
 };
 
 /** The hero's look: their class silhouette, dressed in whatever they have equipped. */
@@ -138,7 +142,12 @@ export function heroLook(classId: ClassId, eq: Gear): HumanoidLook {
   } else {
     look.weapon = null;
   }
-  if (eq.offhand) {
+  if (eq.offhand && baseOf(eq.offhand).kind === 'weapon') {
+    // The four-armed can hold a second weapon where anyone else has a shield.
+    const b = baseOf(eq.offhand);
+    look.offWeapon = b.id === 'club' ? 'club' : b.cat!;
+    look.offWeaponId = b.id;
+  } else if (eq.offhand) {
     const id = eq.offhand.base;
     look.shield = SHIELD_COLOR[id] ?? '#6b4a2e';
     look.shieldShape = SHIELD_KIND[id] ?? 'heater';
@@ -241,6 +250,11 @@ export const HIRE_LOOKS: Record<string, HumanoidLook> = {
   hire_mage: {
     body: '#a84a2a', trim: '#e8c060', skin: '#d8b090', legs: '#2e2a24', boots: '#3a2418', head: 'hood', headColor: '#8a3a20', openHood: true, hairUnder: '#2a1a14',
     robe: true, weapon: 'staff', weaponColor: '#ff9040', weaponGlow: '#ffb060', accent: '#e8c060', cape: '#6a2a18',
+  },
+  // A Hiveborn's Worker: the same shape as the hero, smaller, plainer and unarmed.
+  worker: {
+    body: '#5a3c20', skin: '#7a5028', legs: '#4a3016', boots: '#33200e', head: 'hair', hair: 'bald', headColor: '#7a5028', bareArms: true,
+    lowerArms: '#6a4424', insect: true, build: 0.95, weapon: null,
   },
 };
 

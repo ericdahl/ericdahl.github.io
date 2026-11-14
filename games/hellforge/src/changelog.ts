@@ -1,6 +1,20 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.20.0',
+    date: '2026-11-14',
+    notes: [
+      'A sixth class: the Hiveborn, a four-armed insect from a hive buried under the Glass Sea, and the first hero who is not human. Pick one on the New Hero screen.',
+      'Four arms. A one-handed weapon can go in either upper hand: pick Equip Main Hand or Equip Off Hand. An off-hand weapon adds half its damage to every blow. A two-handed weapon or a bow can be held with a shield or a second weapon beside it, which nobody else can do.',
+      'Claws. The lower arms are claws, and their damage is added to every blow you strike up close. They grow with your level and Strength. With a bow in hand, a plain attack shoots at range and claws anything within reach.',
+      'Soldier skills: Rend strikes with every arm (and works with a bow in hand, using the claws), Carapace thickens your plates and sharpens your claws, Many Hands gets more out of an off-hand weapon, Hold the Line plants your feet, and Fourfold Strike hits everything in front of you.',
+      'Archer skills: Loose, Volley and Skyfall, and Sky Hunter, which makes you deadlier with a bow and deadlier still to bats, kites and anything else that flies.',
+      'Faith skills: Prayer of Mending heals you and everyone at your side, hirelings included. Ward of Faith takes blows for you. Congregation calls Workers up out of the ground to fight for a while, with no corpses needed. Hymn of the Hive makes all your allies hit harder. Sky Above strikes and stuns everything near you.',
+      'New gear: "Hive\'s" items that add to Hiveborn skills, three uniques (Firstclaw, Skywatcher and The Free Queen\'s Fang) and a set, the Shell of the Glass Hive.',
+      'A couple of the sages have something to say about a Hiveborn walking in.',
+    ],
+  },
+  {
     version: '0.19.0',
     date: '2026-11-14',
     notes: [

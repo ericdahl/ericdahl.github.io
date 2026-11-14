@@ -14,9 +14,10 @@ const PLAN: Record<ClassId, string[]> = {
   arcanist: ['fire_bolt', 'fire_bolt', 'fire_bolt', 'fire_bolt', 'ice_bolt', 'frost_shell', 'fire_bolt', 'fire_bolt', 'fire_bolt', 'fire_bolt', 'teleport', 'fire_bolt', 'fire_bolt', 'fire_bolt', 'fire_bolt', 'fire_bolt', 'fireball', 'fireball', 'fireball'],
   necromancer: ['raise_skeleton', 'raise_skeleton', 'bone_shards', 'raise_skeleton', 'frailty', 'skeletal_mastery', 'skeletal_mastery', 'raise_skeleton', 'skeletal_mastery', 'bone_ward', 'raise_skeleton', 'grave_golem', 'skeletal_mastery', 'raise_skeleton', 'bone_shards', 'skeletal_mastery', 'raise_skeleton', 'corpse_burst', 'bone_lance', 'bone_lance', 'bone_lance'],
   forgewright: ['ballista', 'temper', 'sunder', 'sunder', 'slag_burst', 'anvil_drop', 'sunder', 'temper', 'ballista', 'sunder', 'shockwave', 'brass_sentinel', 'shockwave', 'bellows', 'shockwave', 'gearwork', 'furnace', 'shockwave', 'slag_burst', 'white_heat', 'shockwave', 'gearwork', 'earthshaker', 'earthshaker', 'temper'],
+  hiveborn: ['rend', 'carapace', 'rend', 'rend', 'carapace', 'many_hands', 'rend', 'mending', 'many_hands', 'carapace', 'rend', 'hold_the_line', 'ward_of_faith', 'many_hands', 'rend', 'hold_the_line', 'carapace', 'fourfold', 'fourfold', 'fourfold', 'rend', 'fourfold', 'many_hands'],
   huntress: ['power_shot', 'critical_eye', 'power_shot', 'power_shot', 'power_shot', 'multishot', 'multishot', 'multishot', 'multishot', 'multishot', 'evade', 'multishot', 'multishot', 'multishot', 'multishot', 'multishot', 'strafe', 'strafe'],
 };
-const MAIN: Record<ClassId, string[]> = { reaver: ['frenzy', 'bash'], arcanist: ['fireball', 'fire_bolt'], huntress: ['multishot', 'power_shot'], necromancer: ['bone_lance', 'bone_shards'], forgewright: ['shockwave', 'sunder'] };
+const MAIN: Record<ClassId, string[]> = { reaver: ['frenzy', 'bash'], arcanist: ['fireball', 'fire_bolt'], huntress: ['multishot', 'power_shot'], necromancer: ['bone_lance', 'bone_shards'], forgewright: ['shockwave', 'sunder'], hiveborn: ['fourfold', 'rend'] };
 
 function score(w: World, it: Item): number {
   const b = baseOf(it);
@@ -31,7 +32,7 @@ function score(w: World, it: Item): number {
   if (b.kind === 'weapon') {
     const want = c.classId === 'huntress' ? 'bow' : c.classId === 'arcanist' ? 'staff' : null;
     if (want === 'bow' && b.cat !== 'bow') return -1;
-    if ((c.classId === 'reaver' || c.classId === 'forgewright') && (b.cat === 'bow' || b.cat === 'wand' || b.cat === 'staff')) return -1;
+    if ((c.classId === 'reaver' || c.classId === 'forgewright' || c.classId === 'hiveborn') && (b.cat === 'bow' || b.cat === 'wand' || b.cat === 'staff')) return -1;
     if (c.classId === 'arcanist' || c.classId === 'necromancer') return after.skillBonus - before.skillBonus + (after.maxLife - before.maxLife) / 20;
     return (after.minDmg + after.maxDmg) * after.attackSpeed - (before.minDmg + before.maxDmg) * before.attackSpeed;
   }
@@ -111,6 +112,17 @@ function forgeThink(w: World) {
   if (boss && has('anvil_drop') && p.mana > 20) w.cmdSkill('anvil_drop', boss.x, boss.y, boss.id);
 }
 
+/** A Soldier who prays: keep the ward up, plant the feet when there is a fight, and mend when hurt. */
+function hiveThink(w: World) {
+  const c = w.char;
+  const p = w.player;
+  const has = (id: string) => (c.skills[id] ?? 0) > 0 && SKILL_BY_ID[id].mana(c.skills[id]) <= p.mana;
+  const near = w.area.monsters.some((m) => !m.dead && !m.sub && Math.hypot(m.x - p.x, m.y - p.y) < 6);
+  if (has('mending') && p.life < w.stats.maxLife * 0.55) return w.cmdSkill('mending', p.x, p.y);
+  if (has('ward_of_faith') && !p.buffs.ward_of_faith && p.mana > 30) return w.cmdSkill('ward_of_faith', p.x, p.y);
+  if (near && has('hold_the_line') && !p.buffs.hold_the_line) w.cmdSkill('hold_the_line', p.x, p.y);
+}
+
 export interface AreaReport {
   area: string;
   enterLevel: number;
@@ -166,6 +178,7 @@ export function playAct(classId: ClassId, seed: number, maxPerArea = 900, route 
           const st = computeStats(c);
           if (classId === 'reaver') allocStat(c, st.str < 60 ? 'str' : 'vit');
           else if (classId === 'forgewright') allocStat(c, st.str < 75 ? 'str' : 'vit');
+          else if (classId === 'hiveborn') allocStat(c, st.str < 70 ? 'str' : 'vit');
           else if (classId === 'huntress') allocStat(c, st.dex < 70 ? 'dex' : 'vit');
           else allocStat(c, c.alloc.vit <= c.alloc.ene * 2 ? 'vit' : 'ene');
         }
@@ -178,7 +191,9 @@ export function playAct(classId: ClassId, seed: number, maxPerArea = 900, route 
           e.item.identified = true;
           const b = baseOf(e.item);
           if (!slotsFor(e.item).length || requirementError(c, e.item)) continue;
-          if (score(w, e.item) > 0) w.equip(e.item.uid);
+          if (score(w, e.item) > 0) w.equip(e.item.uid, classId === 'hiveborn' && b.kind === 'weapon' ? 'weapon' : undefined);
+          // The four-armed keep a second one-hander in the off hand rather than sell it.
+          else if (classId === 'hiveborn' && b.kind === 'weapon' && !b.twoHanded && b.cat !== 'wand' && (!c.equipment.offhand || (baseOf(c.equipment.offhand).kind === 'weapon' && (b.maxDmg ?? 0) > (baseOf(c.equipment.offhand).maxDmg ?? 0)))) w.equip(e.item.uid, 'offhand');
           else if (opts.forge && w.forge({ type: 'salvage', uid: e.item.uid }).ok) continue;
           else if (b.kind !== 'potion') w.sell(e.item.uid);
         }
@@ -191,6 +206,7 @@ export function playAct(classId: ClassId, seed: number, maxPerArea = 900, route 
         if (c.skills.frost_shell && !p.buffs.frost_shell && p.mana > 20) w.cmdSkill('frost_shell', p.x, p.y);
         if (classId === 'necromancer' && !p.action) necroThink(w);
         if (classId === 'forgewright' && !p.action) forgeThink(w);
+        if (classId === 'hiveborn' && !p.action) hiveThink(w);
         // Unstick: if we have not moved for a while, wander.
         if (Math.hypot(p.x - lastPos.x, p.y - lastPos.y) > 0.5) lastPos = { x: p.x, y: p.y, t };
       }
