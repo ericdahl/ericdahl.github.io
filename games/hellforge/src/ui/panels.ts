@@ -13,9 +13,10 @@ import { DEPTH_BASE_LEVEL } from '../game/depths';
 import { forgeRank, MASTERY_RANKS } from '../game/forge';
 import { hireCost, HIRE_KINDS, HIRELINGS, reviveCost } from '../game/hireling';
 import { itemTooltip } from './tooltip';
+import { WYRM_LINES, WYRM_NAME, WYRM_OFFERS } from '../game/wyrm';
 import { skillsPanel } from './skilltree';
 
-export type PanelKind = 'inventory' | 'character' | 'skills' | 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan' | 'forge' | 'captain' | 'menu' | 'help';
+export type PanelKind = 'inventory' | 'character' | 'skills' | 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan' | 'forge' | 'captain' | 'wyrm' | 'menu' | 'help';
 
 export interface Selection {
   uid: number;
@@ -260,6 +261,8 @@ export function renderPanel(host: PanelHost, kind: PanelKind): HTMLElement {
       return caravanPanel(host);
     case 'captain':
       return captainPanel(host);
+    case 'wyrm':
+      return wyrmPanel(host);
     case 'sage':
       return sagePanel(host);
     case 'fence':
@@ -521,6 +524,39 @@ function caravanPanel(host: PanelHost) {
   );
 }
 
+/** The Brass Wyrm: what he says, what he offers, and the three things to choose between when he pays. */
+let wyrmSaid = '';
+function wyrmPanel(host: PanelHost) {
+  const w = host.world;
+  const c = w.char;
+  const talk = w.wyrmTalk();
+  const choices = w.wyrmChoices;
+  const offers = w.wyrmOffers();
+  const body = h('div', { class: 'p-body wyrm-body' });
+  for (const line of WYRM_LINES[talk]) body.append(h('div', { class: 'wyrm-line' }, line));
+  if (wyrmSaid) body.append(h('div', { class: 'wyrm-line' }, wyrmSaid));
+  if (offers.length) {
+    const picks = h('div', { class: 'wyrm-picks' });
+    offers.forEach((it, i) => picks.append(h('div', { class: 'wyrm-pick' },
+      h('div', { class: 'tt', html: itemTooltip(it, c) }),
+      h('button', { class: 'btn primary wyrm-take', 'data-pick': i, onclick: () => {
+        const got = w.wyrmClaim(i);
+        if (got) host.toast(`From the hoard: ${displayName(got)}`, itemColor(got));
+        wyrmSaid = '';
+        host.refresh();
+      } }, 'Take this one'))));
+    body.append(h('div', { class: 'sub' }, 'Choose one'), picks);
+  } else {
+    const acts = h('div', { class: 'acts' });
+    if (choices.errand) acts.append(h('button', { class: 'btn wyrm-errand', onclick: () => { w.wyrmErrand(); wyrmSaid = WYRM_OFFERS.errand; host.refresh(); } }, 'Ask what he wants done'));
+    if (choices.challenge) acts.append(h('button', { class: 'btn danger wyrm-fight', onclick: () => { wyrmSaid = ''; host.close(); w.wyrmChallenge(); } }, 'Challenge him'));
+    acts.append(h('button', { class: 'btn wyrm-leave', onclick: () => { wyrmSaid = ''; host.close(); } }, 'Leave him be'));
+    body.append(acts);
+    if (choices.challenge) body.append(h('div', { class: 'dim small' }, `He is level ${w.wyrm()?.level ?? '?'}. You are level ${c.level}. He does not die: fight him until he has had enough.`));
+  }
+  return h('div', { class: 'panel wyrm' }, header(host, WYRM_NAME, talk === 'greet' ? 'Not pleased to be woken' : undefined), body);
+}
+
 /** The captain: hire a companion, bring a fallen one back, or send one home. */
 function captainPanel(host: PanelHost) {
   const w = host.world;
@@ -663,6 +699,7 @@ function helpPanel(host: PanelHost) {
         'Finish the Ember Road and <span class="gold2">the Underforge</span> opens at every waypoint: an endless descent, one monster level harder a floor. A warden holds the stairs on each floor, every fifth floor is a boss, and deeper floors carry afflictions that everything on them shares. The deeper you go, the better the loot and the more Cinders each warden leaves for the Forge.',
         'The <span class="gold2">captain</span> in every town hires out one companion at a time: a Shieldbearer, a Bowman or an Ember-Keeper. They fight at your level, follow you between areas, and can be brought back at any captain for a fee if they fall.',
         'The <span class="gold2">Hiveborn</span> has four arms. A one-handed weapon can go in either upper hand (Equip Main Hand or Equip Off Hand), and a two-hander or a bow can be held with a shield or a second weapon beside it. The lower arms are claws: they add their damage to every blow struck up close, and with a bow in hand a plain attack on something within reach is a claw strike.',
+        'Not everything is on the road. High in <span class="gold2">Gloomwood</span> there is a cave that no quest sends you to, and something very old asleep in it. It is far stronger than anything else in the wood. It would rather talk than fight.',
         'Necromancers raise skeletons from fresh corpses: cast Raise Skeleton near a body (or tap its button to use the nearest one). Servants follow you between areas.',
         'Forgewrights build <span class="gold2">Heat</span> with every hammer blow that lands (the gauge above the experience bar). Heat adds fire to your blows with Temper, and Slag Burst spends it all at once. Let it reach 100 and you overheat and burn until it cools or you vent it. Turrets and the Furnace stay where you build them and wind down after a while; the Brass Sentinel follows you between areas.',
       ].map((t) => `<p>${t}</p>`).join('') }),

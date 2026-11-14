@@ -23,6 +23,8 @@ export interface AreaDef {
   cold?: boolean;
   /** Whiteouts roll through this area, and the ember burns down faster while they last. */
   blizzard?: boolean;
+  /** Off the road: no quest leads here, and it is not counted as part of its act's story. */
+  side?: boolean;
   /** A floor of the Underforge, and how deep. */
   depth?: number;
   /** Modifiers every monster in the area carries. */
@@ -91,6 +93,13 @@ export const AREAS: AreaDef[] = [
     id: 'hellforge', name: 'The Hellforge', alvl: 12, monsters: ['hound', 'cultist', 'brute', 'imp', 'hexer'], packs: 14, dark: 0.7, light: 8,
     superUnique: 'mother', quest: 'forge',
     spec: { gen: 'rooms', w: 60, h: 60, theme: 'hell', bossLair: true, links: [{ to: 'catacombs2', label: 'Catacombs Level 2', kind: 'up' }] },
+  },
+  // A cave high above Gloomwood, off the road and far above its level. It is not in Gloomwood's own links: the way in
+  // is added to the finished map (see World.getArea), so the wood is laid out exactly as it was before the cave existed.
+  {
+    id: 'wyrm_roost', name: 'The High Roost', alvl: 20, monsters: [], packs: 0, dark: 0.7, light: 9, superUnique: 'wyrm', side: true,
+    // Big enough that the great chamber always finds room beside the way in.
+    spec: { gen: 'rooms', w: 52, h: 52, theme: 'cave', bossLair: true, links: [{ to: 'gloomwood', label: 'Down to Gloomwood', kind: 'up' }] },
   },
   // ------------------------------------------------------------ Act 2: The Glass Sea
   {

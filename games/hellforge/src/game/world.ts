@@ -12,6 +12,7 @@ import {
 import { afflictionLabel, DEPTH_BOSSES, DEPTH_STRIDE, depthCinders, depthDef, depthFortune, depthId, depthOf, depthStarts, isDepthId } from './depths';
 import { forgeApply, type ForgeAction, type ForgeResult } from './forge';
 import { hireCost, hirelingName, HIRELINGS, reviveCost, type HireKind } from './hireling';
+import { ERRAND_TOWN, WYRM_AREA, WYRM_FROM, YIELD_ANGRY, YIELD_AT, type WyrmState, type WyrmTalk } from './wyrm';
 import { floodDistances, generateLevel, idx, isWalkable, nearestFloor, type Level, type Point } from './map';
 import {
   baseDamage, baseLife, MOD_LABEL, MONSTERS, monsterStats, rollUniqueMods, uniqueName,
@@ -30,7 +31,7 @@ export type SoundId =
 /** Seconds a ground item takes to bounce when it lands or refuses to be picked up. */
 export const LOOT_BOUNCE = 0.4;
 
-export type Panel = 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan' | 'forge' | 'captain';
+export type Panel = 'healer' | 'smith' | 'sage' | 'fence' | 'stash' | 'waypoint' | 'caravan' | 'forge' | 'captain' | 'wyrm';
 
 export type GameEvent =
   | { type: 'sound'; id: SoundId }
@@ -170,6 +171,11 @@ export interface Monster {
   wardId?: number;
   /** Holds the stairs of an Underforge floor: they stay sealed while it lives. */
   warden?: boolean;
+  /** Stands apart from the fight: it does nothing, and nothing can target or hurt it. */
+  calm?: boolean;
+  /** The Brass Wyrm, and how he is. `wyrmAngry` once he has been robbed: harder, and harder to satisfy. */
+  wyrm?: WyrmState;
+  wyrmAngry?: boolean;
 }
 
 /** A Slag Golem at or past these tempers is molten or brittle. */
@@ -281,6 +287,8 @@ export interface WorldObject {
   /** Opened, spent or, for a brazier, lit. */
   used: boolean;
   shrine?: ShrineKind;
+  /** Part of the Brass Wyrm's hoard: opening it is theft. */
+  hoard?: boolean;
 }
 
 export type ShrineKind = 'armor' | 'combat' | 'refill' | 'experience' | 'storm' | 'fortune' | 'haste' | 'cursed';
@@ -382,6 +390,7 @@ export type Interactable =
   | { kind: 'waypoint' }
   | { kind: 'stash' }
   | { kind: 'forge' }
+  | { kind: 'wyrm' }
   | { kind: 'portal' }
   | { kind: 'exit'; index: number };
 
@@ -667,6 +676,7 @@ export class World {
     const rng = new Rng(deep ? hashSeed(this.seed, id, this.char.difficulty, this.depthRun) : hashSeed(this.seed, id, this.char.difficulty));
     const def = deep ? depthDef(depthOf(id), rng) : AREA_BY_ID[id];
     const level = generateLevel(def.spec, rng);
+    if (id === WYRM_FROM) this.addRoostPath(level);
     const a: AreaState = {
       def, level, monsters: [], ground: [], orbs: [], projectiles: [], objects: [], npcs: [], hazards: [], rings: [], fx: [],
       explored: new Uint8Array(level.w * level.h), exploredRev: 0, flow: new FlowField(level, 26),
@@ -683,6 +693,21 @@ export class World {
     }
     this.areas.set(id, a);
     return a;
+  }
+
+  /**
+   * Adds the way up to the Brass Wyrm's cave to a finished Gloomwood. No dice are rolled for it, so the wood itself,
+   * and everything in it, is exactly what it would have been without the cave: the spot is the pack ground furthest from any other way out.
+   */
+  private addRoostPath(l: Level) {
+    let best: Point | null = null;
+    let bd = -1;
+    for (const s of l.spawns) {
+      const d = Math.min(...l.exits.map((e) => Math.abs(e.x - s.x) + Math.abs(e.y - s.y)));
+      if (d > bd) (bd = d), (best = s);
+    }
+    const at = best ?? nearestFloor(l, { x: l.w / 2, y: l.h / 2 });
+    l.exits.push({ x: at.x, y: at.y, to: WYRM_AREA, label: 'A Cave High on the Ridge', kind: 'down' });
   }
 
   private addNpc(a: AreaState, k: NpcKind) {
@@ -743,6 +768,10 @@ export class World {
       occupied.add(idx(l, p.x, p.y));
       return { x: p.x + 0.5, y: p.y + 0.5 };
     };
+    if (def.id === WYRM_AREA) {
+      this.placeWyrm(a);
+      return;
+    }
     if (def.depth) {
       this.placeWarden(a, rng, place);
       packId++;
@@ -850,6 +879,145 @@ export class World {
     }
   }
 
+  // ---------------------------------------------------------------- the Brass Wyrm
+
+  /** Lays the Brass Wyrm on his hoard. What he remembers of this hero is in the quest log, per difficulty. */
+  private placeWyrm(a: AreaState) {
+    const l = a.level;
+    // He has the biggest chamber in the cave: room to breathe, and room to be thrown across.
+    const hall = l.rooms.slice().sort((p, q) => q.w * q.h - p.w * p.h)[0];
+    const spot = hall ? { x: Math.floor(hall.x + hall.w / 2), y: Math.floor(hall.y + hall.h / 2) } : (l.spots.boss ?? l.start);
+    const m = this.spawnMonster(a, 'wyrm', spot.x + 0.5, spot.y + 0.5, 'boss', { packId: 1, superId: 'wyrm', level: this.mlvl(a.def) + 2 });
+    m.facing = Math.PI * 0.75;
+    const fought = this.questState('wyrm_fight') !== 'none';
+    // A thief who got away and comes back finds him awake and waiting.
+    const hunted = this.questState('wyrm_theft') === 'done' && !fought;
+    this.setWyrm(m, hunted ? 'fight' : fought ? 'yielded' : 'asleep', hunted);
+    for (const [dx, dy] of [[-3, 1], [3, 2], [0, -3]]) {
+      const s = nearestFloor(l, { x: spot.x + dx, y: spot.y + dy });
+      a.objects.push({ id: this.id(), x: s.x + 0.5, y: s.y + 0.5, kind: 'chest', used: fought || hunted, hoard: true });
+    }
+  }
+
+  private setWyrm(m: Monster, state: WyrmState, angry = m.wyrmAngry) {
+    m.wyrm = state;
+    m.calm = state !== 'fight';
+    m.alert = state === 'fight';
+    if (angry && !m.wyrmAngry) {
+      // Robbed: he hits harder and does not wait about.
+      m.wyrmAngry = true;
+      m.dmgMin = Math.round(m.dmgMin * 1.35);
+      m.dmgMax = Math.round(m.dmgMax * 1.35);
+      m.speed *= 1.2;
+    }
+    if (state === 'fight') {
+      m.life = m.maxLife;
+      m.phase = 0;
+      m.abilities = undefined;
+      m.abilityCd = 2.5;
+    }
+  }
+
+  /** The Brass Wyrm, if the hero is in his cave. */
+  wyrm(): Monster | undefined {
+    return this.area.def.id === WYRM_AREA ? this.area.monsters.find((m) => m.wyrm && !m.illusion) : undefined;
+  }
+
+  /** What he has to say just now. */
+  wyrmTalk(): WyrmTalk {
+    const fight = this.questState('wyrm_fight');
+    const errand = this.questState('wyrm_errand');
+    if (fight === 'done') return 'fight_pay';
+    if (errand === 'done') return 'errand_pay';
+    if (this.questState('wyrm_theft') === 'done') return 'robbed';
+    if (errand === 'active') return 'errand_out';
+    return fight === 'rewarded' && errand === 'rewarded' ? 'done' : 'greet';
+  }
+
+  /** Whether he will still hand over the letter, and whether he can still be challenged, on this difficulty. */
+  get wyrmChoices() {
+    const robbed = this.questState('wyrm_theft') === 'done';
+    return { errand: this.questState('wyrm_errand') === 'none' && !robbed, challenge: this.questState('wyrm_fight') === 'none' };
+  }
+
+  /** Takes the letter for the captain in Tel Maresh. */
+  wyrmErrand(): boolean {
+    if (!this.wyrm() || !this.wyrmChoices.errand) return false;
+    this.setQuest('wyrm_errand', 'active');
+    this.msg('You take the letter. It is sealed in brass, and warm.', '#e8c860');
+    this.sound('quest');
+    return true;
+  }
+
+  /** Starts the fight. */
+  wyrmChallenge(): boolean {
+    const m = this.wyrm();
+    if (!m || !this.wyrmChoices.challenge || m.wyrm === 'fight') return false;
+    this.setWyrm(m, 'fight');
+    this.emit({ type: 'announce', text: m.name, sub: 'He is awake', color: '#e8b040' });
+    this.emit({ type: 'shake', amount: 8 });
+    this.sound('roar');
+    return true;
+  }
+
+  /** Three things from the hoard to choose between, once he owes the hero a choice. */
+  wyrmOffer: Item[] | null = null;
+  wyrmOffers(): Item[] {
+    const talk = this.wyrmTalk();
+    if (talk !== 'fight_pay' && talk !== 'errand_pay') return [];
+    if (!this.wyrmOffer) {
+      const ilvl = Math.max(this.char.level + 4, 12);
+      const cls = this.char.classId;
+      this.wyrmOffer = [
+        generateItem(this.luck, ilvl, { rarity: 'unique', classId: cls, kinds: ['weapon', 'armor', 'helm', 'shield', 'gloves', 'boots', 'belt'] }),
+        generateItem(this.luck, ilvl, { rarity: 'set', classId: cls }),
+        generateItem(this.luck, ilvl, { rarity: 'rare', classId: cls, kinds: ['ring', 'amulet'] }),
+      ];
+      for (const it of this.wyrmOffer) it.identified = true;
+    }
+    return this.wyrmOffer;
+  }
+
+  /** Takes one of the three. The other two go back on the pile. */
+  wyrmClaim(i: number): Item | null {
+    const talk = this.wyrmTalk();
+    const it = this.wyrmOffers()[i];
+    if (!it) return null;
+    this.setQuest(talk === 'fight_pay' ? 'wyrm_fight' : 'wyrm_errand', 'rewarded');
+    this.wyrmOffer = null;
+    if (!addToInventory(this.char, it)) this.dropToGround(it, this.player.x, this.player.y);
+    this.sound(it.rarity === 'rare' ? 'rare' : 'unique');
+    this.fx({ kind: 'coins', x: this.player.x, y: this.player.y, dur: 1.1, r: 2 });
+    return it;
+  }
+
+  /** He has had enough. He does not die: the fight simply stops, and he pays (or, robbed, does not). */
+  private wyrmYields(m: Monster) {
+    const a = this.area;
+    const robbed = !!m.wyrmAngry;
+    this.setWyrm(m, 'yielded');
+    m.action = null;
+    m.charge = undefined;
+    m.sub = undefined;
+    m.subStrike = undefined;
+    m.poison.t = 0;
+    m.stun = 0;
+    for (const o of a.monsters) if (o.illusion && o.ownerId === m.id && !o.dead) this.dispelIllusion(o);
+    a.projectiles = a.projectiles.filter((pr) => pr.owner !== 'monster');
+    a.hazards = a.hazards.filter((h) => h.owner !== 'monster');
+    const c = this.char;
+    if (addXp(c, m.xp * xpMultiplier(m.level, c.level))) this.levelUp();
+    c.forge.cinders += 60;
+    this.setQuest('wyrm_fight', robbed ? 'rewarded' : 'done');
+    this.emit({ type: 'hitstop', t: 0.3 });
+    this.emit({ type: 'shake', amount: 12 });
+    this.emit({ type: 'flash', color: '#ffd070', a: 0.4 });
+    this.emit({ type: 'announce', text: 'The Brass Wyrm yields', sub: robbed ? 'He keeps what is left of his hoard' : 'He will pay from the hoard · +60 Cinders', color: '#e8b040' });
+    this.sound('quest');
+    if (robbed) this.spawnDrops(m.x, m.y, m.level, 'boss');
+    this.emit({ type: 'open', panel: 'wyrm' });
+  }
+
   /** The warden still holding this floor's stairs, if there is one. */
   wardenAlive(): Monster | undefined {
     return this.area.monsters.find((m) => m.warden && !m.dead);
@@ -928,6 +1096,9 @@ export class World {
       this.syncTownNpcs(a);
     }
     if (a.def.quest && this.questState(a.def.quest) === 'none') this.setQuest(a.def.quest, 'active');
+    // A fight with the Brass Wyrm that was walked away from starts again from the beginning.
+    const wyrm = a.def.id === WYRM_AREA ? a.monsters.find((m) => m.wyrm === 'fight' && !m.illusion) : undefined;
+    if (wyrm) this.setWyrm(wyrm, 'fight');
     this.emit({ type: 'area', id });
     if (a.def.depth && a.def.afflictions?.length && this.wardenAlive()) {
       this.emit({ type: 'announce', text: a.def.afflictions.map((m) => afflictionLabel(m).split(' (')[0]).join(' · '), sub: `Everything on this floor is ${a.def.afflictions.map((m) => MOD_LABEL[m]).join(', ')}`, color: '#d080ff' });
@@ -1052,7 +1223,7 @@ export class World {
     let bestScore = Infinity;
     const focus = this.area.monsters.find((m) => m.id === this.focusId && !m.dead);
     for (const m of this.area.monsters) {
-      if (m.dead || m.sub) continue;
+      if (m.dead || m.sub || m.calm) continue;
       const d = Math.hypot(m.x - p.x, m.y - p.y);
       if (d > range || !lineOfSight(this.area.level, p, m)) continue;
       const ang = Math.abs(angleDiff(Math.atan2(m.y - p.y, m.x - p.x), p.facing));
@@ -1110,6 +1281,10 @@ export class World {
         return a.level.spots.stash ? { x: a.level.spots.stash.x + 0.5, y: a.level.spots.stash.y + 0.5 } : null;
       case 'forge':
         return a.level.spots.forge ? { x: a.level.spots.forge.x + 0.5, y: a.level.spots.forge.y + 0.5 } : null;
+      case 'wyrm': {
+        const m = this.wyrm();
+        return m && m.calm ? { x: m.x, y: m.y } : null;
+      }
       case 'portal': {
         const pp = this.portalPos();
         return pp;
@@ -1141,7 +1316,7 @@ export class World {
       }
       case 'object': {
         const o = a.objects.find((x) => x.id === t.id);
-        return o ? (o.kind === 'shrine' ? SHRINE_NAMES[o.shrine!] : o.kind === 'chest' ? 'Chest' : o.kind === 'brazier' ? 'Unlit Brazier' : 'Barrel') : '';
+        return o ? (o.kind === 'shrine' ? SHRINE_NAMES[o.shrine!] : o.hoard ? 'Hoard' : o.kind === 'chest' ? 'Chest' : o.kind === 'brazier' ? 'Unlit Brazier' : 'Barrel') : '';
       }
       case 'npc': {
         const n = a.npcs.find((x) => x.id === t.id);
@@ -1153,6 +1328,8 @@ export class World {
         return 'Stash';
       case 'forge':
         return 'The Forge';
+      case 'wyrm':
+        return this.wyrm()?.wyrm === 'asleep' ? 'Something Asleep on a Hoard' : (this.wyrm()?.name ?? '');
       case 'portal':
         return this.inTown ? `Town Portal (${this.defOf(this.portal!.area).name})` : 'Town Portal';
       case 'exit': {
@@ -1177,6 +1354,7 @@ export class World {
     if (a.level.waypoint) push({ kind: 'waypoint' }, this.interactPos({ kind: 'waypoint' }));
     if (a.level.spots.stash) push({ kind: 'stash' }, this.interactPos({ kind: 'stash' }));
     if (a.level.spots.forge) push({ kind: 'forge' }, this.interactPos({ kind: 'forge' }));
+    if (a.def.id === WYRM_AREA) push({ kind: 'wyrm' }, this.interactPos({ kind: 'wyrm' }), -0.4);
     push({ kind: 'portal' }, this.portalPos(), -0.2);
     a.level.exits.forEach((_, i) => push({ kind: 'exit', index: i }, this.interactPos({ kind: 'exit', index: i }), 0.3));
     return out.sort((p, q) => p.d - q.d);
@@ -1187,7 +1365,7 @@ export class World {
     let best: Monster | undefined;
     let bd = Infinity;
     for (const m of this.area.monsters) {
-      if (m.dead || m.sub) continue;
+      if (m.dead || m.sub || m.calm) continue;
       // Hit-test slightly above the feet where the body is drawn.
       const d = Math.min(Math.hypot(m.x - x, m.y - y), Math.hypot(m.x - 0.35 * m.def.scale - x, m.y - 0.35 * m.def.scale - y));
       if (d < m.def.radius + 0.55 && d < bd) (bd = d), (best = m);
@@ -1222,6 +1400,12 @@ export class World {
           this.fx({ kind: 'heal', x: p.x, y: p.y, dur: 0.8 });
         }
         if (n.kind === 'sage') this.sageRewards();
+        if (n.kind === 'captain' && a.def.id === ERRAND_TOWN && this.questState('wyrm_errand') === 'active') {
+          this.setQuest('wyrm_errand', 'done');
+          this.msg('The captain breaks the brass seal, reads the letter twice, and laughs until she has to sit down. "Tell the old lizard yes."', '#e8c860');
+          this.msg('Letter delivered. Return to the High Roost above Gloomwood.', '#e8c860');
+          this.sound('quest');
+        }
         this.emit({ type: 'open', panel: n.kind });
         break;
       }
@@ -1236,6 +1420,16 @@ export class World {
         p.facing = -Math.PI / 2;
         this.emit({ type: 'open', panel: 'forge' });
         break;
+      case 'wyrm': {
+        const m = this.wyrm();
+        if (!m || !m.calm) break;
+        if (m.wyrm === 'asleep') {
+          this.setWyrm(m, 'awake');
+          this.sound('roar');
+        }
+        this.emit({ type: 'open', panel: 'wyrm' });
+        break;
+      }
       case 'portal':
         this.takePortal();
         break;
@@ -1863,7 +2057,7 @@ export class World {
     if (it.kind === 'interact') {
       const pos = this.interactPos(it.target);
       if (!pos) return void (p.intent = null);
-      const reach = it.target.kind === 'npc' ? 1.6 : it.target.kind === 'exit' ? 0.7 : it.target.kind === 'forge' ? 1.3 : 1.1;
+      const reach = it.target.kind === 'npc' ? 1.6 : it.target.kind === 'exit' ? 0.7 : it.target.kind === 'forge' ? 1.3 : it.target.kind === 'wyrm' ? 3.4 : 1.1;
       if (Math.hypot(pos.x - p.x, pos.y - p.y) <= reach) {
         p.intent = null;
         p.path = [];
@@ -2469,7 +2663,7 @@ export class World {
 
   monstersNear(x: number, y: number, r: number): Monster[] {
     return this.area.monsters
-      .filter((m) => !m.dead && !m.sub && Math.hypot(m.x - x, m.y - y) <= r + m.def.radius)
+      .filter((m) => !m.dead && !m.sub && !m.calm && Math.hypot(m.x - x, m.y - y) <= r + m.def.radius)
       .sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y));
   }
 
@@ -2488,7 +2682,7 @@ export class World {
   // ---------------------------------------------------------------- damage
 
   damageMonster(m: Monster, d: Damage, o: { ar?: number; chill?: number; stun?: number; knock?: { x: number; y: number; f: number }; crit?: boolean; leech?: boolean; minion?: Monster } = {}): boolean {
-    if (m.dead || m.sub || m.invulnT) return false;
+    if (m.dead || m.sub || m.calm || m.invulnT) return false;
     if (m.wardId !== undefined) {
       if (this.area.monsters.some((o) => o.id === m.wardId && !o.dead)) {
         if (!o.minion) this.floatText(m.x, m.y, 'Warded', '#8ac8ff');
@@ -2503,9 +2697,10 @@ export class World {
     }
     if (m.curse && m.curse.t > 0 && d.phys > 0) d = { ...d, phys: d.phys * (1 + m.curse.pct / 100) };
     // Sky Hunter: a Hiveborn Archer's arrows and claws alike are worse news for anything with wings.
-    if (!o.minion && m.def.ai === 'bat' && d.phys > 0) {
+    if (!o.minion && (m.def.ai === 'bat' || m.def.flies) && d.phys > 0) {
       const sl = skillLevel(this.char, 'sky_hunter');
       if (sl) d = { ...d, phys: d.phys * (1 + SKILL_BY_ID.sky_hunter.params(sl).pct2! / 100) };
+      if (sl && m.wyrm) this.msg('"I am NOT a bird."', '#e8b040', 'notabird');
     }
     if (m.sunder && m.sunder.t > 0 && d.phys > 0) d = { ...d, phys: d.phys * (1 + m.sunder.pct / 100) };
     // Struck by a servant: turn on it some of the time.
@@ -2539,6 +2734,12 @@ export class World {
     m.life -= dealt;
     m.flash = 0.12;
     if (!o.minion) this.setFocus(m);
+    if (m.wyrm === 'fight' && m.life <= m.maxLife * (m.wyrmAngry ? YIELD_ANGRY : YIELD_AT)) {
+      m.life = Math.max(1, m.life);
+      if (total > 0) this.floatText(m.x, m.y, String(Math.round(total)), '#ffffff');
+      this.wyrmYields(m);
+      return true;
+    }
     if (total > 0) {
       this.fx({ kind: d.phys > 0 ? 'blood' : 'spark', x: m.x, y: m.y, dur: 0.35, color: elemColor(d) });
       if (o.crit) this.floatText(m.x, m.y, `${Math.round(total)}!`, '#ffd040', 21);
@@ -2850,6 +3051,7 @@ export class World {
 
   private useObject(o: WorldObject) {
     if (o.kind === 'brazier') return this.lightBrazier(o);
+    if (o.hoard) return this.robHoard();
     o.used = true;
     const p = this.player;
     const mlvl = this.mlvl(this.area.def);
@@ -2882,6 +3084,28 @@ export class World {
     this.spawnDrops(o.x, o.y, mlvl, o.kind === 'chest' ? 'chest' : 'barrel');
   }
 
+  /** Helping yourself to the Brass Wyrm's hoard while he is not fighting. It pays well, once, and he wakes up. */
+  private robHoard() {
+    const m = this.wyrm();
+    if (!m) return;
+    if (m.wyrm === 'yielded' || this.questState('wyrm_fight') !== 'none') return this.msg('He is watching you. Best not.', '#e8b040', 'hoard');
+    const a = this.area;
+    this.setQuest('wyrm_theft', 'done');
+    for (const o of a.objects) {
+      if (!o.hoard || o.used) continue;
+      o.used = true;
+      this.fx({ kind: 'coins', x: o.x, y: o.y, dur: 1.1, r: 2 });
+      this.spawnDrops(o.x, o.y, m.level, 'unique');
+      this.spawnDrops(o.x, o.y, m.level, 'chest');
+    }
+    this.sound('jackpot');
+    this.msg('"THIEF."', '#ff7040');
+    this.setWyrm(m, 'fight', true);
+    this.emit({ type: 'announce', text: m.name, sub: 'He is awake, and he saw that', color: '#ff7040' });
+    this.emit({ type: 'shake', amount: 12 });
+    this.sound('roar');
+  }
+
   // ---------------------------------------------------------------- monsters
 
   private updateMonsters(dt: number) {
@@ -2902,9 +3126,14 @@ export class World {
       if (m.burnT && (m.burnT -= dt) <= 0) m.burnT = 0;
       if (m.drainT && (m.drainT -= dt) <= 0) m.drainT = 0;
       if (Math.abs(m.x - p.x) > 32 || Math.abs(m.y - p.y) > 32) continue;
+      if (m.calm) continue;
       if (m.poison.t > 0) {
         m.poison.t -= dt;
         m.life -= m.poison.dps * dt;
+        if (m.wyrm === 'fight' && m.life <= m.maxLife * (m.wyrmAngry ? YIELD_ANGRY : YIELD_AT)) {
+          this.wyrmYields(m);
+          continue;
+        }
         if (m.life <= 0) {
           this.killMonster(m, 'melt');
           continue;
@@ -3205,6 +3434,7 @@ export class World {
       poison_spray: '#70c030', summon_scarabs: '#40b0a0', burrow_strike: '', summon_kites: '#806050', corpse_feast: '#a02020', sun_lance: '#ffc040',
       summon_mummies: '#d8c890', raise_dead: '#d8c890', mirage_split: '#ffe0a0', summon_acolytes: '#ffc040', noon_burst: '#fff0c0',
       ice_lance: '#80c8ff', summon_thralls: '#80c8ff', summon_eaters: '#6040a0', cold_snap: '#d8f0ff', snuff: '#101828', frost_rain: '#80c8ff', toll: '#c8a860',
+      breath: '#ff9030', buffet: '', take_wing: '#ffd070',
     } satisfies Record<BossAbility, string>)[pick];
     if (flash) this.emit({ type: 'flash', color: flash, a: 0.22 });
     switch (pick) {
@@ -3363,6 +3593,60 @@ export class World {
       case 'mirage_split':
         this.spawnIllusions(m, 2);
         break;
+      case 'breath': {
+        // A fan of fire, marked on the ground before it lands: three lines widening as they go, and the ground burns after.
+        const base = Math.atan2(p.y - m.y, p.x - m.x);
+        m.facing = base;
+        for (const off of [-0.34, 0, 0.34]) {
+          for (let i = 1; i <= 7; i++) {
+            const x = m.x + Math.cos(base + off) * (1 + i * 1.25);
+            const y = m.y + Math.sin(base + off) * (1 + i * 1.25);
+            if (!isWalkable(this.area.level, x, y)) break;
+            const delay = 0.85 + i * 0.06;
+            const radius = 0.9 + i * 0.08;
+            this.area.hazards.push({ x, y, t: 0, delay, dur: 1.6, radius, dmg: dmg('fire', 0.7), owner: 'monster', burnDps: m.dmgMax * 0.2, srcLevel: m.level, fired: false, quiet: true });
+            this.fx({ kind: 'meteor_mark', x, y, dur: delay, r: radius });
+          }
+        }
+        m.action = { t: 0, hitAt: 0.85, dur: 1.5, done: true, kind: 'cast' };
+        this.sound('roar');
+        break;
+      }
+      case 'buffet': {
+        // One beat of the wings: whatever is close is hurt a little and thrown a long way.
+        if (d > 5.5) {
+          m.abilityCd = 1;
+          break;
+        }
+        const ux = (p.x - m.x) / d;
+        const uy = (p.y - m.y) / d;
+        this.fx({ kind: 'wave', x: m.x, y: m.y, dur: 0.45, r: 5.5, ang: Math.atan2(uy, ux) });
+        this.fx({ kind: 'dust', x: p.x, y: p.y, dur: 0.6 });
+        this.emit({ type: 'shake', amount: 7 });
+        this.sound('boom');
+        this.damagePlayer(dmg('phys', 0.45), { level: m.level });
+        p.action = null;
+        p.intent = null;
+        for (let i = 0; i < 9; i++) this.addTimer(i * 0.025, () => void (!p.dead && this.area.def.id === WYRM_AREA && this.moveEntity(p, ux * 0.5, uy * 0.5, 0.3)));
+        for (const mi of this.minions) if (!mi.dead && Math.hypot(mi.x - m.x, mi.y - m.y) < 5.5) this.damageMinion(mi, dmg('phys', 0.45), { level: m.level });
+        break;
+      }
+      case 'take_wing': {
+        // Up into the dark of the cave. He cannot be reached, fire comes down where the hero stands, and then so does he.
+        m.sub = 3.4;
+        m.subStrike = true;
+        m.abilityCd = this.rng.range(7, 10);
+        const a = this.area;
+        for (let i = 0; i < 4; i++) {
+          this.addTimer(0.4 + i * 0.6, () => {
+            if (this.area !== a || !m.sub || m.wyrm !== 'fight') return;
+            a.hazards.push({ x: p.x, y: p.y, t: 0, delay: 0.75, dur: 1.5, radius: 1.5, dmg: dmg('fire', 0.8), owner: 'monster', burnDps: m.dmgMax * 0.2, srcLevel: m.level, fired: false });
+            this.fx({ kind: 'meteor_mark', x: p.x, y: p.y, dur: 0.75, r: 1.5 });
+          });
+        }
+        this.sound('roar');
+        break;
+      }
       case 'noon_burst':
         this.noonBurst(m);
         break;
@@ -3412,7 +3696,7 @@ export class World {
       const d = Math.hypot(dx, dy) || 1;
       const sp = m.speed * (strike ? 3 : 2) * dt;
       if (d > 0.4) this.moveEntity(m, (dx / d) * sp, (dy / d) * sp, m.def.radius);
-      if (Math.floor(before * 9) !== Math.floor(m.sub * 9)) this.fx({ kind: 'dust', x: m.x, y: m.y, dur: 0.7 });
+      if (!m.def.flies && Math.floor(before * 9) !== Math.floor(m.sub * 9)) this.fx({ kind: 'dust', x: m.x, y: m.y, dur: 0.7 });
       if (m.sub <= WARNING) this.fx({ kind: 'meteor_mark', x: m.x, y: m.y, dur: WARNING, r: strike ? 2.2 : 1.6 });
     }
     if (m.sub > 0) return;
@@ -3550,7 +3834,7 @@ export class World {
     // An Ember-Keeper carries a coal of their own.
     for (const mi of this.minions) if (mi.def.id === 'hire_mage' && !mi.dead && Math.hypot(mi.x - x, mi.y - y) <= 2) return 0.5;
     for (const m of a.monsters) {
-      if (m.dead || m.sub) continue;
+      if (m.dead || m.sub || m.calm) continue;
       const hot = (m.burnT ?? 0) > 0 || (m.heat ?? 0) >= SLAG_MOLTEN || m.mods.includes('fireEnch');
       if (hot && Math.hypot(m.x - x, m.y - y) <= 2.6 + m.def.radius) return 0.5;
     }
@@ -3835,7 +4119,7 @@ export class World {
       }
       if (pr.owner === 'player') {
         for (const m of a.monsters) {
-          if (m.dead || m.sub || pr.hit.has(m.id)) continue;
+          if (m.dead || m.sub || m.calm || pr.hit.has(m.id)) continue;
           if (Math.hypot(m.x - pr.x, m.y - pr.y) > m.def.radius + pr.radius) continue;
           pr.hit.add(m.id);
           if (pr.explode) {
@@ -4027,7 +4311,7 @@ export class World {
         // Those who shoot look as far as they can reach.
         let bd = foe ? Math.hypot(foe.x - mi.x, foe.y - mi.y) - 1 : Math.max(7, mi.def.missile ? mi.def.range : 0);
         for (const m of this.area.monsters) {
-          if (m.dead || m.sub || Math.abs(m.x - mi.x) > bd || Math.abs(m.y - mi.y) > bd) continue;
+          if (m.dead || m.sub || m.calm || Math.abs(m.x - mi.x) > bd || Math.abs(m.y - mi.y) > bd) continue;
           const d = Math.hypot(m.x - mi.x, m.y - mi.y);
           if (d < bd && Math.hypot(m.x - p.x, m.y - p.y) < 10 && lineOfSight(l, mi, m)) (bd = d), (foe = m);
         }
@@ -4137,7 +4421,7 @@ export class World {
       let bd = range;
       foe = undefined;
       for (const m of this.area.monsters) {
-        if (m.dead || m.sub || Math.abs(m.x - mi.x) > range + 1 || Math.abs(m.y - mi.y) > range + 1) continue;
+        if (m.dead || m.sub || m.calm || Math.abs(m.x - mi.x) > range + 1 || Math.abs(m.y - mi.y) > range + 1) continue;
         const d = Math.hypot(m.x - mi.x, m.y - mi.y) - m.def.radius;
         if (d < bd && lineOfSight(l, mi, m)) (bd = d), (foe = m);
       }
@@ -4697,7 +4981,7 @@ export class World {
     const a = this.area;
     if (a.def.quest === 'hollow' && this.questState('hollow') === 'active') return this.questStrays();
     if (a.def.town || a.purged) return [];
-    const alive = a.monsters.filter((m) => !m.dead && !m.thief);
+    const alive = a.monsters.filter((m) => !m.dead && !m.thief && !m.wyrm);
     if (alive.length <= 5) return alive;
     // An Underforge warden shows once the hero is near enough to hear it, so the stairs can be found.
     const warden = this.wardenAlive();

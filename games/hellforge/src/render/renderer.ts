@@ -217,6 +217,7 @@ export class Renderer {
     for (const o of a.objects) {
       if (!near(o.x, o.y)) continue;
       add(o.x + o.y, () => {
+        if (o.kind === 'chest' && o.hoard) this.drawHoard(o.x, o.y, o.used);
         if (o.kind === 'chest') this.drawChest(o.x, o.y, o.used, false);
         else if (o.kind === 'barrel') this.drawBarrel(o.x, o.y, o.used);
         else if (o.kind === 'brazier') this.drawBrazier(o.x, o.y, o.used);
@@ -618,6 +619,15 @@ export class Renderer {
       ctx.restore();
       return;
     }
+    if (m.sub && m.def.flies) {
+      // Up in the dark: only his shadow, sliding across the floor and growing as he comes down.
+      const low = 1 - Math.min(1, m.sub / 3.4);
+      ctx.fillStyle = `rgba(0,0,0,${0.3 + 0.3 * low})`;
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y, (26 + 30 * low) * z, (11 + 13 * low) * z, 0, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
     if (m.sub) {
       // Nothing to see but the sand heaving as it moves.
       const heave = 0.7 + 0.3 * Math.sin(this.time * 14 + m.id);
@@ -669,12 +679,14 @@ export class Renderer {
     if (m.mods.includes('lightEnch')) color = '#b9a8f0';
     const id = m.def.id;
     const mt = this.time + m.id;
-    drawMonsterShape(ctx, shape, color, pose, mt, { id });
+    const opts = { id, asleep: m.wyrm === 'asleep' };
+    drawMonsterShape(ctx, shape, color, pose, mt, opts);
+    if (opts.asleep) this.text('z', s.x + (30 + ((this.time * 6) % 12)) * z, s.y - (34 + ((this.time * 9) % 18)) * z, '#c8b890', 12);
     const poisoned = m.poison.t > 0;
     if (m.flash > 0 || m.chill > 0 || poisoned || this.hoverId === m.id) {
       const a = m.flash > 0 ? 0.55 : this.hoverId === m.id ? 0.25 : 0.35;
       const tint = m.flash > 0 ? '#ffffff' : m.chill > 0 ? '#3080ff' : poisoned ? '#40a010' : '#806040';
-      drawTinted(ctx, (c) => drawMonsterShape(c, shape, color, pose, mt, { id }), tint, a);
+      drawTinted(ctx, (c) => drawMonsterShape(c, shape, color, pose, mt, opts), tint, a);
     }
     ctx.restore();
     if ((m.burnT ?? 0) > 0 || (m.def.slag && heat >= SLAG_MOLTEN)) {
@@ -1557,6 +1569,32 @@ export class Renderer {
       ctx.fill();
     }
     ctx.restore();
+  }
+
+  /** A heap of coin under one of the Brass Wyrm's chests. Less of it once it has been robbed. */
+  private drawHoard(x: number, y: number, robbed: boolean) {
+    const ctx = this.ctx;
+    const z = this.cam.zoom;
+    const s = this.cam.toScreen(x, y);
+    const k = robbed ? 0.55 : 1;
+    const g = ctx.createRadialGradient(s.x, s.y - 4 * z, 2, s.x, s.y, 30 * z * k);
+    g.addColorStop(0, '#f0c850');
+    g.addColorStop(0.6, '#a87a20');
+    g.addColorStop(1, '#5a3c10');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(s.x, s.y + 3 * z, 30 * z * k, 12 * z * k, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(s.x - 4 * z, s.y - 2 * z, 18 * z * k, 8 * z * k, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Glints.
+    for (let i = 0; i < 5; i++) {
+      const a = (Math.sin(this.time * 2.1 + i * 2.4 + x) + 1) / 2;
+      if (a < 0.6) continue;
+      ctx.fillStyle = `rgba(255,244,190,${(a - 0.6) * 2.2})`;
+      ctx.fillRect(s.x + Math.cos(i * 2.2 + y) * 20 * z * k, s.y + Math.sin(i * 1.7 + x) * 7 * z * k, 2 * z, 2 * z);
+    }
   }
 
   private drawChest(x: number, y: number, open: boolean, stash: boolean) {
