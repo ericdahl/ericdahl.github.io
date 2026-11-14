@@ -1,7 +1,9 @@
 import { CLASSES, createCharacter, DIFFICULTIES, type Character } from '../game/character';
 import type { ClassId } from '../game/items';
 import { CHANGELOG } from '../changelog';
+import { SKILL_TREES } from '../game/skilltree';
 import { h } from './dom';
+import { heroPortrait, heroScene } from './heroselect';
 import { deleteCharacter, importCharacters, loadCharacters, loadSharedStashes, saveCharacter, saveSharedStashes, sharedIsEmpty } from './save';
 import { bundleJson, decodeBundle, downloadFile, encodeCode } from './transfer';
 
@@ -22,7 +24,7 @@ export function showMenu(root: HTMLElement, play: (c: Character) => void) {
         h(
           'button',
           { class: `char-card ${selected?.id === c.id ? 'sel' : ''} ${c.dead ? 'dead' : ''}`, onclick: () => { selected = c; renderList(); }, ondblclick: () => !c.dead && play(c) },
-          h('div', { class: 'cc-portrait', style: { background: cls.color } }, cls.name[0]),
+          h('div', { class: 'cc-portrait', style: { background: `radial-gradient(circle at 50% 35%, ${cls.color}, #120c08 85%)` } }, heroPortrait(c.classId, c.equipment)),
           h('div', { class: 'cc-info' },
             h('div', { class: 'cc-name' }, c.name, c.hardcore ? h('span', { class: 'hc' }, ' HC') : null),
             h('div', { class: 'cc-sub' }, `Level ${c.level} ${cls.name}`),
@@ -67,23 +69,33 @@ export function showMenu(root: HTMLElement, play: (c: Character) => void) {
     let cls: ClassId = 'reaver';
     let hardcore = false;
     const name = h('input', { class: 'name-in', maxlength: 15, placeholder: 'Hero name', value: '', 'aria-label': 'Hero name' }) as HTMLInputElement;
-    const cards = h('div', { class: 'class-cards' });
+    // The classes stand round a fire. Tapping one, or its name underneath, picks it.
+    const about = h('div', { class: 'class-about', 'aria-live': 'polite' });
+    const cards = h('div', { class: 'class-cards', role: 'tablist', 'aria-label': 'Class' });
+    const pick = (id: ClassId) => {
+      cls = id;
+      scene.select(id);
+      drawCards();
+    };
+    const scene = heroScene(cls, pick);
     const drawCards = () => {
       cards.innerHTML = '';
       for (const c of Object.values(CLASSES)) {
-        cards.append(
-          h('button', { class: `class-card ${cls === c.id ? 'sel' : ''}`, onclick: () => { cls = c.id; drawCards(); } },
-            h('div', { class: 'cc-portrait big', style: { background: c.color } }, c.name[0]),
-            h('div', { class: 'cc-name' }, c.name),
-            h('div', { class: 'small dim' }, c.desc)),
-        );
+        cards.append(h('button', { class: `class-card ${cls === c.id ? 'sel' : ''}`, role: 'tab', 'aria-selected': String(cls === c.id), onclick: () => pick(c.id) }, h('div', { class: 'cc-name' }, c.name)));
       }
+      const c = CLASSES[cls];
+      about.replaceChildren(
+        h('div', { class: 'ca-name', style: { color: c.color } }, c.name),
+        h('div', { class: 'ca-desc' }, c.desc),
+        h('div', { class: 'ca-branches' }, ...SKILL_TREES[cls].map((b) => h('span', { class: 'ca-branch' }, b.name))));
     };
     drawCards();
     const hc = h('label', { class: 'hc-toggle' }, h('input', { type: 'checkbox', onchange: (e: Event) => (hardcore = (e.target as HTMLInputElement).checked) }), ' Hardcore (death is permanent)');
     screen.append(
       h('div', { class: 'logo small' }, h('div', { class: 'logo-main' }, 'NEW HERO')),
+      scene.el,
       cards,
+      about,
       name,
       hc,
       h(
