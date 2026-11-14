@@ -1,4 +1,4 @@
-import { AREA_BY_ID } from '../game/areas';
+import { AREA_BY_ID, type AreaDef } from '../game/areas';
 import type { SoundId } from '../game/world';
 import { Music } from './music';
 
@@ -13,6 +13,7 @@ export class Audio {
   musicOn = true;
   music: Music | null = null;
   private area = 'town';
+  private areaDef: AreaDef | undefined;
 
   /** Must be called from a user gesture on iOS. */
   unlock() {
@@ -32,7 +33,7 @@ export class Audio {
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     this.music = new Music(this.ctx, this.noise, this.master);
     this.music.setEnabled(this.musicOn && this.enabled);
-    this.ambience(this.area);
+    this.ambience(this.area, this.areaDef ?? AREA_BY_ID[this.area]);
   }
 
   /** Stop everything and release the audio device (leaving the game). */
@@ -135,10 +136,11 @@ export class Audio {
   }
 
   /** Low filtered rumble that changes per area for atmosphere. */
-  ambience(areaId: string) {
+  ambience(areaId: string, def: AreaDef | undefined = AREA_BY_ID[areaId]) {
     this.area = areaId;
+    this.areaDef = def;
     if (!this.ctx) return;
-    this.music?.setTheme(AREA_BY_ID[areaId]?.spec.theme ?? 'fields');
+    this.music?.setTheme(def?.spec.theme ?? 'fields');
     if (this.ambient) {
       const old = this.ambient;
       old.gain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.4);
@@ -151,10 +153,10 @@ export class Audio {
     s.loop = true;
     const f = c.createBiquadFilter();
     f.type = 'lowpass';
-    f.frequency.value = AREA_BY_ID[areaId]?.town ? 500 : areaId === 'hellforge' || areaId === 'noon_vault' || areaId === 'hellforge_heart' ? 160 : AREA_BY_ID[areaId]?.blizzard ? 700 : 260;
+    f.frequency.value = def?.town ? 500 : areaId === 'hellforge' || areaId === 'noon_vault' || areaId === 'hellforge_heart' || def?.depth ? 160 : def?.blizzard ? 700 : 260;
     const g = c.createGain();
     g.gain.value = 0;
-    g.gain.setTargetAtTime(AREA_BY_ID[areaId]?.town ? 0.03 : 0.06, c.currentTime, 1);
+    g.gain.setTargetAtTime(def?.town ? 0.03 : 0.06, c.currentTime, 1);
     s.connect(f).connect(g).connect(this.master!);
     s.start();
     this.ambient = { src: s, gain: g };

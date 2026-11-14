@@ -195,8 +195,8 @@ export class Game implements PanelHost {
           this.showStory(STORIES[e.id]);
           break;
         case 'area':
-          this.banner(AREA_BY_ID[e.id].name);
-          this.audio.ambience(e.id);
+          this.banner(w.area.def.name);
+          this.audio.ambience(e.id, w.area.def);
           this.renderer.cam.snap(w.player.x, w.player.y);
           this.save();
           break;
@@ -528,7 +528,8 @@ export class Game implements PanelHost {
     }
     const strays = w.stragglers().length;
     const beacons = w.unlitBeacons().length;
-    this.setText('area', H.area, `${AREA_BY_ID[w.area.def.id].name}${beacons ? ` · ${beacons} ${beacons === 1 ? 'beacon' : 'beacons'} dark` : strays ? ` · ${strays} left` : ''}`);
+    const stairs = w.depth ? (w.wardenAlive() ? ' · stairs sealed' : ' · stairs open') : '';
+    this.setText('area', H.area, `${w.area.def.name}${stairs || (beacons ? ` · ${beacons} ${beacons === 1 ? 'beacon' : 'beacons'} dark` : strays ? ` · ${strays} left` : '')}`);
     // Context button: nearest interactable.
     const near = w.interactablesNear(p.x, p.y, 2.6)[0];
     if (near && !p.dead) {
@@ -710,6 +711,7 @@ export class Game implements PanelHost {
         h('div', { class: 'ov-title' }, STORIES.rekindle.title),
         ...STORIES.rekindle.lines.map((line) => h('div', { class: 'ov-sub' }, line)),
         h('div', { class: 'ov-sub' }, `${next ? `${next} difficulty is now unlocked from the character screen.` : 'You have conquered every difficulty. Legends will be sung of you.'}`),
+        h('div', { class: 'ov-sub' }, 'And under the Heart, something has opened. The Underforge can be entered from any waypoint: an endless descent, a floor at a time.'),
         h('button', { class: 'btn primary', onclick: () => this.overlayEl.classList.add('hidden') }, 'Continue'),
       ),
     );

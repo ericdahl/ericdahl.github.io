@@ -1,6 +1,19 @@
 /** Player-facing release notes, newest first. Shown from the version link on the title screen. */
 export const CHANGELOG: { version: string; date: string; notes: string[] }[] = [
   {
+    version: '0.15.0',
+    date: '2026-11-14',
+    notes: [
+      'The Underforge: an endless dungeon under the Hellforge\'s Heart. Finish the Ember Road and it opens at every waypoint, on each difficulty in turn.',
+      'Every floor is rolled fresh: a crypt, a cistern, a frozen mine or a storm of glass, with monsters from all three acts. Each floor is one level harder than the last, and elite packs grow thicker the deeper you go.',
+      'A warden holds the stairs. Kill it and the way down opens; it shows on the automap once you are close. Every fifth floor belongs to a boss you have met before, risen again.',
+      'Afflictions. From the third floor down, everything on a floor shares a modifier (Extra Fast, Extra Strong, Stone Skin and others), then two, then three.',
+      'The deeper the floor, the better the dead pay: magic find and gold find rise with depth, every warden drops like an elite, and each one leaves Cinders for the Forge.',
+      'Clear a boss floor and your next descent can start from the floor below it. Your deepest floor is kept on the character sheet.',
+      'Cold floors bring the ember and braziers with them, and glass floors their sandstorms. A town portal still takes you home and back, and climbing out leads to Emberwatch Ruins.',
+    ],
+  },
+  {
     version: '0.14.0',
     date: '2026-11-12',
     notes: [

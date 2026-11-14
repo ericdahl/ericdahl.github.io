@@ -1,4 +1,5 @@
 import type { LevelSpec } from './map';
+import type { UniqueMod } from './monsters';
 
 export interface AreaDef {
   id: string;
@@ -22,6 +23,10 @@ export interface AreaDef {
   cold?: boolean;
   /** Whiteouts roll through this area, and the ember burns down faster while they last. */
   blizzard?: boolean;
+  /** A floor of the Underforge, and how deep. */
+  depth?: number;
+  /** Modifiers every monster in the area carries. */
+  afflictions?: UniqueMod[];
 }
 
 export const AREAS: AreaDef[] = [
