@@ -17,8 +17,17 @@ SECTIONS = {"apps": "Apps", "games": "Games"}
 # Shown as cards at the top of the index, in this order: path -> (call to action,
 # accent class in the page's CSS). Each needs an icon.svg.
 FEATURED = {
-    "games/hellforge": ("Play", "ember"),
+    "hellforge": ("Play", "ember"),
     "apps/tingdu": ("Start reading", "ink"),
+}
+
+# Featured projects that are published from their own repos (served at /<repo>/ on
+# this domain), so their title and description can't be read from _site.
+EXTERNAL = {
+    "hellforge": (
+        "Hellforge",
+        "A dark-fantasy action RPG: pick a hero, clear demon-infested fields, caves and catacombs, and hunt ever better loot.",
+    ),
 }
 
 # Paths that moved since the site went up: old -> new. Each old path, and the
@@ -26,7 +35,8 @@ FEATURED = {
 MOVED = {
     "games/macros/claude": "apps/macros",
     "games/tingdu/claude": "apps/tingdu",
-    "games/hellforge/claude": "games/hellforge",
+    "games/hellforge/claude": "hellforge",
+    "games/hellforge": "hellforge",
     "games/hellforge/codex": "games/hellforge-codex",
 }
 
@@ -103,8 +113,8 @@ def main(site: Path, dirs: list[str]) -> None:
     out = []
     cards = []
     for d, (cta, accent) in FEATURED.items():
-        if d in dirs:
-            title, desc = meta(site / d / "index.html")
+        if d in EXTERNAL or d in dirs:
+            title, desc = EXTERNAL[d] if d in EXTERNAL else meta(site / d / "index.html")
             cards.append(
                 f'<a class="card {accent}" href="{d}/"><img src="{d}/icon.svg" alt="" width="44" height="44">'
                 f'<span class="name">{short(title)}</span><p class="desc">{desc}</p>'
