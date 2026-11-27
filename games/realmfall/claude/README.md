@@ -11,7 +11,7 @@ npm run dev        # http://localhost:5173
 
 `npm run build` writes a static site to `dist/`. Desktop browsers with a keyboard and mouse are the target.
 
-URL options: `?seed=N` builds a different world (default 7), and `?autostart&class=warden|ranger|runecaller|cleric&realm=0|1|2&level=N` skips the title screen with a fresh hero.
+URL options: `?seed=N` builds a different world (default 7), `?fps` shows the frame rate, frame time, draw calls and triangles (also under Menu → Show frame rate), and `?autostart&class=warden|ranger|runecaller|cleric&realm=0|1|2&level=N` skips the title screen with a fresh hero.
 
 ## Controls
 

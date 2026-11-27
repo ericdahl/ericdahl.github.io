@@ -25,7 +25,7 @@ export class Panels {
   private shop = false;
   onQuit: () => void = () => {};
   onSettings: (k: string, v: boolean) => void = () => {};
-  settings = { muted: false, shadows: true };
+  settings = { muted: false, shadows: true, fps: false };
 
   constructor(parent: HTMLElement, w: World, r: Renderer, hud: Hud) {
     this.w = w;
@@ -454,6 +454,7 @@ export class Panels {
       <button class="opt" data-m="help">How to play</button>
       <label class="chk"><input type="checkbox" data-s="muted" ${s.muted ? 'checked' : ''}> Mute sound</label>
       <label class="chk"><input type="checkbox" data-s="shadows" ${s.shadows ? 'checked' : ''}> Shadows</label>
+      <label class="chk"><input type="checkbox" data-s="fps" ${s.fps ? 'checked' : ''}> Show frame rate</label>
       <button class="opt" data-m="quit">Save and quit to title</button>`;
     el.querySelector('[data-m="resume"]')!.addEventListener('click', () => this.close('menu'));
     el.querySelector('[data-m="help"]')!.addEventListener('click', () => { this.close('menu'); this.show('help'); });

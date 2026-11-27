@@ -38,7 +38,16 @@ function boot() {
     });
   };
   applyShadows();
+  // Frame rate readout: ?fps in the URL, or Menu → Show frame rate.
+  const fpsEl = document.createElement('div');
+  fpsEl.id = 'fps';
+  app.appendChild(fpsEl);
+  if (params.has('fps')) settings.fps = true;
+  const showFps = () => { fpsEl.style.display = settings.fps ? 'block' : 'none'; };
+  showFps();
+  const fpsStats = { frames: 0, time: 0, worst: 0 };
   panels.onSettings = (k, v) => {
+    if (k === 'fps') showFps();
     if (k === 'muted') setMuted(v);
     if (k === 'shadows') applyShadows();
     saveSettings(settings);
@@ -221,6 +230,22 @@ function boot() {
       world.logs.length = 0;
     }
     renderer.render(dt);
+    if (settings.fps) {
+      const ms = now - (frame as unknown as { prev?: number }).prev!;
+      (frame as unknown as { prev?: number }).prev = now;
+      if (ms > 0 && ms < 1000) {
+        fpsStats.frames++;
+        fpsStats.time += ms;
+        fpsStats.worst = Math.max(fpsStats.worst, ms);
+      }
+      if (fpsStats.time >= 500) {
+        const info = renderer.renderer.info.render;
+        const fps = (fpsStats.frames * 1000) / fpsStats.time;
+        fpsEl.textContent = `${fps.toFixed(0)} fps · ${(fpsStats.time / fpsStats.frames).toFixed(1)} ms (worst ${fpsStats.worst.toFixed(0)}) · ${info.calls} draws · ${(info.triangles / 1000).toFixed(0)}k tris`;
+        fpsEl.style.color = fps >= 50 ? '#7dff9a' : fps >= 30 ? '#ffd84a' : '#ff7b6b';
+        fpsStats.frames = fpsStats.time = fpsStats.worst = 0;
+      }
+    }
     if (playing) {
       hud.update(dt);
       panels.update(dt);

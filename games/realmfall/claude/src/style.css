@@ -187,3 +187,5 @@ em { color: #7dff9a; font-style: normal; }
   #log { display: none; }
   .mapwrap { flex-direction: column; }
 }
+
+#fps { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); z-index: 40; display: none; padding: 2px 8px; font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; background: rgba(0,0,0,0.6); border-radius: 4px; pointer-events: none; white-space: nowrap; }
