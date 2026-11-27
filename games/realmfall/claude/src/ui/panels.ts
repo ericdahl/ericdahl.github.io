@@ -204,7 +204,7 @@ export class Panels {
       return `<div class="abil ${known ? '' : 'locked'}" draggable="${known}" data-ab="${id}"><img src="${iconUrl(ab.icon, ab.school)}" alt=""><div><b>${ab.name}</b> <small>level ${ab.level}</small><br><small>${ab.desc}</small></div></div>`;
     }).join('');
     el.querySelector('.body')!.innerHTML = `<p class="muted">${cls.desc}</p><p class="muted">Drag an ability onto the hotbar. Right-click a hotbar slot to clear it.</p>${list}
-      <h4>Everyone</h4><p class="muted"><b>Shift</b> sprint (uses endurance) · <b>Z</b> toggle attack · <b>G</b>/<b>V</b> potions</p>`;
+      <h4>Everyone</h4><p class="muted"><b>X</b> sprint on/off, or hold <b>Shift</b> (uses endurance) · <b>Z</b> toggle attack · <b>G</b>/<b>V</b> potions</p>`;
     el.querySelectorAll<HTMLElement>('.abil').forEach((d) => {
       d.addEventListener('dragstart', (e) => e.dataTransfer?.setData('text/ability', d.dataset.ab!));
       d.addEventListener('mouseenter', () => this.hud.tip(abilityTip(d.dataset.ab!), d));
@@ -430,8 +430,8 @@ export class Panels {
     el.querySelector('.body')!.innerHTML = `
       <div class="cols"><div>
       <h4>Moving</h4>
-      <p><b>W / S</b> forward and back · <b>A / D</b> turn · <b>Q / E</b> strafe · <b>Space</b> jump · <b>Shift</b> sprint · <b>R</b> auto-run<br>
-      <b>Right-drag</b> turns you with the camera (A/D then strafe) · <b>Left-drag</b> looks around · <b>Both buttons</b> run · <b>Wheel</b> zoom</p>
+      <p><b>W / S</b> forward and back · <b>A / D</b> strafe · <b>Q / E</b> turn · <b>Space</b> jump · <b>X</b> sprint on/off (or hold <b>Shift</b>) · <b>R</b> auto-run<br>
+      <b>Right-drag</b> turns you with the camera (Q/E then strafe) · <b>Left-drag</b> looks around · <b>Both buttons</b> run · <b>Wheel</b> zoom</p>
       <h4>Fighting</h4>
       <p><b>Click</b> to target · <b>Tab</b> nearest enemy · <b>Esc</b> clear target · <b>Z</b> or right-click an enemy to start attacking<br>
       <b>1–0</b> hotbar · <b>G</b> healing draught · <b>V</b> power draught · <b>F</b> talk / use</p>

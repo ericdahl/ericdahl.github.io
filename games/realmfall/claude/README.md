@@ -17,8 +17,8 @@ URL options: `?seed=N` builds a different world (default 7), `?fps` shows the fr
 
 | | |
 |---|---|
-| Move | `W` `S` forward/back, `A` `D` turn, `Q` `E` strafe, `Space` jump, `Shift` sprint, `R` auto-run |
-| Camera | Right-drag turns you with the camera (then `A`/`D` strafe), left-drag looks around, both buttons run, wheel zooms |
+| Move | `W` `S` forward/back, `A` `D` strafe, `Q` `E` turn, `Space` jump, `X` sprint on/off (or hold `Shift`), `R` auto-run |
+| Camera | Right-drag turns you with the camera (then `Q`/`E` strafe too), left-drag looks around, both buttons run, wheel zooms |
 | Target | Click, `Tab` for the nearest enemy, `Esc` to clear |
 | Fight | `1`–`0` hotbar, `Z` or right-click an enemy to auto-attack, `G` healing draught, `V` power draught |
 | Talk / use | `F` (NPCs, soldiers of your realm, and the banner inside a keep your realm holds) |
