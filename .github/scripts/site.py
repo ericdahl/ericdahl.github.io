@@ -18,6 +18,7 @@ SECTIONS = {"apps": "Apps", "games": "Games"}
 # accent class in the page's CSS). Each needs an icon.svg.
 FEATURED = {
     "hellforge": ("Play", "ember"),
+    "realmfall": ("Play", "steel"),
     "apps/tingdu": ("Start reading", "ink"),
 }
 
@@ -27,6 +28,10 @@ EXTERNAL = {
     "hellforge": (
         "Hellforge",
         "A dark-fantasy action RPG: pick a hero, clear demon-infested fields, caves and catacombs, and hunt ever better loot.",
+    ),
+    "realmfall": (
+        "Realmfall",
+        "A 3D realm-war RPG: level a hero in your homeland, then march with your realm's warbands to take the frontier keeps.",
     ),
 }
 
@@ -38,6 +43,8 @@ MOVED = {
     "games/hellforge/claude": "hellforge",
     "games/hellforge": "hellforge",
     "games/hellforge/codex": "games/hellforge-codex",
+    "games/realmfall/claude": "realmfall",
+    "games/realmfall": "realmfall",
 }
 
 # Still published at their URLs, but only linked from the small list at the bottom
@@ -71,8 +78,8 @@ li{{padding:10px 0;border-bottom:1px solid var(--line)}}
 a{{color:var(--link);text-decoration:none}}a:hover{{text-decoration:underline}}
 .name{{font-size:16px;font-weight:600}}
 .desc{{margin:2px 0 0;color:var(--muted);font-size:14px}}
-.ember{{--accent:#b45309}}.ink{{--accent:#b91c1c}}
-@media (prefers-color-scheme:dark){{.ember{{--accent:#f5a35c}}.ink{{--accent:#f4837a}}}}
+.ember{{--accent:#b45309}}.ink{{--accent:#b91c1c}}.steel{{--accent:#1d4ed8}}
+@media (prefers-color-scheme:dark){{.ember{{--accent:#f5a35c}}.ink{{--accent:#f4837a}}.steel{{--accent:#7aa7ff}}}}
 .featured{{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:32px}}
 .card{{display:flex;flex-direction:column;padding:20px;border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);border-radius:12px;background:color-mix(in srgb,var(--accent) 7%,transparent);color:var(--fg)}}
 .card:hover{{text-decoration:none;border-color:var(--accent)}}
