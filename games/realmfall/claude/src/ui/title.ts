@@ -5,6 +5,7 @@ import type { CharSave } from '../game/types';
 import { World } from '../game/world';
 import { loadChars, deleteChar } from './save';
 import { sfx } from './audio';
+import { changelogHtml } from '../changelog';
 
 declare const __APP_VERSION__: string;
 
@@ -27,6 +28,14 @@ export class Title {
     else this.create();
   }
 
+  /** Wires the version button; called after each redraw. */
+  private wireVersion() {
+    this.el.querySelector('.ver')?.addEventListener('click', () => {
+      sfx.click();
+      showNotes(this.el);
+    });
+  }
+
   hide() {
     this.el.style.display = 'none';
   }
@@ -43,7 +52,7 @@ export class Title {
         <div><b>${c.name}</b><br><small>Level ${c.level} ${CLASSES[c.cls].name} of ${REALM_DEFS[c.realm].name}</small></div>
         <button class="play">Play</button><button class="del" title="Delete">✕</button></div>`).join('')}</div>
       <button class="big ghost" data-new>Create a new hero</button>
-      </div><div class="ver">v${__APP_VERSION__}</div>`;
+      </div><button class="ver" title="Release notes">v${__APP_VERSION__} · release notes</button>`;
     this.el.querySelectorAll<HTMLElement>('.char').forEach((d) => {
       const c = chars.find((x) => x.id === d.dataset.id)!;
       d.querySelector('.play')!.addEventListener('click', () => { sfx.click(); this.onPlay(c); });
@@ -55,6 +64,7 @@ export class Title {
       });
     });
     this.el.querySelector('[data-new]')!.addEventListener('click', () => { sfx.click(); this.create(); });
+    this.wireVersion();
   }
 
   private create() {
@@ -70,7 +80,7 @@ export class Title {
       <p class="clsdesc">${CLASSES[this.cls].desc}</p>
       <div class="namerow"><input maxlength="14" value="${name}" aria-label="Name"><button class="dice" title="Another name">⟳</button></div>
       <div class="row">${chars.length ? '<button class="big ghost" data-back>Back</button>' : ''}<button class="big" data-go>Enter ${REALM_DEFS[this.realm].name}</button></div>
-      </div><div class="ver">v${__APP_VERSION__}</div>`;
+      </div><button class="ver" title="Release notes">v${__APP_VERSION__} · release notes</button>`;
     const input = this.el.querySelector('input')!;
     this.el.querySelectorAll<HTMLButtonElement>('.realm').forEach((b) => b.addEventListener('click', () => {
       sfx.click();
@@ -94,5 +104,20 @@ export class Title {
     };
     this.el.querySelector('[data-go]')!.addEventListener('click', go);
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+    this.wireVersion();
   }
+}
+
+/** A modal with the release notes, over whatever is behind it. */
+export function showNotes(parent: HTMLElement) {
+  document.getElementById('notes')?.remove();
+  const el = document.createElement('div');
+  el.id = 'notes';
+  el.innerHTML = `<div class="notes-box"><header><h3>Release notes</h3><button class="x" title="Close">×</button></header><div class="body">${changelogHtml()}</div></div>`;
+  const close = () => { el.remove(); window.removeEventListener('keydown', onKey, true); };
+  const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); close(); } };
+  window.addEventListener('keydown', onKey, true);
+  el.addEventListener('click', (e) => { if (e.target === el) close(); });
+  el.querySelector('.x')!.addEventListener('click', close);
+  parent.appendChild(el);
 }
