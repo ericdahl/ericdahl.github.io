@@ -51,6 +51,8 @@ npm run e2e        # Playwright smoke test: create a hero, travel to the frontie
 npm run typecheck
 ```
 
+Release notes live in `src/changelog.ts` and show in game (click the version on the title screen, or Menu → Release notes). With each version bump, add an entry at the top; `tests/changelog.test.ts` fails if it doesn't match `package.json`.
+
 On a machine where Playwright's own browser isn't installed, point `PW_CHROMIUM` at a Chromium binary.
 
 | Path | What |

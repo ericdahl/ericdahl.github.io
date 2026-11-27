@@ -11,6 +11,7 @@ import { ownerColor } from '../render/structures';
 import { iconUrl } from './icons';
 import { abilityTip, type Hud } from './hud';
 import { sfx } from './audio';
+import { showNotes } from './title';
 
 export type PanelId = 'char' | 'bag' | 'abilities' | 'map' | 'dialog' | 'help' | 'menu';
 
@@ -452,12 +453,14 @@ export class Panels {
     el.querySelector('.body')!.innerHTML = `
       <button class="opt" data-m="resume">Resume</button>
       <button class="opt" data-m="help">How to play</button>
+      <button class="opt" data-m="notes">Release notes</button>
       <label class="chk"><input type="checkbox" data-s="muted" ${s.muted ? 'checked' : ''}> Mute sound</label>
       <label class="chk"><input type="checkbox" data-s="shadows" ${s.shadows ? 'checked' : ''}> Shadows</label>
       <label class="chk"><input type="checkbox" data-s="fps" ${s.fps ? 'checked' : ''}> Show frame rate</label>
       <button class="opt" data-m="quit">Save and quit to title</button>`;
     el.querySelector('[data-m="resume"]')!.addEventListener('click', () => this.close('menu'));
     el.querySelector('[data-m="help"]')!.addEventListener('click', () => { this.close('menu'); this.show('help'); });
+    el.querySelector('[data-m="notes"]')!.addEventListener('click', () => { this.close('menu'); showNotes(document.getElementById('app')!); });
     el.querySelector('[data-m="quit"]')!.addEventListener('click', () => { this.close('menu'); this.onQuit(); });
     el.querySelectorAll<HTMLInputElement>('[data-s]').forEach((i) => i.addEventListener('change', () => {
       (s as Record<string, boolean>)[i.dataset.s!] = i.checked;
