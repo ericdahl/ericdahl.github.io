@@ -40,12 +40,12 @@ export function deleteChar(id: string) {
 }
 
 const SET_KEY = 'realmfall.settings';
-export interface Settings { muted: boolean; shadows: boolean }
+export interface Settings { muted: boolean; shadows: boolean; fps: boolean }
 export function loadSettings(): Settings {
   try {
-    return { muted: false, shadows: true, ...JSON.parse(localStorage.getItem(SET_KEY) ?? '{}') };
+    return { muted: false, shadows: true, fps: false, ...JSON.parse(localStorage.getItem(SET_KEY) ?? '{}') };
   } catch {
-    return { muted: false, shadows: true };
+    return { muted: false, shadows: true, fps: false };
   }
 }
 export function saveSettings(s: Settings) {
