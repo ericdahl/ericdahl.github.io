@@ -1,0 +1,21 @@
+const { chromium } = require('playwright');
+(async () => {
+  const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+  const page = await b.newPage({ viewport: { width: 1000, height: 700 } });
+  await page.goto('http://localhost:5181/?autostart');
+  await page.waitForFunction(() => window.game && window.game.world.player);
+  await page.mouse.click(500, 300);
+  const st = () => page.evaluate(() => { const p = game.world.player; return { x: p.x, z: p.z, f: p.facing, spr: p.sprinting }; });
+  const hold = async (k, ms) => { await page.keyboard.down(k); await page.waitForTimeout(ms); await page.keyboard.up(k); await page.waitForTimeout(300); };
+  let a = await st(); await hold('d', 1500); let c = await st();
+  const side = (c.x - a.x) * -Math.sin(a.f) + (c.z - a.z) * Math.cos(a.f);
+  const fwd = (c.x - a.x) * Math.cos(a.f) + (c.z - a.z) * Math.sin(a.f);
+  console.log('D: right', side.toFixed(1), 'fwd', fwd.toFixed(1), 'turned', (c.f - a.f).toFixed(2));
+  a = await st(); await hold('q', 800); c = await st();
+  console.log('Q: turned', (c.f - a.f).toFixed(2), 'moved', Math.hypot(c.x - a.x, c.z - a.z).toFixed(1));
+  await page.keyboard.press('x'); await page.keyboard.down('w'); await page.waitForTimeout(800);
+  console.log('X+W sprinting', (await st()).spr, 'toggle', await page.evaluate(() => game.controls.sprintOn));
+  await page.keyboard.up('w'); await page.keyboard.press('x');
+  console.log('X again', await page.evaluate(() => game.controls.sprintOn));
+  await b.close();
+})();

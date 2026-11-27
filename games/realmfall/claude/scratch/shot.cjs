@@ -1,0 +1,22 @@
+const { chromium } = require('playwright');
+(async () => {
+  const url = process.argv[2] || 'http://localhost:5181/';
+  const out = process.argv[3] || '/tmp/claude-0/shots/a.png';
+  const wait = +(process.argv[4] || 4000);
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  const errs = [];
+  page.on('pageerror', (e) => errs.push('PAGEERR ' + e.message));
+  page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') errs.push(m.type() + ' ' + m.text()); });
+  const t0 = Date.now();
+  await page.goto(url);
+  await page.waitForFunction(() => window.game, null, { timeout: 60000 });
+  console.log('boot ms', Date.now() - t0);
+  if (process.argv[5]) await page.evaluate(process.argv[5]);
+  await page.waitForTimeout(wait);
+  await page.screenshot({ path: out });
+  const fps = await page.evaluate(() => new Promise((res) => { let n = 0; const t = performance.now(); const f = () => { n++; if (performance.now() - t < 2000) requestAnimationFrame(f); else res(n / 2); }; requestAnimationFrame(f); }));
+  console.log('fps', fps);
+  console.log(errs.slice(0, 15).join('\n'));
+  await browser.close();
+})();
