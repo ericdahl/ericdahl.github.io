@@ -16,6 +16,8 @@ export class Controls {
   private dragR = false;
   private dragMoved = 0;
   autorun = false;
+  /** X toggles sprint on and off; Shift sprints while held. */
+  sprintOn = false;
   private follow = true;
   enabled = true;
   private w: World;
@@ -58,6 +60,11 @@ export class Controls {
         e.preventDefault();
         return;
       }
+      if (e.code === 'KeyX' && !e.repeat) {
+        this.sprintOn = !this.sprintOn;
+        e.preventDefault();
+        return;
+      }
       if (['KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyQ', 'KeyE', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'ShiftLeft', 'ShiftRight'].includes(e.code)) {
         this.keys.add(e.code);
         if (e.code === 'KeyW' || e.code === 'KeyS' || e.code === 'ArrowUp' || e.code === 'ArrowDown') this.autorun = false;
@@ -79,15 +86,16 @@ export class Controls {
     const inp = w.input;
     inp.mx = inp.mz = 0;
     inp.jump = this.down('Space');
-    inp.sprint = this.down('ShiftLeft', 'ShiftRight');
+    if (this.sprintOn && p && p.endu <= 0) this.sprintOn = false;
+    inp.sprint = this.sprintOn || this.down('ShiftLeft', 'ShiftRight');
     inp.face = null;
     if (!p || p.dead || !this.enabled) return;
     let fwd = 0, strafe = 0;
     if (this.down('KeyW', 'ArrowUp') || this.autorun || (this.dragL && this.dragR)) fwd += 1;
     if (this.down('KeyS', 'ArrowDown')) fwd -= 1;
-    if (this.down('KeyQ')) strafe -= 1;
-    if (this.down('KeyE')) strafe += 1;
-    const turn = (this.down('KeyD', 'ArrowRight') ? 1 : 0) - (this.down('KeyA', 'ArrowLeft') ? 1 : 0);
+    if (this.down('KeyA')) strafe -= 1;
+    if (this.down('KeyD')) strafe += 1;
+    const turn = (this.down('KeyE', 'ArrowRight') ? 1 : 0) - (this.down('KeyQ', 'ArrowLeft') ? 1 : 0);
     if (this.dragR) {
       strafe += turn;
       p.facing = this.yaw;
