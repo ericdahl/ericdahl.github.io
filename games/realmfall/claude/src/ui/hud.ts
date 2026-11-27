@@ -346,9 +346,16 @@ export class Hud {
     } else pr.style.display = 'none';
     // task tracker
     const tk = $(this.root, '#task');
-    if (ch.task) {
+    const band = w.war.ledBy(p);
+    const bits: string[] = [];
+    if (ch.task) bits.push(`<b>Task</b> Slay ${plural(ch.task.mobName)} in ${ch.task.zone}: ${ch.task.have}/${ch.task.need}${ch.task.have >= ch.task.need ? '<br><i>Return to the Taskmaster.</i>' : ''}`);
+    if (band) {
+      const alive = band.members.map((id) => w.get(id)).filter((e): e is Entity => !!e && !e.dead);
+      bits.push(`<b>Your warband</b> · ${alive.length} strong${alive.map((e) => `<div class="wb"><span>${e.name}</span><i style="width:${Math.round((e.hp / e.maxHp) * 100)}%"></i></div>`).join('')}`);
+    }
+    if (bits.length) {
       tk.style.display = 'block';
-      tk.innerHTML = `<b>Task</b> Slay ${plural(ch.task.mobName)} in ${ch.task.zone}: ${ch.task.have}/${ch.task.need}${ch.task.have >= ch.task.need ? '<br><i>Return to the Taskmaster.</i>' : ''}`;
+      tk.innerHTML = bits.join('<hr>');
     } else tk.style.display = 'none';
     this.drawMinimap();
   }

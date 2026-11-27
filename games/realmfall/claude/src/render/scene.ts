@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { World } from '../game/world';
 import type { Entity, GameEvent } from '../game/types';
 import { ABILITIES } from '../game/data';
@@ -38,6 +39,7 @@ export class Renderer {
   private ring: THREE.Mesh;
   private fx: Fx[] = [];
   private stars: THREE.Points;
+  private clouds: THREE.Mesh;
   plateInfo: (e: Entity) => PlateInfo = (e) => ({ text: e.name, color: '#fff', show: true });
   targetColor: (e: Entity) => string = () => '#ffd84a';
   focus = new THREE.Vector3();
@@ -103,6 +105,20 @@ export class Renderer {
     this.scene.add(st.group);
     this.keepViews = st.keepViews;
     this.portals = st.portals;
+
+    // drifting clouds
+    const cloudGeo: THREE.BufferGeometry[] = [];
+    const cr = new (class { s = 99; n() { this.s = (this.s * 16807) % 2147483647; return this.s / 2147483647; } })();
+    for (let i = 0; i < 46; i++) {
+      const cx = (cr.n() - 0.5) * 2600, cz = (cr.n() - 0.5) * 2600, cy = 230 + cr.n() * 90;
+      const puffs = 3 + Math.floor(cr.n() * 4);
+      for (let j = 0; j < puffs; j++) {
+        const r = 18 + cr.n() * 22;
+        cloudGeo.push(new THREE.IcosahedronGeometry(r, 1).scale(1.6, 0.45, 1).translate(cx + (j - puffs / 2) * r * 1.3, cy + cr.n() * 8, cz + (cr.n() - 0.5) * r));
+      }
+    }
+    this.clouds = new THREE.Mesh(mergeGeometries(cloudGeo)!, new THREE.MeshLambertMaterial({ color: '#ffffff', emissive: '#8a96a8', transparent: true, opacity: 0.85, flatShading: true, fog: false }));
+    this.scene.add(this.clouds);
 
     this.ring = new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffd84a', transparent: true, opacity: 0.85, depthWrite: false }));
     this.ring.renderOrder = 2;
@@ -394,6 +410,8 @@ export class Renderer {
     }
     (this.water.material as THREE.MeshPhongMaterial).opacity = 0.74 + Math.sin(now * 0.7) * 0.03;
     this.sky.position.copy(cam);
+    this.clouds.position.set(Math.sin(now / 900) * 400, 0, Math.cos(now / 1300) * 250);
+    (this.clouds.material as THREE.MeshLambertMaterial).emissive.copy(this.skyMat.uniforms.horizon.value).multiplyScalar(0.55);
     this.stars.position.copy(cam);
     this.lighting();
     this.renderer.render(this.scene, this.camera);

@@ -368,6 +368,13 @@ export class Panels {
       html = t.role === 'teleporter'
         ? `<p>“The Frontier is no place for the green, ${CLASSES[ch.cls].name}. The other realms send warbands against our keeps day and night. Most who go out there are level 15 or better. Shall I send you?”</p>${travel()}`
         : `<p>“Beyond this gate lies the Frontier. Keeps held by ${REALM_DEFS[ch.realm].name} can take you in; I can send you home, or to any of them.”</p>${travel()}`;
+    } else if (t.kind === 'soldier') {
+      const b = w.war.band(t);
+      const led = w.war.ledBy(p);
+      const n = b?.members.length ?? 0;
+      const k = b ? w.keeps[b.objective] : null;
+      if (b && led === b) html = `<p>“We're with you, ${p.title ?? CLASSES[ch.cls].name}. Point us at something.”</p><p class="muted">Your warband of ${n} follows you and attacks whatever you attack.</p><button class="opt" data-lead="release">Carry on without me (they return to the war)</button>`;
+      else html = `<p>“${n} of us, ${b?.mode === 'hold' ? `holding ${k?.site.name}` : b?.mode === 'siege' || b?.mode === 'rally' ? `pressing ${k?.site.name}` : `bound for ${k?.site.name ?? 'the front'}`}. ${p.level >= 15 ? 'We could use someone to lead us.' : 'You look a little green for this, but we\'ll take any sword.'}”</p><button class="opt" data-lead="follow">“Follow me.” Take command of this warband</button>${led ? '<p class="muted">You will give up the warband you lead now.</p>' : ''}`;
     } else if (t.role === 'healer') {
       html = `<p>“Let me see to those wounds.”</p><button class="opt" data-heal="1">Heal me</button>`;
     } else if (t.role === 'taskmaster') {
@@ -384,6 +391,20 @@ export class Panels {
     body.querySelectorAll<HTMLButtonElement>('[data-travel]').forEach((b) => b.addEventListener('click', () => {
       const o = w.travelOptions()[+b.dataset.travel!];
       if (o && w.teleport(o.x, o.z, o.name)) { this.close('dialog'); sfx.cast('energy'); }
+    }));
+    body.querySelectorAll<HTMLButtonElement>('[data-lead]').forEach((b) => b.addEventListener('click', () => {
+      if (!('kind' in t)) return;
+      if (b.dataset.lead === 'follow') {
+        const band = w.war.lead(t, p);
+        if (band) {
+          w.log(`[Realm] ${t.name}: Warband, on ${p.name}! Follow!`, 'chat');
+          sfx.horn();
+        }
+      } else {
+        w.war.release(p);
+        w.log(`[Realm] ${t.name}: Understood. Back to it!`, 'chat');
+      }
+      this.close('dialog');
     }));
     body.querySelector('[data-heal]')?.addEventListener('click', () => {
       p.hp = p.maxHp;

@@ -26,6 +26,8 @@ export interface Warband {
   objective: number;
   mode: 'march' | 'rally' | 'siege' | 'hold';
   rallyAt: number;
+  /** set while the band follows the player */
+  follow?: number;
   holdUntil: number;
   defend: boolean;
 }
@@ -270,6 +272,17 @@ export class War {
       }
       for (const b of mine) {
         const k = this.keeps[b.objective];
+        if (b.follow !== undefined) {
+          const p = w.get(b.follow);
+          const lead = w.get(b.members[0]);
+          if (!p || p.dead || !lead || dist(p, lead) > 160 || Math.hypot(p.x, p.z) > 620) {
+            b.follow = undefined;
+            b.mode = 'march';
+            b.objective = this.pickObjective(r.id, b);
+            if (p && !p.dead && w.player === p) w.log(`[Realm] ${lead?.name ?? 'Your warband'}: We can't follow you there. Back to the fight at ${this.keeps[b.objective].site.name}!`, 'chat');
+          }
+          continue;
+        }
         if (b.mode === 'hold' && w.t > b.holdUntil) {
           b.objective = this.pickObjective(r.id, b);
           b.mode = 'march';
@@ -367,6 +380,7 @@ export class War {
   anchorOf(e: Entity): { x: number; z: number } | null {
     const b = this.band(e);
     if (!b) return null;
+    if (b.follow !== undefined) return this.w.get(b.follow) ?? null;
     const lead = this.w.get(b.members[0]);
     if (!lead || lead === e) return { x: e.x, z: e.z };
     return lead;
@@ -379,6 +393,24 @@ export class War {
     const k = this.keeps[b.objective];
     const lead = w.get(b.members[0])!;
     const H = KEEP_HALF;
+    if (b.follow !== undefined) {
+      const p = w.get(b.follow);
+      if (p) {
+        const i = b.members.indexOf(e.id);
+        const o = { x: -3.5 - Math.floor(i / 3) * 2.8, z: ((i % 3) - 1) * 3 };
+        const cs = Math.cos(p.facing), sn = Math.sin(p.facing);
+        const tx = p.x + o.x * cs - o.z * sn, tz = p.z + o.x * sn + o.z * cs;
+        const d = Math.hypot(tx - e.x, tz - e.z);
+        if (d > 1.2) {
+          e.sprinting = d > 12;
+          w.moveToward(e, tx, tz, dt, 0.6, d > 6 ? 1.25 : 0.95);
+        } else {
+          e.sprinting = false;
+          e.facing = p.facing;
+        }
+        return;
+      }
+    }
     if (b.mode === 'march' || b.mode === 'siege' || b.mode === 'rally') {
       const gateOut = w.keepToWorld(k.site, H + 12, 0);
       const rally = w.keepToWorld(k.site, H + 60, 0);
@@ -428,6 +460,28 @@ export class War {
     const d = Math.hypot(tx - e.x, tz - e.z);
     if (d > 1) w.moveToward(e, tx, tz, dt, 0.5, d > 8 ? 1.15 : 0.85);
     else e.facing = lead.facing;
+  }
+
+  /** The player takes command of the warband this soldier belongs to. */
+  lead(soldier: Entity, player: Entity): Warband | null {
+    const b = this.band(soldier);
+    if (!b || b.realm !== player.realm) return null;
+    for (const o of this.bands) if (o.follow === player.id && o !== b) o.follow = undefined;
+    b.follow = player.id;
+    return b;
+  }
+
+  release(player: Entity) {
+    for (const b of this.bands) {
+      if (b.follow !== player.id) continue;
+      b.follow = undefined;
+      b.mode = 'march';
+      b.objective = this.pickObjective(b.realm, b);
+    }
+  }
+
+  ledBy(player: Entity): Warband | undefined {
+    return this.bands.find((b) => b.follow === player.id);
   }
 
   ambientChat() {

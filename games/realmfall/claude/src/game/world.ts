@@ -1385,7 +1385,7 @@ export class World {
     if (!p || p.dead) return null;
     let best: Entity | null = null, bd = 7;
     this.near(p.x, p.z, 7, (o) => {
-      if (o.kind === 'npc' && o.realm === p.realm) {
+      if ((o.kind === 'npc' || (o.kind === 'soldier' && !o.dead && this.t - o.lastCombat > 3)) && o.realm === p.realm) {
         const d = dist(p, o);
         if (d < bd) { bd = d; best = o; }
       }

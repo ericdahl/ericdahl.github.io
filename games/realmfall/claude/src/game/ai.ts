@@ -274,6 +274,15 @@ export function thinkCombatant(w: World, e: Entity, dt: number) {
       if (n) t = n;
     }
   }
+  // Soldiers following the player fight what the player fights.
+  if (e.kind === 'soldier') {
+    const b = w.war.band(e);
+    const p = b?.follow !== undefined ? w.get(b.follow) : undefined;
+    if (p && !p.dead) {
+      const pt = w.get(p.target);
+      if (pt && w.hostile(e, pt) && dist(p, pt) < 45 && (p.attacking || p.cast || pt.target === p.id || w.t - p.lastCombat < 4)) t = pt;
+    }
+  }
   if (e.cls === 'cleric' && !e.cast && w.t - e.lastCombat < 12 && healSomeone(w, e)) return;
 
   // Posts and leashes.

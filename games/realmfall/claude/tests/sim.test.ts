@@ -76,3 +76,30 @@ describe('progression', () => {
     expect(p.maxHp).toBeGreaterThan(100);
   });
 });
+
+describe('leading a warband', () => {
+  it('soldiers follow the player and fight the player’s target', () => {
+    const w = new World(6, { headless: true });
+    w.run(20);
+    const c = World.newChar('Bot', 0, 'warden', 6);
+    c.level = 18;
+    const p = w.spawnPlayer(c);
+    const b = w.war.bands.find((x) => x.realm === 0)!;
+    const s = w.get(b.members[0])!;
+    p.x = s.x + 3;
+    p.z = s.z;
+    w.war.lead(s, p);
+    // walk the player 60 m toward the centre
+    for (let i = 0; i < 20 * 12; i++) {
+      const d = Math.hypot(p.x, p.z);
+      w.input.mx = -p.x / d;
+      w.input.mz = -p.z / d;
+      w.tick(0.05);
+    }
+    w.input.mx = w.input.mz = 0;
+    w.run(4);
+    const alive = b.members.map((id) => w.get(id)!).filter((e) => !e.dead);
+    const near = alive.filter((e) => Math.hypot(e.x - p.x, e.z - p.z) < 15);
+    expect(near.length).toBeGreaterThan(alive.length / 2);
+  });
+});
